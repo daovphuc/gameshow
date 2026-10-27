@@ -26,30 +26,34 @@ const SAMPLE_TEAMS = [
 ];
 
 const SAMPLE_PACKAGES = normaliseRound1([
-  { package: "Gói Chung 1", team_id: "", order: "1", question: "Q1", answer: "A1", points: "10" },
-  { package: "Gói Chung 2", team_id: "", order: "1", question: "Q2", answer: "A2", points: "10" },
-  { package: "Gói T1", team_id: "t1", order: "1", question: "Q3", answer: "A3", points: "10" }
+  { package: "Gói A", team_id: "t1", question: "Q1", points: "10" },
+  { package: "Gói B", team_id: "t1", question: "Q2", points: "10" },
+  { package: "Gói A", team_id: "t2", question: "Q3", points: "10" }
 ]);
 
-test("finishing a round-1 package locks the team and picked shared package is unavailable to other teams", () => {
+test("picking and finishing a team's round-1 package locks the team and leaves other teams' packages untouched", () => {
   let state = createInitialState(SAMPLE_TEAMS);
 
-  // t1 picks shared package "Gói Chung 1"
-  state = pickRound1Package(state, "t1", "Gói Chung 1");
+  // t1 picks its own package "t1::Gói A"
+  state = pickRound1Package(state, "t1", "t1::Gói A");
 
-  // "Gói Chung 1" is now unavailable to t2
+  // t1 has "t1::Gói B" remaining; t2 still has "t2::Gói A"
+  const availableForT1 = getAvailableRound1Packages(state, SAMPLE_PACKAGES, "t1");
+  assert.deepEqual(
+    availableForT1.map((p) => p.id),
+    ["t1::Gói B"]
+  );
   const availableForT2 = getAvailableRound1Packages(state, SAMPLE_PACKAGES, "t2");
   assert.deepEqual(
     availableForT2.map((p) => p.id),
-    ["Gói Chung 2"]
+    ["t2::Gói A"]
   );
-  assert.throws(() => pickRound1Package(state, "t2", "Gói Chung 1"));
 
   // Finishing the package locks t1
   state = finishRound1Package(state, "t1");
   assert.equal(isTeamLocked(state, "t1"), true);
   assert.equal(isTeamLocked(state, "t2"), false);
-  assert.throws(() => pickRound1Package(state, "t1", "Gói Chung 2"));
+  assert.throws(() => pickRound1Package(state, "t1", "t1::Gói B"));
 });
 
 test("opening a round-3 tile marks it opened", () => {
@@ -84,7 +88,7 @@ test("correct answer adds points to the right team and round, wrong adds none, a
 
 test("unlock team/package/tile, reset, and export->import round-trip", () => {
   let state = createInitialState(SAMPLE_TEAMS);
-  state = pickRound1Package(state, "t1", "Gói Chung 1");
+  state = pickRound1Package(state, "t1", "t1::Gói A");
   state = finishRound1Package(state, "t1");
   state = openRound3Tile(state, 7, "t2");
   state = recordAnswer(state, { round: 1, teamId: "t1", points: 20, correct: true });
@@ -99,8 +103,8 @@ test("unlock team/package/tile, reset, and export->import round-trip", () => {
   let unlocked = unlockRound1Team(restored, "t1");
   assert.equal(isTeamLocked(unlocked, "t1"), false);
 
-  unlocked = unlockRound1Package(unlocked, "Gói Chung 1");
-  assert.equal(unlocked.round1.pickedPackages.includes("Gói Chung 1"), false);
+  unlocked = unlockRound1Package(unlocked, "t1::Gói A");
+  assert.equal(unlocked.round1.pickedPackages.includes("t1::Gói A"), false);
 
   unlocked = unlockRound3Tile(unlocked, 7);
   assert.equal(isTileOpened(unlocked, 7), false);

@@ -1,5 +1,5 @@
-// Shared browser runtime wiring: sheet fetching, Apps Script score sync, localStorage state,
-// theme application from config tab, and collapsible left sidebar.
+// Shared browser runtime wiring: data fetching, score sync, state persistence,
+// theme application from config, and collapsible left sidebar.
 
 import {
   DEFAULT_SHEET_ID,
@@ -9,7 +9,7 @@ import {
   buildTabUrl
 } from "./config.js";
 import { resolvePasswordHash, verifyPassword } from "./auth.js";
-import { normaliseAllData } from "./data.js";
+import { normaliseAllData, resolveImageUrl } from "./data.js";
 import { normaliseScores, buildScoresPayload, mergeScores } from "./scores.js";
 import { createInitialState, syncStateWithTeams, exportState, importState } from "./state.js";
 import { getTeamInitials } from "./leaderboard.js";
@@ -288,7 +288,7 @@ export async function fetchQuizData({ forceRefresh = false } = {}) {
               fetched.scoresCsv = "";
               return;
             }
-            throw new Error(`Không thể tải tab "${tab}" (${res.status})`);
+            throw new Error("Không thể tải dữ liệu câu hỏi.");
           }
           fetched[`${tab}Csv`] = await res.text();
         } catch (err) {
@@ -390,15 +390,15 @@ export function saveAppState(state) {
 }
 
 /**
- * Posts score updates to the Google Apps Script Web App URL (if configured) using text/plain
- * to avoid a CORS preflight request. Keeps local scores on failure and allows retry.
+ * Posts score updates to the configured score endpoint using text/plain.
+ * Keeps local scores on failure and allows retry.
  */
 export async function syncScoresToSheet(scoresOrState, teams = []) {
   const webAppUrl = getWebAppUrl();
   if (!webAppUrl) {
     notifySyncStatus({
-      state: "idle",
-      message: "Đang lưu cục bộ (localStorage)",
+      state: "saved",
+      message: "Đã lưu",
       retryFn: null
     });
     return { ok: true, localOnly: true };
@@ -409,7 +409,7 @@ export async function syncScoresToSheet(scoresOrState, teams = []) {
 
   notifySyncStatus({
     state: "saving",
-    message: "Đang lưu điểm lên Google Sheet...",
+    message: "Đang lưu…",
     retryFn: null
   });
 
@@ -437,7 +437,7 @@ export async function syncScoresToSheet(scoresOrState, teams = []) {
     }
 
     if (result && result.ok === false) {
-      throw new Error(result.error || "Apps Script trả về lỗi");
+      throw new Error(result.error || "Không thể lưu điểm");
     }
 
     // Update cached sheet scores so subsequent reads match immediately
@@ -456,14 +456,14 @@ export async function syncScoresToSheet(scoresOrState, teams = []) {
 
     notifySyncStatus({
       state: "saved",
-      message: "✓ Đã lưu điểm lên Google Sheet",
+      message: "Đã lưu",
       retryFn: null
     });
     return { ok: true };
   } catch (err) {
     notifySyncStatus({
       state: "failed",
-      message: `⚠ Lỗi lưu lên Sheet (${err.message || "Không thể kết nối"}). Đã giữ điểm trên máy.`,
+      message: "Chưa lưu được, bấm để thử lại",
       retryFn: doSend
     });
     return { ok: false, error: err };
@@ -474,11 +474,12 @@ export function renderAvatarHtml(team, sizeClass = "") {
   const initials = escapeHtml(getTeamInitials(team?.name || "?"));
   const color = escapeHtml(team?.color || "#D97757");
   const cls = ["team-avatar", sizeClass].filter(Boolean).join(" ");
-  if (team?.image_url) {
-    const imgUrl = escapeHtml(team.image_url);
-    const alt = escapeHtml(team.name || "");
-    return `<div class="${cls}" style="background-color: ${color}" data-initials="${initials}">
-      <img src="${imgUrl}" alt="${alt}" onerror="this.parentElement.textContent = this.parentElement.dataset.initials;" />
+  const resolvedUrl = resolveImageUrl(team?.image_url);
+  if (resolvedUrl) {
+    const imgUrl = escapeHtml(resolvedUrl);
+    return `<div class="${cls}" style="background-color: ${color}">
+      <span class="team-avatar-initials">${initials}</span>
+      <img src="${imgUrl}" alt="" onload="if(this.previousElementSibling)this.previousElementSibling.style.display='none'" onerror="this.remove()" />
     </div>`;
   }
   return `<div class="${cls}" style="background-color: ${color}">${initials}</div>`;
@@ -503,28 +504,25 @@ export function showToast(message, durationMs = 2800) {
 function updateSidebarSyncBadge() {
   const badge = document.getElementById("sidebar-sync-status");
   if (!badge) return;
-  const webAppUrl = getWebAppUrl();
-  const sheetId = getSheetId();
 
   badge.classList.remove("saving", "saved", "failed");
   if (currentSyncStatus.state === "saving") {
     badge.classList.add("saving");
-    badge.innerHTML = escapeHtml(currentSyncStatus.message);
+    badge.textContent = currentSyncStatus.message || "Đang lưu…";
   } else if (currentSyncStatus.state === "saved") {
     badge.classList.add("saved");
-    badge.innerHTML = escapeHtml(currentSyncStatus.message);
+    badge.textContent = currentSyncStatus.message || "Đã lưu";
   } else if (currentSyncStatus.state === "failed") {
     badge.classList.add("failed");
-    badge.innerHTML = `${escapeHtml(currentSyncStatus.message)} <button type="button" id="btn-sidebar-retry-sync" class="btn btn-sm" style="margin-top:0.35rem; width:100%;">Thử lại</button>`;
+    badge.innerHTML = `<button type="button" id="btn-sidebar-retry-sync" class="btn btn-sm" style="width:100%;">Chưa lưu được, bấm để thử lại</button>`;
     document.getElementById("btn-sidebar-retry-sync")?.addEventListener("click", () => {
       if (typeof currentSyncStatus.retryFn === "function") {
         currentSyncStatus.retryFn();
       }
     });
   } else {
-    const srcText = sheetId ? `Sheet: ${sheetId.slice(0, 12)}...` : "Nguồn: Dữ liệu mẫu";
-    const syncText = webAppUrl ? "Đồng bộ: Google Sheet" : "Đồng bộ: Trình duyệt (Local)";
-    badge.textContent = `${srcText} • ${syncText}`;
+    badge.classList.add("saved");
+    badge.textContent = "Đã lưu";
   }
 }
 
@@ -598,24 +596,24 @@ export function wireStageLayout({
             </summary>
             <div class="sidebar-settings-body">
               <div>
-                <label class="sidebar-field-label" for="sidebar-sheet-id">Google Sheet Link / ID</label>
+                <label class="sidebar-field-label" for="sidebar-sheet-id">Link Google Sheet</label>
                 <input
                   type="text"
                   id="sidebar-sheet-id"
                   class="sidebar-input"
                   value="${sheetIdVal}"
-                  placeholder="Dán link hoặc ID Sheet..."
+                  placeholder="Dán link Google Sheet..."
                 />
               </div>
 
               <div>
-                <label class="sidebar-field-label" for="sidebar-webapp-url">Apps Script Web App URL</label>
+                <label class="sidebar-field-label" for="sidebar-webapp-url">Link ghi điểm</label>
                 <input
                   type="url"
                   id="sidebar-webapp-url"
                   class="sidebar-input"
                   value="${webAppVal}"
-                  placeholder="https://script.google.com/macros/s/.../exec"
+                  placeholder="Dán link ghi điểm..."
                 />
               </div>
 
@@ -679,9 +677,9 @@ export function wireStageLayout({
       if (typeof onReload === "function") {
         try {
           await onReload();
-          showToast("Đã lưu cài đặt và tải lại dữ liệu thành công!");
+          showToast("Đã lưu cài đặt và tải lại dữ liệu!");
         } catch (err) {
-          showToast(`Lỗi tải dữ liệu từ Sheet: ${err.message || err}`);
+          showToast(err.message || "Không thể tải dữ liệu, vui lòng kiểm tra lại đường dẫn.");
         }
       } else {
         showToast("Đã lưu cài đặt!");
@@ -694,9 +692,9 @@ export function wireStageLayout({
         reloadBtn.disabled = true;
         try {
           await onReload();
-          showToast("Đã tải lại dữ liệu từ Sheet thành công!");
+          showToast("Đã tải lại dữ liệu!");
         } catch (err) {
-          showToast(`Lỗi tải dữ liệu: ${err.message || err}`);
+          showToast(err.message || "Không thể tải dữ liệu.");
         } finally {
           reloadBtn.disabled = false;
         }

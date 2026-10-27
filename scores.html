@@ -18,7 +18,7 @@
         <div>
           <h1 class="section-title">Quản Lý Điểm Số &amp; Điều Khiển Trận Đấu</h1>
           <p class="section-subtitle">
-            Nhập điểm Vòng 1, Vòng 2, Vòng 3 cho từng đội và đồng bộ trực tiếp lên tab <code>scores</code> của Google Sheet.
+            Nhập điểm Vòng 1, Vòng 2, Vòng 3 cho từng đội và quản lý trạng thái câu hỏi.
           </p>
         </div>
 
@@ -107,28 +107,17 @@
     function renderSyncBanner(status) {
       const banner = document.getElementById("page-sync-banner");
       if (!banner) return;
-      const webAppUrl = getWebAppUrl();
 
       banner.classList.remove("saving", "saved", "failed");
 
-      if (!webAppUrl) {
-        banner.innerHTML = `
-          <span>💾 Đang lưu điểm cục bộ trên trình duyệt (localStorage). Dán <strong>Apps Script Web App URL</strong> trong mục Cài đặt ở thanh bên trái để ghi điểm lên Google Sheet.</span>
-        `;
-        return;
-      }
-
       if (status.state === "saving") {
         banner.classList.add("saving");
-        banner.innerHTML = `<span>⏳ ${escapeHtml(status.message || "Đang lưu điểm lên Google Sheet...")}</span>`;
-      } else if (status.state === "saved") {
-        banner.classList.add("saved");
-        banner.innerHTML = `<span>${escapeHtml(status.message || "✓ Đã lưu điểm lên Google Sheet")}</span>`;
+        banner.innerHTML = `<span>⏳ Đang lưu…</span>`;
       } else if (status.state === "failed") {
         banner.classList.add("failed");
         banner.innerHTML = `
-          <span>${escapeHtml(status.message || "⚠ Lỗi lưu điểm lên Google Sheet (đã giữ điểm trên máy).")}</span>
-          <button type="button" id="btn-banner-retry" class="btn btn-sm">Thử lại ngay</button>
+          <span>⚠ Chưa lưu được, bấm để thử lại</span>
+          <button type="button" id="btn-banner-retry" class="btn btn-sm">Chưa lưu được, bấm để thử lại</button>
         `;
         document.getElementById("btn-banner-retry")?.addEventListener("click", () => {
           if (typeof status.retryFn === "function") {
@@ -138,9 +127,15 @@
           }
         });
       } else {
+        banner.classList.add("saved");
+        const hasRemoteLink = Boolean(getWebAppUrl());
         banner.innerHTML = `
-          <span>☁ Đã kết nối Apps Script Web App — mọi thay đổi điểm số sẽ tự động ghi lên tab <code>scores</code> của Google Sheet.</span>
-          <button type="button" id="btn-push-now" class="btn btn-sm">Đồng bộ ngay</button>
+          <span>✓ Đã lưu</span>
+          ${
+            hasRemoteLink
+              ? `<button type="button" id="btn-push-now" class="btn btn-sm">Lưu lại ngay</button>`
+              : ""
+          }
         `;
         document.getElementById("btn-push-now")?.addEventListener("click", () => {
           if (gameState && quizData) {
@@ -246,16 +241,21 @@
       const pkgListEl = document.getElementById("picked-packages-list");
       const picked = gameState.round1.pickedPackages || [];
       if (picked.length === 0) {
-        pkgListEl.innerHTML = `<span style="color: var(--text-muted); font-size: 0.95rem;">Chưa có gói câu hỏi nào bị khóa.</span>`;
+        pkgListEl.innerHTML = `<span style="color: var(--text-muted); font-size: 0.95rem;">Chưa có gói câu hỏi nào được chọn.</span>`;
       } else {
         pkgListEl.innerHTML = picked
-          .map(
-            (pkgId) => `
-            <button type="button" class="btn btn-sm" data-unlock-pkg="${escapeHtml(pkgId)}">
-              🔓 ${escapeHtml(pkgId)} (Bấm để mở khóa)
-            </button>
-          `
-          )
+          .map((pkgId) => {
+            const pkgObj = quizData.round1Packages.find((p) => p.id === pkgId);
+            const teamObj = pkgObj ? quizData.teams.find((t) => t.id === pkgObj.team_id) : null;
+            const label = pkgObj
+              ? `${teamObj ? teamObj.name : pkgObj.team_id} — ${pkgObj.package}`
+              : pkgId;
+            return `
+              <button type="button" class="btn btn-sm" data-unlock-pkg="${escapeHtml(pkgId)}" data-unlock-label="${escapeHtml(label)}">
+                🔓 ${escapeHtml(label)} (Bấm để mở khóa)
+              </button>
+            `;
+          })
           .join("");
 
         pkgListEl.querySelectorAll("[data-unlock-pkg]").forEach((btn) => {
@@ -263,7 +263,7 @@
             gameState = unlockRound1Package(gameState, btn.dataset.unlockPkg);
             saveAppState(gameState);
             renderAdminPage();
-            showToast(`Đã mở khóa gói "${btn.dataset.unlockPkg}".`);
+            showToast(`Đã mở khóa gói "${btn.dataset.unlockLabel || btn.dataset.unlockPkg}".`);
           });
         });
       }

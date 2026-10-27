@@ -1,27 +1,25 @@
-package,team_id,question,answer,image_url,time_seconds,points
-Gói A,doi-01,Kinh đô của nhà nước Văn Lang được đặt tại vùng đất thuộc tỉnh nào của Việt Nam hiện nay?,Phú Thọ,,15,10
-Gói B,doi-01,Nguyên tố hóa học nào chiếm tỷ lệ thể tích lớn nhất trong khí quyển Trái Đất?,Nitơ (khoảng 78%),,15,10
-Gói A,doi-02,"Tác phẩm ""Truyện Kiều"" của đại thi hào Nguyễn Du được viết theo thể thơ nào?",Thể thơ lục bát,,15,10
-Gói B,doi-02,Ánh sáng từ Mặt Trời mất khoảng bao nhiêu phút để truyền tới Trái Đất?,Khoảng 8 phút 20 giây,,15,10
-Gói A,doi-03,Sông Mê Kông chảy vào lãnh thổ Việt Nam qua hai nhánh chính là sông Tiền và sông gì?,Sông Hậu,,15,10
-Gói B,doi-03,"Từ viết tắt ""CPU"" trong máy tính có nghĩa tiếng Việt là gì?",Bộ xử lý trung tâm,,15,10
-Gói A,doi-04,Quần thể di tích Cố đô Huế được UNESCO công nhận là Di sản Văn hóa Thế giới vào năm nào?,Năm 1993,,15,10
-Gói B,doi-04,Quá trình cây xanh tổng hợp chất hữu cơ nhờ năng lượng ánh sáng gọi là gì?,Quang hợp,,15,10
-Gói A,doi-05,"Vị vua nào đã ban ""Chiếu dời đô"" đưa kinh đô từ Hoa Lư về Đại La (Thăng Long) năm 1010?",Lý Thái Tổ (Lý Công Uẩn),,15,10
-Gói B,doi-05,Đại dương nào có diện tích và độ sâu lớn nhất thế giới?,Thái Bình Dương,,15,10
-Gói A,doi-06,Lễ hội Đền Hùng tưởng nhớ các Vua Hùng diễn ra vào ngày nào âm lịch hằng năm?,Mùng 10 tháng 3 âm lịch,,15,10
-Gói B,doi-06,"Trong bảng tuần hoàn hóa học, nguyên tố Vàng có ký hiệu là gì?",Au,,15,10
-Gói Chung 01,,"Tác giả của bản ""Tuyên ngôn Độc lập"" khai sinh nước Việt Nam Dân chủ Cộng hòa ngày 2/9/1945 là ai?",Chủ tịch Hồ Chí Minh,,15,10
-Gói Chung 02,,Chiến dịch Hồ Chí Minh lịch sử toàn thắng vào ngày tháng năm nào?,30/04/1975,,15,10
-Gói Chung 03,,Trường đại học đầu tiên của Việt Nam tại kinh thành Thăng Long có tên là gì?,Quốc Tử Giám,,15,10
-Gói Chung 04,,"Trên sông Bạch Đằng năm 938, vị anh hùng nào đã đánh tan quân Nam Hán?",Ngô Quyền,,15,10
-Gói Chung 05,,Ai là vị trạng nguyên trẻ tuổi nhất trong lịch sử khoa bảng phong kiến Việt Nam?,Nguyễn Hiền,,15,10
-Gói Chung 06,,"Bài hát ""Tiến quân ca"" - Quốc ca Việt Nam do nhạc sĩ nào sáng tác?",Văn Cao,,15,10
-Gói Chung 07,,Đảo lớn nhất của Việt Nam tính theo diện tích là đảo nào?,Đảo Phú Quốc,,15,10
-Gói Chung 08,,Nhà Trần đã ba lần đánh thắng quân xâm lược Nguyên - Mông vào thế kỷ thứ mấy?,Thế kỷ XIII,,15,10
-Gói Chung 09,,Chợ nổi Cái Răng là nét văn hóa đặc sắc của thành phố trực thuộc trung ương nào?,Thành phố Cần Thơ,,15,10
-Gói Chung 10,,Cao nguyên đá Đồng Văn nằm ở tỉnh nào của nước ta?,Tỉnh Hà Giang,,15,10
-Gói Chung 11,,"Ai là tác giả của ""Bình Ngô đại cáo"" - bản tuyên ngôn độc lập thứ hai của dân tộc?",Nguyễn Trãi,,15,10
-Gói Chung 12,,"Bài thơ thần ""Nam quốc sơn hà"" tương truyền vang lên bên dòng sông nào?",Sông Như Nguyệt,,15,10
-Gói Chung 13,,Hồ nước ngọt tự nhiên lớn nhất miền núi phía Bắc Việt Nam là hồ nào?,Hồ Ba Bể,,15,10
-Gói Chung 14,,Đèo Hải Vân nằm giữa ranh giới tỉnh Thừa Thiên Huế và thành phố nào?,Thành phố Đà Nẵng,,15,10
+package,team_id,question,image_url,time_seconds,points
+Gói A,doi-01,Kinh đô của nhà nước Văn Lang được đặt tại vùng đất thuộc tỉnh nào của Việt Nam hiện nay?,,15,10
+Gói B,doi-01,Nguyên tố hóa học nào chiếm tỷ lệ thể tích lớn nhất trong khí quyển Trái Đất?,,15,10
+Gói A,doi-02,"Tác phẩm ""Truyện Kiều"" của đại thi hào Nguyễn Du được viết theo thể thơ nào?",,15,10
+Gói B,doi-02,Ánh sáng từ Mặt Trời mất khoảng bao nhiêu phút để truyền tới Trái Đất?,,15,10
+Gói A,doi-03,Sông Mê Kông chảy vào lãnh thổ Việt Nam qua hai nhánh chính là sông Tiền và sông gì?,,15,10
+Gói B,doi-03,"Từ viết tắt ""CPU"" trong máy tính có nghĩa tiếng Việt là gì?",,15,10
+Gói A,doi-04,Quần thể di tích Cố đô Huế được UNESCO công nhận là Di sản Văn hóa Thế giới vào năm nào?,,15,10
+Gói B,doi-04,Quá trình cây xanh tổng hợp chất hữu cơ nhờ năng lượng ánh sáng gọi là gì?,,15,10
+Gói A,doi-05,"Vị vua nào đã ban ""Chiếu dời đô"" đưa kinh đô từ Hoa Lư về Đại La (Thăng Long) năm 1010?",,15,10
+Gói B,doi-05,Đại dương nào có diện tích và độ sâu lớn nhất thế giới?,,15,10
+Gói A,doi-06,Lễ hội Đền Hùng tưởng nhớ các Vua Hùng diễn ra vào ngày nào âm lịch hằng năm?,,15,10
+Gói B,doi-06,"Trong bảng tuần hoàn hóa học, nguyên tố Vàng có ký hiệu là gì?",,15,10
+Gói A,doi-07,"Tác giả của bản ""Tuyên ngôn Độc lập"" khai sinh nước Việt Nam Dân chủ Cộng hòa ngày 2/9/1945 là ai?",,15,10
+Gói B,doi-07,Chiến dịch Hồ Chí Minh lịch sử toàn thắng vào ngày tháng năm nào?,,15,10
+Gói A,doi-08,Trường đại học đầu tiên của Việt Nam tại kinh thành Thăng Long có tên là gì?,,15,10
+Gói B,doi-08,"Trên sông Bạch Đằng năm 938, vị anh hùng nào đã đánh tan quân Nam Hán?",,15,10
+Gói A,doi-09,Ai là vị trạng nguyên trẻ tuổi nhất trong lịch sử khoa bảng phong kiến Việt Nam?,,15,10
+Gói B,doi-09,"Bài hát ""Tiến quân ca"" - Quốc ca Việt Nam do nhạc sĩ nào sáng tác?",,15,10
+Gói A,doi-10,Đảo lớn nhất của Việt Nam tính theo diện tích là đảo nào?,,15,10
+Gói B,doi-10,Nhà Trần đã ba lần đánh thắng quân xâm lược Nguyên - Mông vào thế kỷ thứ mấy?,,15,10
+Gói A,doi-11,Chợ nổi Cái Răng là nét văn hóa đặc sắc của thành phố trực thuộc trung ương nào?,,15,10
+Gói B,doi-11,Cao nguyên đá Đồng Văn nằm ở tỉnh nào của nước ta?,,15,10
+Gói A,doi-12,"Ai là tác giả của ""Bình Ngô đại cáo"" - bản tuyên ngôn độc lập thứ hai của dân tộc?",,15,10
+Gói B,doi-12,"Bài thơ thần ""Nam quốc sơn hà"" tương truyền vang lên bên dòng sông nào?",,15,10

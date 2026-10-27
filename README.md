@@ -48,8 +48,8 @@ Hoặc tự tạo từ các file CSV:
 
 ### Bước 4: Cấu hình trong Thanh bên trái (Sidebar) trên Website
 1. Mở thanh bên trái (Sidebar) của website, bấm mở mục **⚙ Cài đặt & Dữ liệu**.
-2. Dán đường dẫn hoặc ID của Google Sheet vào ô **Google Sheet Link / ID**.
-3. Dán đường dẫn **Apps Script Web App URL** vào ô tương ứng (nếu để trống, điểm số sẽ chỉ lưu cục bộ trên trình duyệt hiện tại).
+2. Dán đường dẫn hoặc ID của Google Sheet vào ô **Link Google Sheet**.
+3. Dán đường dẫn **Apps Script Web App URL** vào ô **Link ghi điểm** (nếu để trống, điểm số sẽ chỉ lưu cục bộ trên trình duyệt hiện tại).
 4. Nhấn **Lưu cài đặt**.
 
 ### Bước 5: Triển khai miễn phí lên GitHub Pages
@@ -68,17 +68,16 @@ Tên cột ở dòng đầu tiên (header) của mỗi tab sử dụng chữ th�
 | :--- | :---: | :--- |
 | `id` | Có | Mã định danh duy nhất của đội (ví dụ: `doi-01`, `doi-02`). |
 | `name` | Có | Tên hiển thị của đội thi trên sân khấu (ví dụ: `Đội Sao Vàng`). |
-| `image_url` | Không | Đường dẫn ảnh/logo của đội. Nếu để trống, hệ thống tự tạo avatar chữ cái đầu trên nền màu của đội. |
+| `image_url` | Không | Tên file ảnh của đội đặt trong thư mục [`images/`](./images/) ở gốc dự án (ví dụ: `doi-01.jpg` sẽ được tải từ `images/doi-01.jpg`). Nếu đã là đường dẫn đầy đủ `http(s)://...` hoặc có chứa dấu `/` (như `teams/x.png`) thì giữ nguyên. Nếu để trống hoặc file ảnh không tồn tại, hệ thống tự động hiển thị chữ viết tắt tên đội trên nền màu của đội. |
 | `color` | Không | Mã màu HEX đại diện cho đội (ví dụ: `#D97757`). |
 
-### Tab `round1` (Câu hỏi Vòng 1 — Mỗi gói 1 câu hỏi)
+### Tab `round1` (Câu hỏi Vòng 1 — Mỗi gói 1 câu hỏi, gắn với từng đội)
 | Tên cột | Bắt buộc | Mô tả |
 | :--- | :---: | :--- |
-| `package` | Có | Tên gói câu hỏi (ví dụ: `Gói A`, `Gói B` hoặc `Gói Chung 01`). |
-| `team_id` | Không | Nếu điền `id` của đội, gói này chỉ đề xuất riêng cho đội đó (định danh nội bộ `<team_id>::<package>` nên nhiều đội có thể cùng có `Gói A`). Nếu **để trống**, gói thuộc kho gói chung (đội nào chọn trước sẽ khóa gói đó). |
-| `question` | Có | Nội dung câu hỏi duy nhất của gói. *(Nếu trong Sheet có nhiều dòng trùng cùng một khóa gói, dòng hợp lệ **đầu tiên** sẽ được sử dụng, các dòng dư bị bỏ qua).* |
-| `answer` | Không | Đáp án tham khảo dành cho Ban tổ chức trong Sheet (không hiển thị lên màn chiếu). |
-| `image_url` | Không | Đường dẫn hình ảnh minh họa cho câu hỏi (nếu có). |
+| `package` | Có | Tên gói câu hỏi của đội (ví dụ: `Gói A`, `Gói B`). |
+| `team_id` | Có | Mã `id` của đội sở hữu gói câu hỏi này (ví dụ: `doi-01`). Mỗi gói thuộc về một đội cụ thể; các dòng thiếu `team_id` sẽ bị bỏ qua. |
+| `question` | Có | Nội dung câu hỏi duy nhất của gói. *(Nếu trong Sheet có nhiều dòng trùng cùng một khóa `<team_id>::<package>`, dòng hợp lệ **đầu tiên** sẽ được sử dụng, các dòng dư bị bỏ qua).* |
+| `image_url` | Không | Tên file hình ảnh minh họa trong thư mục `images/` (hoặc đường dẫn `http(s)://...`). |
 | `time_seconds` | Không | Thời gian đếm ngược (giây). Nếu trống, lấy theo `round1_time_seconds` trong tab `config`. |
 | `points` | Không | Điểm số của câu hỏi. Nếu trống, lấy theo `round1_default_points` trong tab `config`. |
 
@@ -87,8 +86,7 @@ Tên cột ở dòng đầu tiên (header) của mỗi tab sử dụng chữ th�
 | :--- | :---: | :--- |
 | `number` | Có | Số thứ tự ô câu hỏi trên bảng (`1` đến `50`). |
 | `question` | Có | Nội dung câu hỏi. |
-| `answer` | Không | Đáp án tham khảo trong Sheet (không hiển thị lên màn chiếu). |
-| `image_url` | Không | Đường dẫn hình ảnh minh họa (nếu có). |
+| `image_url` | Không | Tên file hình ảnh minh họa trong thư mục `images/` (hoặc đường dẫn `http(s)://...`). |
 | `time_seconds` | Không | Thời gian đếm ngược (giây). Nếu trống, lấy theo `round3_time_seconds` trong tab `config`. |
 | `points` | Không | Điểm số của ô câu hỏi (ví dụ: `20`, `30`, `40`). |
 

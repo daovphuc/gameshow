@@ -28,6 +28,7 @@
       showToast,
       wireStageLayout
     } from "./js/app.js";
+    import { resolveImageUrl } from "./js/data.js";
     import {
       isTeamLocked,
       getAvailableRound1Packages,
@@ -42,7 +43,6 @@
     let quizData = null;
     let gameState = null;
     let pendingTeamId = sessionStorage.getItem(PENDING_TEAM_KEY) || null;
-    let showAllSharedPackages = false;
 
     let currentTimer = null;
     let timerInterval = null;
@@ -137,7 +137,6 @@
       }
       if (pendingTeamId) {
         setPendingTeam(null);
-        showAllSharedPackages = false;
         renderStage();
         return;
       }
@@ -154,7 +153,7 @@
         setPendingTeam(null);
         stopTimerLoop();
         activeTimerKey = null;
-        showToast(`Đã hoàn thành gói câu hỏi của ${team ? team.name : session.teamId}!`);
+        showToast(`Đã hoàn thành phần thi của ${team ? team.name : session.teamId}!`);
         renderStage();
         return;
       }
@@ -175,7 +174,6 @@
         gameState = pickRound1Package(gameState, teamId, packageId);
         saveAppState(gameState);
         setPendingTeam(null);
-        showAllSharedPackages = false;
         renderStage();
       } catch (err) {
         showToast(err.message || "Không thể chọn gói câu hỏi này.");
@@ -214,7 +212,7 @@
           <div>
             <h1 class="section-title">${escapeHtml(quizData.config.round1_name)}</h1>
             <p class="section-subtitle">
-              Chọn đội thi trên sân khấu để nhận 2 gói câu hỏi đề xuất.
+              Chọn đội thi trên sân khấu để hiển thị các gói câu hỏi của đội.
             </p>
           </div>
         </div>
@@ -226,7 +224,6 @@
       container.querySelectorAll(".team-card:not(.locked)").forEach((btn) => {
         btn.addEventListener("click", () => {
           setPendingTeam(btn.dataset.teamId);
-          showAllSharedPackages = false;
           renderStage();
         });
       });
@@ -244,19 +241,16 @@
       }
 
       const offeredLimit = Number(quizData.config.round1_packages_offered) || 2;
-      const allAvailable = getAvailableRound1Packages(gameState, quizData.round1Packages, teamId, null);
-      const primaryOffered = allAvailable.slice(0, offeredLimit);
-      const extraAvailable = allAvailable.slice(offeredLimit);
+      const offered = getAvailableRound1Packages(gameState, quizData.round1Packages, teamId, offeredLimit);
 
-      const renderPkgCard = (pkg, idx, isPrimary) => {
-        const isTeamSpecific = Boolean(pkg.team_id);
+      const renderPkgCard = (pkg, idx) => {
         const timeSec = pkg.time_seconds || pkg.questions?.[0]?.time_seconds || quizData.config.round1_time_seconds;
         const pts = pkg.points ?? pkg.questions?.[0]?.points ?? quizData.config.round1_default_points;
         return `
           <button type="button" class="package-card" data-package-id="${escapeHtml(pkg.id)}">
             <div>
               <span class="package-card-tag">
-                ${isPrimary ? `Lựa chọn ${idx + 1}` : "Gói dự phòng"} • ${isTeamSpecific ? "Gói riêng của đội" : "Kho gói chung"}
+                Lựa chọn ${idx + 1} • ${escapeHtml(team.name)}
               </span>
               <h2 class="package-card-title">${escapeHtml(pkg.package)}</h2>
               <p class="package-card-meta">
@@ -283,57 +277,31 @@
               <strong style="font-family: var(--font-serif); font-size: 1.35rem;">${escapeHtml(team.name)}</strong>
             </div>
           </div>
-
-          <div class="screen-right-group">
-            ${
-              extraAvailable.length > 0
-                ? `<button type="button" id="btn-toggle-extra-pkgs" class="btn btn-sm">
-                    ${showAllSharedPackages ? "Ẩn bớt gói chung" : `Xem thêm ${extraAvailable.length} gói chung khác`}
-                  </button>`
-                : ""
-            }
-          </div>
         </div>
 
         <div class="section-header">
           <div>
-            <h1 class="section-title">Chọn 1 trong ${primaryOffered.length} gói câu hỏi</h1>
+            <h1 class="section-title">Chọn 1 trong ${offered.length} gói câu hỏi</h1>
             <p class="section-subtitle">
-              Mỗi gói gồm 1 câu hỏi. Gói câu hỏi chung sau khi chọn sẽ khóa đối với các đội khác.
+              Mỗi gói gồm 1 câu hỏi dành riêng cho ${escapeHtml(team.name)}.
             </p>
           </div>
         </div>
 
         ${
-          primaryOffered.length === 0
+          offered.length === 0
             ? `<div class="panel-card">
                 <h2 class="panel-title">Không còn gói câu hỏi khả dụng</h2>
-                <p class="panel-desc">Tất cả các gói câu hỏi cho đội này đã được sử dụng. Bạn có thể mở khóa gói trong trang Điểm số.</p>
+                <p class="panel-desc">Các gói câu hỏi của đội này đã được mở. Bạn có thể mở khóa lại trong trang Điểm số.</p>
                 <a href="./scores.html" class="btn btn-primary">Mở trang Điểm số</a>
               </div>`
             : `<div class="packages-grid">
-                ${primaryOffered.map((pkg, idx) => renderPkgCard(pkg, idx, true)).join("")}
+                ${offered.map((pkg, idx) => renderPkgCard(pkg, idx)).join("")}
               </div>`
-        }
-
-        ${
-          showAllSharedPackages && extraAvailable.length > 0
-            ? `<div style="margin-top: 2rem;">
-                <h3 class="section-title" style="font-size: 1.35rem; margin-bottom: 1rem;">Các gói câu hỏi chung còn lại</h3>
-                <div class="packages-grid">
-                  ${extraAvailable.map((pkg, idx) => renderPkgCard(pkg, idx + offeredLimit, false)).join("")}
-                </div>
-              </div>`
-            : ""
         }
       `;
 
       document.getElementById("btn-screen-back")?.addEventListener("click", handleBack);
-
-      document.getElementById("btn-toggle-extra-pkgs")?.addEventListener("click", () => {
-        showAllSharedPackages = !showAllSharedPackages;
-        renderStage();
-      });
 
       container.querySelectorAll(".package-card").forEach((card) => {
         card.addEventListener("click", () => {
@@ -400,9 +368,9 @@
           <article class="question-card">
             <p class="question-text">${escapeHtml(question.question)}</p>
             ${
-              question.image_url
+              resolveImageUrl(question.image_url)
                 ? `<div class="question-image-wrap">
-                    <img class="question-image" src="${escapeHtml(question.image_url)}" alt="Hình minh họa câu hỏi" />
+                    <img class="question-image" src="${escapeHtml(resolveImageUrl(question.image_url))}" alt="" onerror="this.parentElement.remove()" />
                   </div>`
                 : ""
             }

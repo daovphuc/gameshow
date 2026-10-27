@@ -1,4 +1,4 @@
-// Data normalisation and package selection logic (DOM-free).
+// Data normalisation, image path resolution, and package selection logic (DOM-free).
 
 import { DEFAULT_CONFIG, TEAM_PALETTE } from "./config.js";
 import { parseCsv } from "./csv.js";
@@ -25,6 +25,28 @@ function parseNumber(value, fallback) {
   }
   const num = Number(String(value).trim());
   return Number.isFinite(num) ? num : fallback;
+}
+
+/**
+ * Resolves an `image_url` cell value:
+ * - Blank / null / undefined -> `""` (triggers initials avatar fallback or hides question image).
+ * - Full `http(s)://` URL or any path already containing `/` (e.g. `teams/x.png`, `images/a.jpg`) -> unchanged.
+ * - Bare file name (e.g. `doi-01.jpg`) -> `images/doi-01.jpg`.
+ * @param {string} [raw]
+ * @returns {string}
+ */
+export function resolveImageUrl(raw) {
+  if (raw === undefined || raw === null) {
+    return "";
+  }
+  const trimmed = String(raw).trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (/^https?:\/\//i.test(trimmed) || trimmed.includes("/")) {
+    return trimmed;
+  }
+  return `images/${trimmed}`;
 }
 
 /**
@@ -80,7 +102,7 @@ export function normaliseTeams(input = []) {
       continue;
     }
     seenIds.add(id);
-    const image_url = row?.image_url ? String(row.image_url).trim() : "";
+    const image_url = resolveImageUrl(row?.image_url);
     const rawColor = row?.color ? String(row.color).trim() : "";
     const color = rawColor || TEAM_PALETTE[teams.length % TEAM_PALETTE.length];
 
@@ -96,10 +118,10 @@ export function normaliseTeams(input = []) {
 }
 
 /**
- * Normalises rows from the `round1` tab into single-question packages.
- * - Required fields per row: `package`, `question`.
- * - Optional fields: `team_id`, `answer`, `image_url`, `time_seconds`, `points`.
- * - Team-specific packages are keyed as `<team_id>::<package>` so different teams can have a "Gói A".
+ * Normalises rows from the `round1` tab into single-question team packages.
+ * - Required fields per row: `package`, `team_id`, `question` (rows without `team_id` are skipped).
+ * - Optional fields: `image_url`, `time_seconds`, `points`.
+ * - Packages are keyed as `<team_id>::<package>` so every team can have its own "Gói A", "Gói B".
  * - Rule for duplicate rows of the same package key: the FIRST valid row wins; extra rows for the
  *   same package are ignored so a package never has more than one question.
  * @param {Array<Record<string, any>>|string} input
@@ -109,7 +131,6 @@ export function normaliseTeams(input = []) {
  *   package: string,
  *   team_id: string,
  *   question: string,
- *   answer: string,
  *   image_url: string,
  *   time_seconds: number,
  *   points: number,
@@ -131,20 +152,18 @@ export function normaliseRound1(input = [], config = DEFAULT_CONFIG) {
 
   for (const row of rows) {
     const pkgName = row?.package !== undefined && row?.package !== null ? String(row.package).trim() : "";
+    const team_id = row?.team_id !== undefined && row?.team_id !== null ? String(row.team_id).trim() : "";
     const question = row?.question !== undefined && row?.question !== null ? String(row.question).trim() : "";
 
-    if (!pkgName || !question) {
+    if (!pkgName || !team_id || !question) {
       continue;
     }
 
-    const answer = row?.answer !== undefined && row?.answer !== null ? String(row.answer).trim() : "";
-    const team_id = row?.team_id !== undefined && row?.team_id !== null ? String(row.team_id).trim() : "";
-    const image_url = row?.image_url !== undefined && row?.image_url !== null ? String(row.image_url).trim() : "";
+    const image_url = resolveImageUrl(row?.image_url);
     const time_seconds = parsePositiveNumber(row?.time_seconds, defaultTime);
     const points = parseNumber(row?.points, defaultPoints);
 
-    // Team-specific packages are keyed per team so every team may have its own "Gói A".
-    const pkgKey = team_id ? `${team_id}::${pkgName}` : pkgName;
+    const pkgKey = `${team_id}::${pkgName}`;
 
     // First valid row for a package wins; extra rows for the same package are ignored.
     if (packageMap.has(pkgKey)) {
@@ -157,7 +176,6 @@ export function normaliseRound1(input = [], config = DEFAULT_CONFIG) {
       team_id,
       order: 1,
       question,
-      answer,
       image_url,
       time_seconds,
       points
@@ -168,7 +186,6 @@ export function normaliseRound1(input = [], config = DEFAULT_CONFIG) {
       package: pkgName,
       team_id,
       question,
-      answer,
       image_url,
       time_seconds,
       points,
@@ -180,10 +197,8 @@ export function normaliseRound1(input = [], config = DEFAULT_CONFIG) {
 }
 
 /**
- * Returns Round 1 packages eligible to be offered to a specific team.
- * - Packages with `team_id === teamId` are offered only to that team (listed first).
- * - Packages with blank `team_id` are shared and offered to any team until picked.
- * - Packages already in `pickedPackages` are excluded.
+ * Returns Round 1 packages belonging to `teamId` that have not yet been picked.
+ * Every package belongs to one team (`pkg.team_id === teamId`); there is no shared pool.
  * @param {Array<{id?: string, package: string, team_id?: string, questions: Array<any>}>} packages
  * @param {string} teamId
  * @param {Iterable<string>} [pickedPackages]
@@ -192,29 +207,27 @@ export function normaliseRound1(input = [], config = DEFAULT_CONFIG) {
  */
 export function getOfferedPackages(packages = [], teamId, pickedPackages = [], limit = null) {
   const cleanTeamId = teamId ? String(teamId).trim() : "";
+  if (!cleanTeamId) {
+    return [];
+  }
   const pickedSet = new Set(pickedPackages || []);
 
-  const teamSpecific = [];
-  const shared = [];
-
+  const owned = [];
   for (const pkg of packages) {
     const pkgId = pkg.id || pkg.package;
     if (pickedSet.has(pkgId)) {
       continue;
     }
     const pkgTeam = pkg.team_id ? String(pkg.team_id).trim() : "";
-    if (pkgTeam && pkgTeam === cleanTeamId) {
-      teamSpecific.push(pkg);
-    } else if (!pkgTeam) {
-      shared.push(pkg);
+    if (pkgTeam === cleanTeamId) {
+      owned.push(pkg);
     }
   }
 
-  const combined = [...teamSpecific, ...shared];
   if (typeof limit === "number" && limit > 0) {
-    return combined.slice(0, limit);
+    return owned.slice(0, limit);
   }
-  return combined;
+  return owned;
 }
 
 export const getPackagesForTeam = getOfferedPackages;
@@ -222,10 +235,10 @@ export const getPackagesForTeam = getOfferedPackages;
 /**
  * Normalises rows from the `round3` tab into ordered question tiles.
  * Required fields: number, question.
- * Optional fields: answer, image_url, time_seconds, points.
+ * Optional fields: image_url, time_seconds, points.
  * @param {Array<Record<string, any>>|string} input
  * @param {Record<string, any>} [config]
- * @returns {Array<{number: number, question: string, answer: string, image_url: string, time_seconds: number, points: number}>}
+ * @returns {Array<{number: number, question: string, image_url: string, time_seconds: number, points: number}>}
  */
 export function normaliseRound3(input = [], config = DEFAULT_CONFIG) {
   const rows = toRows(input);
@@ -243,7 +256,6 @@ export function normaliseRound3(input = [], config = DEFAULT_CONFIG) {
   for (const row of rows) {
     const rawNum = row?.number !== undefined && row?.number !== null ? String(row.number).trim() : "";
     const question = row?.question !== undefined && row?.question !== null ? String(row.question).trim() : "";
-    const answer = row?.answer !== undefined && row?.answer !== null ? String(row.answer).trim() : "";
 
     if (!rawNum || !question) {
       continue;
@@ -254,14 +266,13 @@ export function normaliseRound3(input = [], config = DEFAULT_CONFIG) {
       continue;
     }
 
-    const image_url = row?.image_url !== undefined && row?.image_url !== null ? String(row.image_url).trim() : "";
+    const image_url = resolveImageUrl(row?.image_url);
     const time_seconds = parsePositiveNumber(row?.time_seconds, defaultTime);
     const points = parseNumber(row?.points, defaultPoints);
 
     byNumber.set(number, {
       number,
       question,
-      answer,
       image_url,
       time_seconds,
       points

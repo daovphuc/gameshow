@@ -26,6 +26,7 @@
       escapeHtml,
       wireStageLayout
     } from "./js/app.js";
+    import { resolveImageUrl } from "./js/data.js";
     import {
       isTileOpened,
       openRound3Tile,
@@ -264,9 +265,9 @@
           <article class="question-card">
             <p class="question-text">${escapeHtml(tile.question)}</p>
             ${
-              tile.image_url
+              resolveImageUrl(tile.image_url)
                 ? `<div class="question-image-wrap">
-                    <img class="question-image" src="${escapeHtml(tile.image_url)}" alt="Hình minh họa câu hỏi" />
+                    <img class="question-image" src="${escapeHtml(resolveImageUrl(tile.image_url))}" alt="" onerror="this.parentElement.remove()" />
                   </div>`
                 : ""
             }
