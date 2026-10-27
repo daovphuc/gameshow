@@ -1,0 +1,97 @@
+package,team_id,order,question,answer,image_url,time_seconds,points
+Gói Đ01 - Lịch Sử & Địa Lý,doi-01,1,Kinh đô của nhà nước Văn Lang được đặt tại vùng đất thuộc tỉnh nào của Việt Nam hiện nay?,Phú Thọ,,15,10
+Gói Đ01 - Lịch Sử & Địa Lý,doi-01,2,"Đỉnh núi nào được mệnh danh là ""Nóc nhà Đông Dương""?","Đỉnh Fansipan (3.147,3m)",,15,10
+Gói Đ01 - Lịch Sử & Địa Lý,doi-01,3,Chiến thắng Điện Biên Phủ lừng lẫy năm châu diễn ra vào năm nào?,Năm 1954,,15,10
+Gói Đ01 - Lịch Sử & Địa Lý,doi-01,4,Quần đảo Trường Sa trực thuộc tỉnh/thành phố nào của nước ta?,Tỉnh Khánh Hòa,,15,10
+Gói Đ01 - Khoa Học & Đời Sống,doi-01,1,Nguyên tố hóa học nào chiếm tỷ lệ thể tích lớn nhất trong khí quyển Trái Đất?,Nitơ (khoảng 78%),,15,10
+Gói Đ01 - Khoa Học & Đời Sống,doi-01,2,Hành tinh nào gần Mặt Trời nhất trong Hệ Mặt Trời?,Sao Thủy (Thủy tinh),,15,10
+Gói Đ01 - Khoa Học & Đời Sống,doi-01,3,Vitamin nào được cơ thể tổng hợp chủ yếu khi da tiếp xúc với ánh nắng mặt trời?,Vitamin D,,15,10
+Gói Đ01 - Khoa Học & Đời Sống,doi-01,4,Đơn vị đo cường độ dòng điện trong hệ SI là gì?,Ampe (A),,15,10
+Gói Đ02 - Văn Học & Nghệ Thuật,doi-02,1,"Tác phẩm ""Truyện Kiều"" của đại thi hào Nguyễn Du được viết theo thể thơ nào?",Thể thơ lục bát,,15,10
+Gói Đ02 - Văn Học & Nghệ Thuật,doi-02,2,"Ai là tác giả của bản nhạc giao hưởng ""Số 9"" nổi tiếng thế giới?",Ludwig van Beethoven,,15,10
+Gói Đ02 - Văn Học & Nghệ Thuật,doi-02,3,Loại hình nghệ thuật sân khấu truyền thống nào của vùng đồng bằng Bắc Bộ gắn liền với hình tượng chú Tễu?,Múa rối nước,,15,10
+Gói Đ02 - Văn Học & Nghệ Thuật,doi-02,4,"Bài thơ ""Tây Tiến"" là sáng tác tiêu biểu của nhà thơ nào?",Quang Dũng,,15,10
+Gói Đ02 - Tự Nhiên & Vũ Trụ,doi-02,1,Ánh sáng từ Mặt Trời mất khoảng bao nhiêu phút để truyền tới Trái Đất?,Khoảng 8 phút 20 giây,,15,10
+Gói Đ02 - Tự Nhiên & Vũ Trụ,doi-02,2,Kim loại nào dẫn điện tốt nhất ở điều kiện thường?,Bạc (Ag),,15,10
+Gói Đ02 - Tự Nhiên & Vũ Trụ,doi-02,3,Loài động vật có vú nào duy nhất biết bay thực sự?,Dơi,,15,10
+Gói Đ02 - Tự Nhiên & Vũ Trụ,doi-02,4,Nước tinh khiết đóng băng ở nhiệt độ bao nhiêu độ C tại áp suất tiêu chuẩn?,0 độ C,,15,10
+Gói Đ03 - Đất Nước & Con Người,doi-03,1,Sông Mê Kông chảy vào lãnh thổ Việt Nam qua hai nhánh chính là sông Tiền và sông gì?,Sông Hậu,,15,10
+Gói Đ03 - Đất Nước & Con Người,doi-03,2,Vịnh Hạ Long thuộc địa phận tỉnh nào của Việt Nam?,Tỉnh Quảng Ninh,,15,10
+Gói Đ03 - Đất Nước & Con Người,doi-03,3,Danh nhân văn hóa Nguyễn Trãi có hiệu là gì?,Ức Trai,,15,10
+Gói Đ03 - Đất Nước & Con Người,doi-03,4,Cầu Hiền Lương bắc qua dòng sông lịch sử nào tại tỉnh Quảng Trị?,Sông Bến Hải,,15,10
+Gói Đ03 - Công Nghệ & Toán Học,doi-03,1,Số nguyên tố chẵn duy nhất là số mấy?,Số 2,,15,10
+Gói Đ03 - Công Nghệ & Toán Học,doi-03,2,"Từ viết tắt ""CPU"" trong máy tính có nghĩa tiếng Việt là gì?",Bộ xử lý trung tâm (Central Processing Unit),,15,10
+Gói Đ03 - Công Nghệ & Toán Học,doi-03,3,Tổng ba góc trong của một tam giác phẳng bằng bao nhiêu độ?,180 độ,,15,10
+Gói Đ03 - Công Nghệ & Toán Học,doi-03,4,Hệ đếm nhị phân sử dụng bao nhiêu chữ số cơ bản?,2 chữ số (0 và 1),,15,10
+Gói Đ04 - Di Sản Việt Nam,doi-04,1,Quần thể di tích Cố đô Huế được UNESCO công nhận là Di sản Văn hóa Thế giới vào năm nào?,Năm 1993,,15,10
+Gói Đ04 - Di Sản Việt Nam,doi-04,2,Hang động tự nhiên lớn nhất thế giới Sơn Đoòng nằm ở tỉnh nào?,Tỉnh Quảng Bình,,15,10
+Gói Đ04 - Di Sản Việt Nam,doi-04,3,Nhã nhạc cung đình Việt Nam gắn liền với triều đại phong kiến nào?,Triều Nguyễn,,15,10
+Gói Đ04 - Di Sản Việt Nam,doi-04,4,Thánh địa Mỹ Sơn nằm trên địa bàn tỉnh nào của miền Trung Việt Nam?,Tỉnh Quảng Nam,,15,10
+Gói Đ04 - Khoa Học Cơ Bản,doi-04,1,Công thức hóa học của muối ăn thông thường là gì?,NaCl (Natri clorua),,15,10
+Gói Đ04 - Khoa Học Cơ Bản,doi-04,2,Cơ quan nào trong cơ thể người đảm nhận chức năng bơm máu đi nuôi cơ thể?,Tim,,15,10
+Gói Đ04 - Khoa Học Cơ Bản,doi-04,3,Sóng âm không thể truyền được trong môi trường nào?,Môi trường chân không,,15,10
+Gói Đ04 - Khoa Học Cơ Bản,doi-04,4,Quá trình cây xanh tổng hợp chất hữu cơ nhờ năng lượng ánh sáng gọi là gì?,Quang hợp,,15,10
+Gói Đ05 - Anh Hùng Dân Tộc,doi-05,1,"Vị vua nào đã ban ""Chiếu dời đô"" đưa kinh đô từ Hoa Lư về Đại La (Thăng Long) năm 1010?",Lý Thái Tổ (Lý Công Uẩn),,15,10
+Gói Đ05 - Anh Hùng Dân Tộc,doi-05,2,Hai Bà Trưng phất cờ khởi nghĩa vào năm 40 sau Công nguyên tại cửa sông nào?,Sông Hát (Hát Môn),,15,10
+Gói Đ05 - Anh Hùng Dân Tộc,doi-05,3,Ai là người chỉ huy cuộc khởi nghĩa Lam Sơn đánh đuổi quân Minh xâm lược?,Lê Lợi,,15,10
+Gói Đ05 - Anh Hùng Dân Tộc,doi-05,4,Chiến thắng Rạch Gầm - Xoài Mút năm 1785 gắn với tên tuổi vị anh hùng nào?,Nguyễn Huệ (Quang Trung),,15,10
+Gói Đ05 - Thế Giới Quanh Ta,doi-05,1,Châu lục nào có diện tích lớn nhất trên Trái Đất?,Châu Á,,15,10
+Gói Đ05 - Thế Giới Quanh Ta,doi-05,2,Đại dương nào có diện tích và độ sâu lớn nhất thế giới?,Thái Bình Dương,,15,10
+Gói Đ05 - Thế Giới Quanh Ta,doi-05,3,"Quốc gia nào được mệnh danh là ""Xứ sở mặt trời mọc""?",Nhật Bản,,15,10
+Gói Đ05 - Thế Giới Quanh Ta,doi-05,4,Kênh đào Suez nối liền Địa Trung Hải với biển nào?,Biển Đỏ (Hồng Hải),,15,10
+Gói Đ06 - Văn Hóa Dân Gian,doi-06,1,Lễ hội Đền Hùng tưởng nhớ các Vua Hùng diễn ra vào ngày nào âm lịch hằng năm?,Mùng 10 tháng 3 âm lịch,,15,10
+Gói Đ06 - Văn Hóa Dân Gian,doi-06,2,Làn điệu dân ca Quan họ là di sản văn hóa đặc trưng của hai tỉnh nào?,Bắc Ninh và Bắc Giang,,15,10
+Gói Đ06 - Văn Hóa Dân Gian,doi-06,3,Tranh dân gian Đông Hồ có xuất xứ từ huyện nào của tỉnh Bắc Ninh?,Huyện Thuận Thành (nay là thị xã Thuận Thành),,15,10
+Gói Đ06 - Văn Hóa Dân Gian,doi-06,4,Đờn ca tài tử là loại hình nghệ thuật dân gian đặc trưng của vùng nào?,Vùng Nam Bộ,,15,10
+Gói Đ06 - Khám Phá Tri Thức,doi-06,1,Ai là người phát minh ra bóng đèn sợi đốt thương mại đầu tiên?,Thomas Edison,,15,10
+Gói Đ06 - Khám Phá Tri Thức,doi-06,2,"Trong bảng tuần hoàn hóa học, nguyên tố Vàng có ký hiệu là gì?",Au,,15,10
+Gói Đ06 - Khám Phá Tri Thức,doi-06,3,Tốc độ ánh sáng trong chân không xấp xỉ bao nhiêu km/giây?,300.000 km/giây,,15,10
+Gói Đ06 - Khám Phá Tri Thức,doi-06,4,Bộ phận nào của tế bào thực vật chứa chất diệp lục?,Lục lạp,,15,10
+Gói Chung 01,,1,"Tác giả của bản ""Tuyên ngôn Độc lập"" khai sinh nước Việt Nam Dân chủ Cộng hòa ngày 2/9/1945 là ai?",Chủ tịch Hồ Chí Minh,,15,10
+Gói Chung 01,,2,Tỉnh nào nằm ở cực Bắc của Tổ quốc Việt Nam?,Tỉnh Hà Giang,,15,10
+Gói Chung 01,,3,Khí nào cần thiết cho sự hô hấp của hầu hết sinh vật hiếu khí trên Trái Đất?,Khí Oxy (O2),,15,10
+Gói Chung 01,,4,Một thế kỷ bao gồm bao nhiêu năm?,100 năm,,15,10
+Gói Chung 02,,1,Chiến dịch Hồ Chí Minh lịch sử toàn thắng vào ngày tháng năm nào?,30/04/1975,,15,10
+Gói Chung 02,,2,"Thành phố nào của Việt Nam được mệnh danh là ""Thành phố ngàn hoa""?",Đà Lạt (tỉnh Lâm Đồng),,15,10
+Gói Chung 02,,3,Kim loại nào tồn tại ở trạng thái lỏng trong điều kiện nhiệt độ phòng?,Thủy ngân (Hg),,15,10
+Gói Chung 02,,4,Hình vuông có cạnh dài 5 cm thì diện tích bằng bao nhiêu cm vuông?,25 cm vuông,,15,10
+Gói Chung 03,,1,Trường đại học đầu tiên của Việt Nam tại kinh thành Thăng Long có tên là gì?,Quốc Tử Giám,,15,10
+Gói Chung 03,,2,Đèo Hải Vân nằm giữa ranh giới tỉnh Thừa Thiên Huế và thành phố nào?,Thành phố Đà Nẵng,,15,10
+Gói Chung 03,,3,"Hành tinh nào được gọi là ""Hành tinh Đỏ""?",Sao Hỏa (Hỏa tinh),,15,10
+Gói Chung 03,,4,"Tác phẩm ""Dế Mèn phiêu lưu ký"" là của nhà văn nào?",Tô Hoài,,15,10
+Gói Chung 04,,1,"Trên sông Bạch Đằng năm 938, vị anh hùng nào đã đánh tan quân Nam Hán?",Ngô Quyền,,15,10
+Gói Chung 04,,2,Hồ nước ngọt tự nhiên lớn nhất miền núi phía Bắc Việt Nam là hồ nào?,Hồ Ba Bể (Bắc Kạn),,15,10
+Gói Chung 04,,3,Đơn vị cơ bản của sự sống trong mọi cơ thể sinh vật là gì?,Tế bào,,15,10
+Gói Chung 04,,4,Thủ đô của nước Cộng hòa Pháp là thành phố nào?,Paris,,15,10
+Gói Chung 05,,1,Ai là vị trạng nguyên trẻ tuổi nhất trong lịch sử khoa bảng phong kiến Việt Nam?,Nguyễn Hiền (đỗ trạng nguyên năm 13 tuổi),,15,10
+Gói Chung 05,,2,Mũi Cà Mau thuộc địa phận huyện nào của tỉnh Cà Mau?,Huyện Ngọc Hiển,,15,10
+Gói Chung 05,,3,Chất rắn tự nhiên nào có độ cứng lớn nhất theo thang độ cứng Mohs?,Kim cương,,15,10
+Gói Chung 05,,4,Thế vận hội Olympic hiện đại được tổ chức định kỳ mấy năm một lần?,4 năm một lần,,15,10
+Gói Chung 06,,1,Bộ luật thành văn đầu tiên của nước ta dưới triều nhà Lý có tên là gì?,Hình thư,,15,10
+Gói Chung 06,,2,Dãy núi nào chạy dọc biên giới phía Tây giữa Việt Nam với Lào và Campuchia?,Dãy Trường Sơn,,15,10
+Gói Chung 06,,3,Dụng cụ dùng để đo áp suất khí quyển được gọi là gì?,Khí áp kế (Áp kế),,15,10
+Gói Chung 06,,4,"Bài hát ""Tiến quân ca"" - Quốc ca Việt Nam do nhạc sĩ nào sáng tác?",Văn Cao,,15,10
+Gói Chung 07,,1,Cuộc khởi nghĩa Yên Thế cuối thế kỷ XIX đầu thế kỷ XX do ai lãnh đạo chủ chốt?,Hoàng Hoa Thám (Đề Thám),,15,10
+Gói Chung 07,,2,Đảo lớn nhất của Việt Nam tính theo diện tích là đảo nào?,Đảo Phú Quốc (tỉnh Kiên Giang),,15,10
+Gói Chung 07,,3,Loài chim nào lớn nhất còn sống trên Trái Đất hiện nay?,Đà điểu châu Phi,,15,10
+Gói Chung 07,,4,"Số La Mã ""XIV"" biểu diễn giá trị số tự nhiên nào?",14,,15,10
+Gói Chung 08,,1,Nhà Trần đã ba lần đánh thắng quân xâm lược Nguyên - Mông vào thế kỷ thứ mấy?,Thế kỷ XIII (thế kỷ 13),,15,10
+Gói Chung 08,,2,"Vườn quốc gia Cúc Phương nằm trên địa bàn ba tỉnh Ninh Bình, Hòa Bình và tỉnh nào?",Thanh Hóa,,15,10
+Gói Chung 08,,3,Hợp chất H2O là công thức hóa học của chất quen thuộc nào?,Nước,,15,10
+Gói Chung 08,,4,"Tác phẩm ""Lão Hạc"" là truyện ngắn xuất sắc của nhà văn nào?",Nam Cao,,15,10
+Gói Chung 09,,1,Hội nghị thành lập Đảng Cộng sản Việt Nam đầu năm 1930 do ai chủ trì?,Nguyễn Ái Quốc (Hồ Chí Minh),,15,10
+Gói Chung 09,,2,Chợ nổi Cái Răng là nét văn hóa đặc sắc của thành phố trực thuộc trung ương nào?,Thành phố Cần Thơ,,15,10
+Gói Chung 09,,3,Lực hút của Trái Đất tác dụng lên các vật có khối lượng gọi là lực gì?,Trọng lực (lực hấp dẫn),,15,10
+Gói Chung 09,,4,Một năm nhuận dương lịch có bao nhiêu ngày?,366 ngày,,15,10
+Gói Chung 10,,1,Quốc hiệu của nước ta dưới thời vua Gia Long (năm 1804) là gì?,Việt Nam,,15,10
+Gói Chung 10,,2,Cao nguyên đá Đồng Văn nằm ở tỉnh nào của nước ta?,Tỉnh Hà Giang,,15,10
+Gói Chung 10,,3,Khí CO2 ở trạng thái rắn thường được gọi bằng tên thông dụng là gì?,Đá khô (băng khô),,15,10
+Gói Chung 10,,4,"Bức tranh nổi tiếng ""Mona Lisa"" là kiệt tác của danh họa nào?",Leonardo da Vinci,,15,10
+Gói Chung 11,,1,"Ai là tác giả của ""Bình Ngô đại cáo"" - bản tuyên ngôn độc lập thứ hai của dân tộc?",Nguyễn Trãi,,15,10
+Gói Chung 11,,2,Thành phố biển Nha Trang thuộc tỉnh nào?,Tỉnh Khánh Hòa,,15,10
+Gói Chung 11,,3,Hành tinh lớn nhất trong Hệ Mặt Trời là hành tinh nào?,Sao Mộc (Mộc tinh),,15,10
+Gói Chung 11,,4,"Trong âm nhạc, khuông nhạc chuẩn có bao nhiêu dòng kẻ song song?",5 dòng kẻ,,15,10
+Gói Chung 12,,1,"Bài thơ thần ""Nam quốc sơn hà"" tương truyền vang lên bên dòng sông nào?",Sông Như Nguyệt (sông Cầu),,15,10
+Gói Chung 12,,2,Đồng bằng sông Hồng được bồi đắp bởi hệ thống sông Hồng và hệ thống sông nào?,Sông Thái Bình,,15,10
+Gói Chung 12,,3,Nhiệt kế y tế truyền thống thường dùng kim loại lỏng nào để đo thân nhiệt?,Thủy ngân,,15,10
+Gói Chung 12,,4,"Tổ chức Giáo dục, Khoa học và Văn hóa của Liên Hợp Quốc có tên viết tắt là gì?",UNESCO,,15,10

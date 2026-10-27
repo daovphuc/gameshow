@@ -1,0 +1,19 @@
+key,value
+show_title,Đấu Trường Tri Thức 2026
+show_subtitle,Hội thi tìm hiểu kiến thức tổng hợp & bản lĩnh đồng đội
+round1_name,Vòng 1: Khởi Động
+round2_name,Vòng 2: Vượt Chướng Ngại Vật
+round3_name,Vòng 3: Tăng Tốc & Về Đích
+round1_time_seconds,15
+round3_time_seconds,20
+round1_default_points,10
+round3_default_points,20
+round1_packages_offered,2
+theme_mode,light
+bg_color,#F5F4ED
+surface_color,#FAF9F5
+text_color,#141413
+muted_color,#6B6960
+accent_color,#D97757
+accent_dark_color,#C6613F
+border_color,#E3E0D3

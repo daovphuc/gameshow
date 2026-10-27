@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cài đặt - Đấu Trường Tri Thức</title>
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <header class="stage-header">
+    <div class="header-actions">
+      <button id="btn-header-back" class="btn" type="button">
+        ← Quay lại
+      </button>
+    </div>
+
+    <div class="header-center">
+      <div id="header-show-title" class="header-show-title">Đấu Trường Tri Thức</div>
+      <nav class="header-nav-bar" aria-label="Điều hướng chính">
+        <a href="./index.html" class="header-nav-link">Trang chủ</a>
+        <a href="./round1.html" class="header-nav-link">Vòng 1</a>
+        <a href="./round3.html" class="header-nav-link">Vòng 3</a>
+        <a href="./leaderboard.html" class="header-nav-link">Bảng xếp hạng</a>
+        <a href="./scores.html" class="header-nav-link">Điểm số / Quản trị</a>
+        <a href="./settings.html" class="header-nav-link active">Cài đặt</a>
+      </nav>
+    </div>
+
+    <div class="header-actions">
+      <button id="btn-reload-data" class="btn btn-sm" type="button">
+        ↻ Tải lại dữ liệu
+      </button>
+      <button id="btn-header-continue" class="btn btn-primary" type="button">
+        Về Trang chủ →
+      </button>
+    </div>
+  </header>
+
+  <main class="stage-main">
+    <div class="section-header">
+      <div>
+        <h1 class="section-title">Cài Đặt Nguồn Dữ Liệu &amp; Giao Diện Sân Khấu</h1>
+        <p class="section-subtitle">
+          Tùy chỉnh Google Sheet ID và bảng màu trình chiếu (Cài đặt tại đây được ưu tiên cao nhất: localStorage &gt; Sheet config &gt; Mặc định).
+        </p>
+      </div>
+    </div>
+
+    <!-- Google Sheet Configuration -->
+    <section class="panel-card">
+      <h2 class="panel-title">Kết Nối Google Sheet</h2>
+      <p class="panel-desc">
+        Dán đường dẫn Google Sheet (hoặc ID của Sheet) đã bật chia sẻ <strong>"Bất kỳ ai có đường liên kết đều có thể xem"</strong>. Để trống nếu muốn dùng bộ dữ liệu mẫu tích hợp sẵn (<code>data/sample/*.csv</code>).
+      </p>
+
+      <div class="form-group">
+        <label class="form-label" for="input-sheet-id">Google Sheet ID hoặc URL đầy đủ:</label>
+        <input
+          type="text"
+          id="input-sheet-id"
+          class="form-input"
+          placeholder="Ví dụ: 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms hoặc dán toàn bộ link Google Sheets"
+        />
+        <span id="sheet-status-hint" class="form-hint"></span>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+        <button type="button" id="btn-save-sheet" class="btn btn-primary">
+          💾 Lưu &amp; Tải dữ liệu từ Sheet
+        </button>
+        <button type="button" id="btn-use-sample" class="btn">
+          Dùng dữ liệu mẫu mặc định (Xóa Sheet ID)
+        </button>
+      </div>
+    </section>
+
+    <!-- Theme & Palette Editor -->
+    <section class="panel-card">
+      <h2 class="panel-title">Bảng Màu &amp; Chế Độ Hiển Thị (Claude Warm Palette)</h2>
+      <p class="panel-desc">
+        Chuyển đổi nhanh giữa giao diện Sáng ấm (Kem &amp; Đất nung) và Tối sân khấu, hoặc tinh chỉnh từng mã màu CSS Custom Properties.
+      </p>
+
+      <div class="form-group">
+        <label class="form-label">Chế độ nền:</label>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+          <button type="button" id="btn-mode-light" class="btn">
+            ☀ Giao diện Sáng ấm (Kem Claude)
+          </button>
+          <button type="button" id="btn-mode-dark" class="btn">
+            🌙 Giao diện Tối sân khấu (Đen ấm)
+          </button>
+        </div>
+      </div>
+
+      <div class="color-grid" style="margin-bottom: 1.5rem;">
+        <div class="color-field">
+          <label class="form-label" for="color-bg">Màu nền chính (--bg)</label>
+          <div class="color-picker-row">
+            <input type="color" id="picker-bg" />
+            <input type="text" id="color-bg" class="form-input" placeholder="#F5F4ED" />
+          </div>
+        </div>
+
+        <div class="color-field">
+          <label class="form-label" for="color-surface">Màu bề mặt thẻ (--surface)</label>
+          <div class="color-picker-row">
+            <input type="color" id="picker-surface" />
+            <input type="text" id="color-surface" class="form-input" placeholder="#FAF9F5" />
+          </div>
+        </div>
+
+        <div class="color-field">
+          <label class="form-label" for="color-text">Màu chữ chính (--text)</label>
+          <div class="color-picker-row">
+            <input type="color" id="picker-text" />
+            <input type="text" id="color-text" class="form-input" placeholder="#141413" />
+          </div>
+        </div>
+
+        <div class="color-field">
+          <label class="form-label" for="color-textMuted">Màu chữ phụ (--text-muted)</label>
+          <div class="color-picker-row">
+            <input type="color" id="picker-textMuted" />
+            <input type="text" id="color-textMuted" class="form-input" placeholder="#6B6960" />
+          </div>
+        </div>
+
+        <div class="color-field">
+          <label class="form-label" for="color-accent">Màu nhấn đất nung (--accent)</label>
+          <div class="color-picker-row">
+            <input type="color" id="picker-accent" />
+            <input type="text" id="color-accent" class="form-input" placeholder="#D97757" />
+          </div>
+        </div>
+
+        <div class="color-field">
+          <label class="form-label" for="color-accentDark">Màu nhấn đậm (--accent-dark)</label>
+          <div class="color-picker-row">
+            <input type="color" id="picker-accentDark" />
+            <input type="text" id="color-accentDark" class="form-input" placeholder="#C6613F" />
+          </div>
+        </div>
+
+        <div class="color-field">
+          <label class="form-label" for="color-border">Màu đường viền (--border)</label>
+          <div class="color-picker-row">
+            <input type="color" id="picker-border" />
+            <input type="text" id="color-border" class="form-input" placeholder="#E3E0D3" />
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+        <button type="button" id="btn-save-theme" class="btn btn-primary">
+          💾 Lưu bảng màu tùy chỉnh
+        </button>
+        <button type="button" id="btn-reset-theme" class="btn">
+          ↺ Khôi phục bảng màu mặc định (Theo Sheet / Mặc định)
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    import {
+      getSheetId,
+      setSheetId,
+      getLocalTheme,
+      saveLocalTheme,
+      clearLocalTheme,
+      applyResolvedTheme,
+      fetchQuizData,
+      showToast,
+      wireStageHeader
+    } from "./js/app.js";
+    import { LIGHT_THEME, DARK_THEME } from "./js/theme.js";
+
+    const COLOR_KEYS = ["bg", "surface", "text", "textMuted", "accent", "accentDark", "border"];
+    let quizData = null;
+    let currentMode = "light";
+
+    function syncThemeInputs(resolvedTheme) {
+      currentMode = resolvedTheme.mode || "light";
+      document.getElementById("btn-mode-light")?.classList.toggle("btn-primary", currentMode === "light");
+      document.getElementById("btn-mode-dark")?.classList.toggle("btn-primary", currentMode === "dark");
+
+      for (const key of COLOR_KEYS) {
+        const val = resolvedTheme[key] || "";
+        const textInput = document.getElementById(`color-${key}`);
+        const pickerInput = document.getElementById(`picker-${key}`);
+        if (textInput) textInput.value = val;
+        if (pickerInput && /^#[0-9a-fA-F]{6}$/.test(val)) {
+          pickerInput.value = val;
+        }
+      }
+    }
+
+    for (const key of COLOR_KEYS) {
+      const picker = document.getElementById(`picker-${key}`);
+      const text = document.getElementById(`color-${key}`);
+      picker?.addEventListener("input", () => {
+        if (text) text.value = picker.value;
+      });
+      text?.addEventListener("input", () => {
+        if (picker && /^#[0-9a-fA-F]{6}$/.test(text.value.trim())) {
+          picker.value = text.value.trim();
+        }
+      });
+    }
+
+    document.getElementById("btn-mode-light")?.addEventListener("click", () => {
+      saveLocalTheme({ ...LIGHT_THEME, mode: "light" });
+      const resolved = applyResolvedTheme(quizData?.config || {});
+      syncThemeInputs(resolved);
+      showToast("Đã chuyển sang Giao diện Sáng ấm (Claude Code).");
+    });
+
+    document.getElementById("btn-mode-dark")?.addEventListener("click", () => {
+      saveLocalTheme({ ...DARK_THEME, mode: "dark" });
+      const resolved = applyResolvedTheme(quizData?.config || {});
+      syncThemeInputs(resolved);
+      showToast("Đã chuyển sang Giao diện Tối sân khấu.");
+    });
+
+    document.getElementById("btn-save-theme")?.addEventListener("click", () => {
+      const custom = { mode: currentMode };
+      for (const key of COLOR_KEYS) {
+        const val = document.getElementById(`color-${key}`)?.value.trim();
+        if (val) {
+          custom[key] = val;
+        }
+      }
+      saveLocalTheme(custom);
+      const resolved = applyResolvedTheme(quizData?.config || {});
+      syncThemeInputs(resolved);
+      showToast("Đã lưu bảng màu tùy chỉnh vào trình duyệt.");
+    });
+
+    document.getElementById("btn-reset-theme")?.addEventListener("click", () => {
+      clearLocalTheme();
+      const resolved = applyResolvedTheme(quizData?.config || {});
+      syncThemeInputs(resolved);
+      showToast("Đã khôi phục bảng màu về cấu hình Sheet / Mặc định.");
+    });
+
+    document.getElementById("btn-save-sheet")?.addEventListener("click", async () => {
+      const raw = document.getElementById("input-sheet-id")?.value || "";
+      const cleanId = setSheetId(raw);
+      document.getElementById("input-sheet-id").value = cleanId;
+      try {
+        await initSettingsPage(true);
+        showToast(
+          cleanId
+            ? `Đã lưu Sheet ID "${cleanId}" và tải dữ liệu thành công!`
+            : "Đã chuyển sang sử dụng dữ liệu mẫu tích hợp."
+        );
+      } catch (err) {
+        showToast(`Không thể tải Google Sheet: ${err.message || err}`);
+      }
+    });
+
+    document.getElementById("btn-use-sample")?.addEventListener("click", async () => {
+      setSheetId("");
+      document.getElementById("input-sheet-id").value = "";
+      await initSettingsPage(true);
+      showToast("Đã chuyển về sử dụng dữ liệu mẫu (data/sample/*.csv).");
+    });
+
+    async function initSettingsPage(forceRefresh = false) {
+      quizData = await fetchQuizData({ forceRefresh });
+      document.title = `Cài đặt - ${quizData.config.show_title}`;
+
+      const sheetId = getSheetId();
+      const sheetInput = document.getElementById("input-sheet-id");
+      const statusHint = document.getElementById("sheet-status-hint");
+      if (sheetInput) sheetInput.value = sheetId;
+      if (statusHint) {
+        statusHint.textContent = sheetId
+          ? `Đang lấy dữ liệu từ Google Sheet ID: ${sheetId} (${quizData.teams.length} đội, ${quizData.round1Packages.length} gói V1, ${quizData.round3Questions.length} câu V3).`
+          : `Đang dùng dữ liệu mẫu nội bộ (${quizData.teams.length} đội, ${quizData.round1Packages.length} gói V1, ${quizData.round3Questions.length} câu V3).`;
+      }
+
+      const resolved = applyResolvedTheme(quizData.config);
+      syncThemeInputs(resolved);
+
+      wireStageHeader({
+        config: quizData.config,
+        onBack: () => {
+          window.location.href = "./scores.html";
+        },
+        onContinue: () => {
+          window.location.href = "./index.html";
+        },
+        onReload: () => initSettingsPage(true)
+      });
+    }
+
+    initSettingsPage(false);
+  </script>
+</body>
+</html>

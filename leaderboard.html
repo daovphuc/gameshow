@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bảng xếp hạng - Đấu Trường Tri Thức</title>
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <header class="stage-header">
+    <div class="header-actions">
+      <button id="btn-header-back" class="btn" type="button">
+        ← Quay lại
+      </button>
+    </div>
+
+    <div class="header-center">
+      <div id="header-show-title" class="header-show-title">Đấu Trường Tri Thức</div>
+      <nav class="header-nav-bar" aria-label="Điều hướng chính">
+        <a href="./index.html" class="header-nav-link">Trang chủ</a>
+        <a href="./round1.html" class="header-nav-link">Vòng 1</a>
+        <a href="./round3.html" class="header-nav-link">Vòng 3</a>
+        <a href="./leaderboard.html" class="header-nav-link active">Bảng xếp hạng</a>
+        <a href="./scores.html" class="header-nav-link">Điểm số / Quản trị</a>
+        <a href="./settings.html" class="header-nav-link">Cài đặt</a>
+      </nav>
+    </div>
+
+    <div class="header-actions">
+      <button id="btn-reload-data" class="btn btn-sm" type="button">
+        ↻ Tải lại dữ liệu
+      </button>
+      <button id="btn-header-continue" class="btn btn-primary" type="button">
+        Điểm số / Quản trị →
+      </button>
+    </div>
+  </header>
+
+  <main class="stage-main">
+    <div class="section-header">
+      <div>
+        <h1 class="section-title">Bảng Xếp Hạng Đội Thi</h1>
+        <p class="section-subtitle">
+          Các đội bằng điểm nhau được xếp đồng hạng. Dữ liệu cập nhật tức thời từ các vòng thi.
+        </p>
+      </div>
+
+      <div class="tabs-bar" role="tablist" aria-label="Chọn bảng xếp hạng">
+        <button type="button" class="tab-btn active" data-tab="total">Tổng Điểm</button>
+        <button type="button" class="tab-btn" data-tab="round1">Vòng 1</button>
+        <button type="button" class="tab-btn" data-tab="round2">Vòng 2</button>
+        <button type="button" class="tab-btn" data-tab="round3">Vòng 3</button>
+      </div>
+    </div>
+
+    <section id="podium-section" class="podium-grid" aria-label="Bục vinh danh"></section>
+    <section id="leaderboard-list" class="leaderboard-list" aria-label="Danh sách thứ hạng"></section>
+  </main>
+
+  <script type="module">
+    import {
+      fetchQuizData,
+      loadAppState,
+      renderAvatarHtml,
+      escapeHtml,
+      wireStageHeader
+    } from "./js/app.js";
+    import { computeLeaderboard } from "./js/leaderboard.js";
+
+    const params = new URLSearchParams(window.location.search);
+    let currentMode = params.get("tab") || "total";
+    if (!["total", "round1", "round2", "round3"].includes(currentMode)) {
+      currentMode = "total";
+    }
+
+    let quizData = null;
+    let gameState = null;
+
+    function renderBoard() {
+      document.querySelectorAll(".tab-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.tab === currentMode);
+      });
+
+      const ranked = computeLeaderboard(quizData.teams, gameState, currentMode);
+      const podiumEl = document.getElementById("podium-section");
+      const listEl = document.getElementById("leaderboard-list");
+
+      // Show top 3 podium entries (or all with rank <= 3 up to 4 cards)
+      const podiumEntries = ranked.filter((item) => item.rank <= 3).slice(0, 4);
+      podiumEl.innerHTML = podiumEntries
+        .map(
+          (entry) => `
+          <div class="podium-card rank-${entry.rank}">
+            <span class="podium-rank-badge">Hạng #${entry.rank}</span>
+            ${renderAvatarHtml(entry, "team-avatar-lg")}
+            <h2 class="team-card-name" style="margin-top: 1rem;">${escapeHtml(entry.name)}</h2>
+            <div class="podium-score">${entry.score} <span style="font-size: 1rem; font-weight: 600;">điểm</span></div>
+            <div style="font-size: 0.9rem; color: var(--text-muted); margin-top: 0.4rem; font-family: var(--font-mono);">
+              V1: ${entry.round1} • V2: ${entry.round2} • V3: ${entry.round3}
+            </div>
+          </div>
+        `
+        )
+        .join("");
+
+      listEl.innerHTML = ranked
+        .map(
+          (entry) => `
+          <div class="leaderboard-row ${entry.rank <= 3 ? "top-rank" : ""}">
+            <div class="rank-number">#${entry.rank}</div>
+            <div class="leaderboard-team-info">
+              ${renderAvatarHtml(entry)}
+              <div class="leaderboard-team-name">${escapeHtml(entry.name)}</div>
+            </div>
+            <div class="leaderboard-subscores">
+              <span>V1: <strong>${entry.round1}</strong></span>
+              <span>V2: <strong>${entry.round2}</strong></span>
+              <span>V3: <strong>${entry.round3}</strong></span>
+              <span>Tổng: <strong>${entry.total}</strong></span>
+            </div>
+            <div class="leaderboard-main-score">${entry.score} đ</div>
+          </div>
+        `
+        )
+        .join("");
+    }
+
+    async function initLeaderboard(forceRefresh = false) {
+      quizData = await fetchQuizData({ forceRefresh });
+      gameState = loadAppState(quizData.teams);
+      document.title = `Bảng xếp hạng - ${quizData.config.show_title}`;
+
+      renderBoard();
+
+      wireStageHeader({
+        config: quizData.config,
+        onBack: () => {
+          window.location.href = "./round3.html";
+        },
+        onContinue: () => {
+          window.location.href = "./scores.html";
+        },
+        onReload: () => initLeaderboard(true)
+      });
+    }
+
+    document.querySelectorAll(".tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        currentMode = btn.dataset.tab;
+        renderBoard();
+      });
+    });
+
+    // Live update if scores change in another tab
+    window.addEventListener("storage", () => {
+      if (quizData) {
+        gameState = loadAppState(quizData.teams);
+        renderBoard();
+      }
+    });
+
+    initLeaderboard(false);
+  </script>
+</body>
+</html>

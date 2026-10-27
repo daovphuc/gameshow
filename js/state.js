@@ -1,0 +1,458 @@
+// Pure game state management for Round 1, Round 2 (manual), Round 3, locks, and JSON backup.
+
+import { getOfferedPackages } from "./data.js";
+
+function cloneState(state) {
+  return JSON.parse(JSON.stringify(state));
+}
+
+function normaliseRoundKey(round) {
+  if (round === 1 || round === "1" || round === "round1") return "round1";
+  if (round === 2 || round === "2" || round === "round2") return "round2";
+  if (round === 3 || round === "3" || round === "round3") return "round3";
+  throw new Error(`Invalid round: ${round}`);
+}
+
+function ensureTeamEntry(scores, teamId) {
+  if (!scores[teamId]) {
+    scores[teamId] = { round1: 0, round2: 0, round3: 0 };
+  } else {
+    scores[teamId] = {
+      round1: Number(scores[teamId].round1) || 0,
+      round2: Number(scores[teamId].round2) || 0,
+      round3: Number(scores[teamId].round3) || 0
+    };
+  }
+}
+
+/**
+ * Creates a fresh initial game state.
+ * @param {Array<{id: string}>} [teams]
+ */
+export function createInitialState(teams = []) {
+  const scores = {};
+  for (const team of teams) {
+    if (team && team.id) {
+      scores[String(team.id).trim()] = { round1: 0, round2: 0, round3: 0 };
+    }
+  }
+
+  return {
+    version: 1,
+    scores,
+    answeredQuestions: {},
+    round1: {
+      lockedTeams: [],
+      pickedPackages: [],
+      teamPackages: {},
+      activeSession: null
+    },
+    round3: {
+      openedTiles: [],
+      activeTile: null
+    }
+  };
+}
+
+/**
+ * Synchronises an existing state object with a list of teams without losing existing scores or progress.
+ * @param {object} state
+ * @param {Array<{id: string}>} [teams]
+ */
+export function syncStateWithTeams(state, teams = []) {
+  const next = state ? importState(exportState(state)) : createInitialState(teams);
+  for (const team of teams) {
+    if (team && team.id) {
+      ensureTeamEntry(next.scores, String(team.id).trim());
+    }
+  }
+  return next;
+}
+
+/**
+ * Checks whether a team has completed Round 1 and is locked.
+ * @param {object} state
+ * @param {string} teamId
+ * @returns {boolean}
+ */
+export function isTeamLocked(state, teamId) {
+  return Boolean(state?.round1?.lockedTeams?.includes(teamId));
+}
+
+/**
+ * Checks whether a Round 1 package has already been picked.
+ * @param {object} state
+ * @param {string} packageId
+ * @returns {boolean}
+ */
+export function isPackagePicked(state, packageId) {
+  return Boolean(state?.round1?.pickedPackages?.includes(packageId));
+}
+
+/**
+ * Returns the Round 1 packages available to be offered to `teamId` given current state.
+ * @param {object} state
+ * @param {Array<any>} packages
+ * @param {string} teamId
+ * @param {number|null} [limit]
+ */
+export function getAvailableRound1Packages(state, packages, teamId, limit = null) {
+  const picked = state?.round1?.pickedPackages || [];
+  return getOfferedPackages(packages, teamId, picked, limit);
+}
+
+/**
+ * Picks a Round 1 package for a team, locking that package from other teams and starting an active session.
+ * @param {object} state
+ * @param {string} teamId
+ * @param {string} packageId
+ */
+export function pickRound1Package(state, teamId, packageId) {
+  const next = cloneState(state);
+  ensureTeamEntry(next.scores, teamId);
+
+  if (next.round1.lockedTeams.includes(teamId)) {
+    throw new Error(`Team "${teamId}" is already locked in Round 1.`);
+  }
+
+  const alreadyPickedByOther =
+    next.round1.pickedPackages.includes(packageId) &&
+    next.round1.teamPackages?.[teamId] !== packageId;
+
+  if (alreadyPickedByOther) {
+    throw new Error(`Package "${packageId}" has already been picked.`);
+  }
+
+  if (!next.round1.pickedPackages.includes(packageId)) {
+    next.round1.pickedPackages.push(packageId);
+  }
+  if (!next.round1.teamPackages) {
+    next.round1.teamPackages = {};
+  }
+  next.round1.teamPackages[teamId] = packageId;
+
+  next.round1.activeSession = {
+    teamId,
+    packageId,
+    questionIndex: 0,
+    revealed: false
+  };
+
+  return next;
+}
+
+/**
+ * Updates the active Round 1 session (e.g. moving to next question or revealing answer).
+ * @param {object} state
+ * @param {Partial<{questionIndex: number, revealed: boolean}>} patch
+ */
+export function updateRound1Session(state, patch = {}) {
+  const next = cloneState(state);
+  if (!next.round1.activeSession) {
+    return next;
+  }
+  next.round1.activeSession = {
+    ...next.round1.activeSession,
+    ...patch
+  };
+  return next;
+}
+
+/**
+ * Clears an unstarted/aborted Round 1 team selection before a package is finished,
+ * or finishes the package and locks the team.
+ * @param {object} state
+ * @param {string} [teamId]
+ */
+export function finishRound1Package(state, teamId) {
+  const next = cloneState(state);
+  const targetTeamId = teamId || next.round1.activeSession?.teamId;
+  if (!targetTeamId) {
+    return next;
+  }
+
+  ensureTeamEntry(next.scores, targetTeamId);
+  if (!next.round1.lockedTeams.includes(targetTeamId)) {
+    next.round1.lockedTeams.push(targetTeamId);
+  }
+
+  if (next.round1.activeSession?.teamId === targetTeamId) {
+    next.round1.activeSession = null;
+  }
+
+  return next;
+}
+
+/**
+ * Checks whether a Round 3 tile is marked opened.
+ * @param {object} state
+ * @param {number} tileNumber
+ * @returns {boolean}
+ */
+export function isTileOpened(state, tileNumber) {
+  const num = Number(tileNumber);
+  return Boolean(state?.round3?.openedTiles?.includes(num));
+}
+
+/**
+ * Opens a Round 3 tile and marks it opened.
+ * @param {object} state
+ * @param {number} tileNumber
+ * @param {string|null} [selectedTeamId]
+ */
+export function openRound3Tile(state, tileNumber, selectedTeamId = null) {
+  const next = cloneState(state);
+  const num = Number(tileNumber);
+  if (!Number.isFinite(num)) {
+    throw new Error(`Invalid tile number: ${tileNumber}`);
+  }
+
+  if (!next.round3.openedTiles.includes(num)) {
+    next.round3.openedTiles.push(num);
+  }
+
+  next.round3.activeTile = {
+    number: num,
+    selectedTeamId: selectedTeamId || null,
+    revealed: false
+  };
+
+  return next;
+}
+
+/**
+ * Updates the active Round 3 tile session (e.g. changing answering team or revealing answer).
+ * @param {object} state
+ * @param {Partial<{selectedTeamId: string|null, revealed: boolean}>} patch
+ */
+export function updateRound3TileSession(state, patch = {}) {
+  const next = cloneState(state);
+  if (!next.round3.activeTile) {
+    return next;
+  }
+  next.round3.activeTile = {
+    ...next.round3.activeTile,
+    ...patch
+  };
+  return next;
+}
+
+/**
+ * Closes the active Round 3 tile view (keeping the tile marked opened).
+ * @param {object} state
+ */
+export function closeRound3Tile(state) {
+  const next = cloneState(state);
+  next.round3.activeTile = null;
+  return next;
+}
+
+/**
+ * Records a Correct/Wrong answer for a team in a given round.
+ * Correct adds `points` to that team's score in `round`; Wrong adds 0.
+ * If `questionKey` is provided, re-marking the same question key updates the previous decision cleanly.
+ * @param {object} state
+ * @param {{round: number|string, teamId: string, points: number, correct: boolean, questionKey?: string}} params
+ */
+export function recordAnswer(state, { round, teamId, points, correct, questionKey } = {}) {
+  if (!teamId) {
+    throw new Error("teamId is required to record an answer.");
+  }
+  const roundKey = normaliseRoundKey(round);
+  const numericPoints = Number(points) || 0;
+  const isCorrect = Boolean(correct);
+
+  const next = cloneState(state);
+  ensureTeamEntry(next.scores, teamId);
+  if (!next.answeredQuestions) {
+    next.answeredQuestions = {};
+  }
+
+  if (questionKey !== undefined && questionKey !== null && String(questionKey) !== "") {
+    const key = String(questionKey);
+    const prev = next.answeredQuestions[key];
+    if (prev && prev.correct && prev.teamId && prev.roundKey) {
+      ensureTeamEntry(next.scores, prev.teamId);
+      next.scores[prev.teamId][prev.roundKey] -= Number(prev.points) || 0;
+    }
+
+    if (isCorrect) {
+      next.scores[teamId][roundKey] += numericPoints;
+    }
+
+    next.answeredQuestions[key] = {
+      roundKey,
+      teamId,
+      points: numericPoints,
+      correct: isCorrect
+    };
+  } else {
+    if (isCorrect) {
+      next.scores[teamId][roundKey] += numericPoints;
+    }
+  }
+
+  return next;
+}
+
+/**
+ * Sets a team's score for a specific round (1, 2, or 3).
+ * @param {object} state
+ * @param {string} teamId
+ * @param {number|string} round
+ * @param {number} score
+ */
+export function setRoundScore(state, teamId, round, score) {
+  const roundKey = normaliseRoundKey(round);
+  const next = cloneState(state);
+  ensureTeamEntry(next.scores, teamId);
+  next.scores[teamId][roundKey] = Number(score) || 0;
+  return next;
+}
+
+/**
+ * Convenience helper to set a team's manual Round 2 score.
+ * @param {object} state
+ * @param {string} teamId
+ * @param {number} score
+ */
+export function setRound2Score(state, teamId, score) {
+  return setRoundScore(state, teamId, 2, score);
+}
+
+/**
+ * Adjusts a team's score in a round by a delta (+ or -).
+ * @param {object} state
+ * @param {string} teamId
+ * @param {number|string} round
+ * @param {number} delta
+ */
+export function adjustRoundScore(state, teamId, round, delta) {
+  const roundKey = normaliseRoundKey(round);
+  const next = cloneState(state);
+  ensureTeamEntry(next.scores, teamId);
+  next.scores[teamId][roundKey] += Number(delta) || 0;
+  return next;
+}
+
+/**
+ * Unlocks a locked Round 1 team (and optionally unlocks the package they picked).
+ * @param {object} state
+ * @param {string} teamId
+ * @param {{unlockPackage?: boolean}} [options]
+ */
+export function unlockRound1Team(state, teamId, { unlockPackage = false } = {}) {
+  const next = cloneState(state);
+  next.round1.lockedTeams = next.round1.lockedTeams.filter((id) => id !== teamId);
+
+  if (unlockPackage && next.round1.teamPackages?.[teamId]) {
+    const pkgId = next.round1.teamPackages[teamId];
+    next.round1.pickedPackages = next.round1.pickedPackages.filter((p) => p !== pkgId);
+    delete next.round1.teamPackages[teamId];
+  }
+
+  return next;
+}
+
+/**
+ * Unlocks a picked Round 1 package so it returns to the pool.
+ * @param {object} state
+ * @param {string} packageId
+ */
+export function unlockRound1Package(state, packageId) {
+  const next = cloneState(state);
+  next.round1.pickedPackages = next.round1.pickedPackages.filter((p) => p !== packageId);
+  if (next.round1.teamPackages) {
+    for (const [tId, pId] of Object.entries(next.round1.teamPackages)) {
+      if (pId === packageId) {
+        delete next.round1.teamPackages[tId];
+      }
+    }
+  }
+  return next;
+}
+
+/**
+ * Unlocks an opened Round 3 tile.
+ * @param {object} state
+ * @param {number} tileNumber
+ */
+export function unlockRound3Tile(state, tileNumber) {
+  const num = Number(tileNumber);
+  const next = cloneState(state);
+  next.round3.openedTiles = next.round3.openedTiles.filter((t) => t !== num);
+  if (next.round3.activeTile?.number === num) {
+    next.round3.activeTile = null;
+  }
+  return next;
+}
+
+/**
+ * Resets the entire game state back to zero.
+ * @param {Array<{id: string}>} [teams]
+ */
+export function resetState(teams = []) {
+  return createInitialState(teams);
+}
+
+/**
+ * Serialises state to JSON string for backup/export.
+ * @param {object} state
+ * @returns {string}
+ */
+export function exportState(state) {
+  return JSON.stringify(state, null, 2);
+}
+
+/**
+ * Restores and validates a game state from a JSON string.
+ * @param {string} jsonString
+ */
+export function importState(jsonString) {
+  if (typeof jsonString !== "string" || !jsonString.trim()) {
+    throw new Error("Invalid state JSON: input must be a non-empty string.");
+  }
+  const parsed = JSON.parse(jsonString);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Invalid state JSON: root must be an object.");
+  }
+
+  const scores = {};
+  if (parsed.scores && typeof parsed.scores === "object") {
+    for (const [teamId, entry] of Object.entries(parsed.scores)) {
+      scores[teamId] = {
+        round1: Number(entry?.round1) || 0,
+        round2: Number(entry?.round2) || 0,
+        round3: Number(entry?.round3) || 0
+      };
+    }
+  }
+
+  return {
+    version: Number(parsed.version) || 1,
+    scores,
+    answeredQuestions:
+      parsed.answeredQuestions && typeof parsed.answeredQuestions === "object"
+        ? { ...parsed.answeredQuestions }
+        : {},
+    round1: {
+      lockedTeams: Array.isArray(parsed.round1?.lockedTeams)
+        ? parsed.round1.lockedTeams.map(String)
+        : [],
+      pickedPackages: Array.isArray(parsed.round1?.pickedPackages)
+        ? parsed.round1.pickedPackages.map(String)
+        : [],
+      teamPackages:
+        parsed.round1?.teamPackages && typeof parsed.round1.teamPackages === "object"
+          ? { ...parsed.round1.teamPackages }
+          : {},
+      activeSession: parsed.round1?.activeSession || null
+    },
+    round3: {
+      openedTiles: Array.isArray(parsed.round3?.openedTiles)
+        ? parsed.round3.openedTiles.map(Number).filter(Number.isFinite)
+        : [],
+      activeTile: parsed.round3?.activeTile || null
+    }
+  };
+}
