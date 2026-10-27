@@ -2,6 +2,8 @@
 
 export const DEFAULT_SHEET_ID = "";
 export const DEFAULT_WEB_APP_URL = "";
+export const DEFAULT_PASSWORD_SHA256 =
+  "63640264849a87c90356129d99ea165e37aa5fabc1fea46906df1a7ca50db492";
 
 export const SHEET_TABS = ["teams", "round1", "round3", "config", "scores"];
 

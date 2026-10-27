@@ -1,6 +1,8 @@
-// Leaderboard ranking and team avatar helper functions (DOM-free).
+// Leaderboard ranking, trophy podium slot mapping, and team avatar helpers (DOM-free).
 
 import { TEAM_PALETTE } from "./config.js";
+
+export const PODIUM_SLOT_ORDER = [4, 2, 1, 3, 5];
 
 /**
  * Generates 1-2 character uppercase initials from a Vietnamese team name.
@@ -111,3 +113,31 @@ export function computeLeaderboard(teams = [], stateOrScores = {}, mode = "total
 
   return entries;
 }
+
+/**
+ * Maps ranked leaderboard entries into left-to-right trophy podium slots (4 - 2 - 1 - 3 - 5).
+ * - For fewer than 5 teams (1-4), returns only existing places in that relative left-to-right order.
+ * - Placement follows sorted order (`slot` = 1..5), while `rank` keeps shared ranks for ties.
+ * @param {Array<Record<string, any>>} [rankedEntries]
+ * @returns {Array<Record<string, any> & {slot: number, rank: number, trophy: "gold"|"silver"|"bronze"|"clay"}>}
+ */
+export function buildPodiumSlots(rankedEntries = []) {
+  const top = Array.isArray(rankedEntries) ? rankedEntries.slice(0, 5) : [];
+  return PODIUM_SLOT_ORDER
+    .filter((slot) => slot <= top.length)
+    .map((slot) => {
+      const entry = top[slot - 1];
+      const rank = entry?.rank ?? slot;
+      const trophy =
+        slot === 1 ? "gold" : slot === 2 ? "silver" : slot === 3 ? "bronze" : "clay";
+      return {
+        ...entry,
+        slot,
+        rank,
+        trophy
+      };
+    });
+}
+
+export const mapToPodiumSlots = buildPodiumSlots;
+export const getPodiumSlots = buildPodiumSlots;

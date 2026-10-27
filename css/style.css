@@ -65,6 +65,90 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Password Gate: Hide all page content until unlocked (zero flash of content) */
+body:not(.auth-unlocked) .app-shell {
+  display: none !important;
+}
+
+.auth-gate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background-color: var(--bg);
+}
+
+.auth-gate-card {
+  width: 100%;
+  max-width: 440px;
+  padding: 2.5rem 2.25rem;
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+
+.auth-gate-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.auth-gate-title {
+  font-family: var(--font-serif);
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0 0 0.4rem;
+}
+
+.auth-gate-subtitle {
+  color: var(--text-muted);
+  font-size: 0.96rem;
+  margin: 0 0 1.5rem;
+}
+
+.auth-gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.auth-gate-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+  background-color: var(--surface);
+  color: var(--text);
+  font-size: 1.05rem;
+  text-align: center;
+  letter-spacing: 0.08em;
+}
+
+.auth-gate-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.auth-gate-error {
+  color: var(--danger);
+  font-size: 0.9rem;
+  font-weight: 600;
+  min-height: 1.35rem;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -182,6 +266,11 @@ body.sidebar-collapsed .sidebar-footer-note {
   color: var(--text-muted);
   transition: all 0.15s ease;
   white-space: nowrap;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
 }
 
 body.sidebar-collapsed .sidebar-link {
@@ -284,6 +373,14 @@ body.sidebar-collapsed .sidebar-link {
 .sidebar-sync-badge.failed {
   border-color: var(--danger);
   color: var(--danger);
+}
+
+.sidebar-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
 }
 
 /* Main Stage Area */
@@ -469,9 +566,9 @@ body.sidebar-collapsed .sidebar-link {
 }
 
 .team-avatar-lg {
-  width: 80px;
-  height: 80px;
-  font-size: 1.6rem;
+  width: 76px;
+  height: 76px;
+  font-size: 1.55rem;
 }
 
 .team-avatar img {
@@ -697,25 +794,10 @@ body.sidebar-collapsed .sidebar-link {
   margin: 0 auto;
 }
 
-.question-meta-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
 .question-team-banner {
   display: flex;
   align-items: center;
   gap: 0.85rem;
-}
-
-.question-meta-pills {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
 }
 
 .meta-pill {
@@ -855,7 +937,7 @@ body.sidebar-collapsed .sidebar-link {
   cursor: not-allowed;
 }
 
-/* Leaderboard Pyramid (Top 5: 1 on top, 2-3 second row, 4-5 third row) & List */
+/* Leaderboard Tabs & Trophy Podium (Left-to-Right: 4 - 2 - 1 - 3 - 5) */
 .tabs-bar {
   display: inline-flex;
   flex-wrap: wrap;
@@ -888,77 +970,231 @@ body.sidebar-collapsed .sidebar-link {
   box-shadow: var(--shadow-sm);
 }
 
-.pyramid-section {
+@keyframes podiumRise {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scaleY(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+.trophy-podium-stage {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.15rem;
-  margin-bottom: 2.25rem;
-}
-
-.pyramid-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 1.25rem;
+  margin: 1rem auto 2.5rem;
+  max-width: 1220px;
   width: 100%;
 }
 
-.pyramid-card {
+.podium-columns-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(0.4rem, 1.2vw, 1rem);
+  width: 100%;
+  padding: 0 0.5rem;
+}
+
+.podium-column {
+  flex: 1 1 0;
+  max-width: 225px;
+  min-width: 130px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: bottom center;
+}
+
+.trophy-podium-stage.animate-rise .podium-column {
+  animation: podiumRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.trophy-podium-stage.animate-rise .podium-column.slot-1 {
+  animation-delay: 0.08s;
+}
+.trophy-podium-stage.animate-rise .podium-column.slot-2,
+.trophy-podium-stage.animate-rise .podium-column.slot-3 {
+  animation-delay: 0.16s;
+}
+.trophy-podium-stage.animate-rise .podium-column.slot-4,
+.trophy-podium-stage.animate-rise .podium-column.slot-5 {
+  animation-delay: 0.24s;
+}
+
+.podium-team-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 1.35rem 1.5rem;
-  background-color: var(--surface-elevated);
-  border: 2px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  width: 280px;
-  max-width: 100%;
+  padding: 0.75rem 0.6rem 0.4rem;
+  width: 100%;
 }
 
-.pyramid-row-1 .pyramid-card {
-  width: 340px;
-  padding: 1.65rem 1.75rem;
-  border-color: var(--accent);
-  background: linear-gradient(180deg, var(--surface-elevated) 0%, var(--surface) 100%);
+.podium-team-name {
+  font-family: var(--font-serif);
+  font-size: clamp(0.98rem, 1.35vw, 1.22rem);
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 0.5rem 0 0.2rem;
+  color: var(--text);
+  word-break: break-word;
 }
 
-.pyramid-row-2 .pyramid-card {
-  width: 300px;
+.podium-column.slot-1 .podium-team-name {
+  font-size: clamp(1.1rem, 1.55vw, 1.4rem);
 }
 
-.pyramid-rank-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.25rem 0.85rem;
-  border-radius: 999px;
-  font-weight: 800;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background-color: var(--bg);
-  border: 1px solid var(--border);
-  margin-bottom: 0.75rem;
-}
-
-.pyramid-row-1 .pyramid-rank-badge {
-  background-color: var(--accent);
-  border-color: var(--accent);
-  color: #FFFFFF;
-}
-
-.pyramid-score {
+.podium-team-points {
   font-family: var(--font-mono);
-  font-size: 2.15rem;
+  font-size: clamp(1.05rem, 1.4vw, 1.3rem);
   font-weight: 800;
   color: var(--accent);
-  margin-top: 0.35rem;
   font-variant-numeric: tabular-nums;
 }
 
+.podium-column.slot-1 .podium-team-points {
+  font-size: clamp(1.25rem, 1.75vw, 1.55rem);
+}
+
+.podium-team-sub {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+.podium-trophy-figure {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  margin-top: 0.25rem;
+  margin-bottom: -4px;
+  z-index: 2;
+  filter: drop-shadow(0 4px 8px rgba(20, 20, 19, 0.14));
+}
+
+.podium-trophy-svg {
+  display: block;
+}
+
+.podium-column.slot-1 .podium-trophy-svg {
+  width: 120px;
+  height: 120px;
+}
+
+.podium-column.slot-2 .podium-trophy-svg,
+.podium-column.slot-3 .podium-trophy-svg {
+  width: 96px;
+  height: 96px;
+}
+
+.podium-column.slot-4 .podium-trophy-svg,
+.podium-column.slot-5 .podium-trophy-svg {
+  width: 76px;
+  height: 76px;
+}
+
+/* Per-round breakdown stays in the list below; the podium keeps only the total. */
+.podium-team-rounds {
+  display: none;
+}
+
+/* Warm Golden Podium Pedestal Blocks */
+.podium-block {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px 12px 0 0;
+  border: 2px solid #C8963E;
+  border-bottom: none;
+  box-shadow: inset 0 10px 0 rgba(255, 250, 230, 0.45), var(--shadow-md);
+  color: #2A1E0D;
+  overflow: hidden;
+}
+
+.podium-block::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 10px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.35));
+}
+
+.podium-block.slot-1 {
+  height: 215px;
+  background: linear-gradient(180deg, #F6CE65 0%, #E0A83B 55%, #C68B28 100%);
+  border-color: #B57B1E;
+}
+
+.podium-block.slot-2 {
+  height: 170px;
+  background: linear-gradient(180deg, #F2D588 0%, #DCA94E 55%, #C18B34 100%);
+  border-color: #B47E2B;
+}
+
+.podium-block.slot-3 {
+  height: 140px;
+  background: linear-gradient(180deg, #EED294 0%, #D6A156 55%, #BB823B 100%);
+  border-color: #AA7330;
+}
+
+.podium-block.slot-4 {
+  height: 112px;
+  background: linear-gradient(180deg, #ECD7A8 0%, #D3AC6E 55%, #B88D4F 100%);
+  border-color: #A67B40;
+}
+
+.podium-block.slot-5 {
+  height: 92px;
+  background: linear-gradient(180deg, #E9D9B5 0%, #CEAF7A 55%, #B3915B 100%);
+  border-color: #9E7C48;
+}
+
+.podium-block-rank {
+  font-family: var(--font-serif);
+  font-weight: 800;
+  font-size: clamp(2.4rem, 4.2vw, 4rem);
+  line-height: 1;
+  color: #FFFDF7;
+  text-shadow: 0 3px 8px rgba(68, 42, 8, 0.45);
+  user-select: none;
+}
+
+.podium-block.slot-4 .podium-block-rank,
+.podium-block.slot-5 .podium-block-rank {
+  font-size: clamp(2rem, 3.2vw, 3rem);
+}
+
+/* Shared Striped Stage Base */
+.podium-striped-base {
+  width: 100%;
+  height: 26px;
+  border-radius: 8px;
+  border: 2px solid #8E5B23;
+  background: repeating-linear-gradient(
+    180deg,
+    #5C3A18 0px,
+    #5C3A18 6px,
+    #D97757 6px,
+    #D97757 12px,
+    #F3C65F 12px,
+    #F3C65F 18px,
+    #5C3A18 18px,
+    #5C3A18 24px
+  );
+  box-shadow: 0 10px 24px rgba(20, 20, 19, 0.22);
+}
+
+/* Leaderboard List Below Podium */
 .leaderboard-list {
   display: flex;
   flex-direction: column;
@@ -1152,6 +1388,7 @@ body.sidebar-collapsed .sidebar-link {
   }
   body.sidebar-collapsed .sidebar-nav,
   body.sidebar-collapsed .sidebar-settings-section,
+  body.sidebar-collapsed .sidebar-bottom,
   body.sidebar-collapsed .sidebar-footer-note {
     display: none !important;
   }
@@ -1162,10 +1399,47 @@ body.sidebar-collapsed .sidebar-link {
     justify-content: space-between;
   }
   .stage-main {
-    padding: 1.25rem 1rem 3rem;
+    padding: 1.25rem 0.75rem 3rem;
   }
   .question-card {
     padding: 1.5rem;
+  }
+  .podium-columns-row {
+    gap: 0.3rem;
+    padding: 0;
+  }
+  .podium-column {
+    min-width: 0;
+  }
+  .podium-team-card {
+    padding: 0.4rem 0.2rem 0.25rem;
+  }
+  .podium-team-sub {
+    display: none;
+  }
+  .podium-column .team-avatar {
+    width: 44px;
+    height: 44px;
+    font-size: 0.95rem;
+  }
+  .podium-column.slot-1 .team-avatar {
+    width: 54px;
+    height: 54px;
+    font-size: 1.15rem;
+  }
+  .podium-column.slot-1 .podium-trophy-svg {
+    width: 52px;
+    height: 52px;
+  }
+  .podium-column.slot-2 .podium-trophy-svg,
+  .podium-column.slot-3 .podium-trophy-svg {
+    width: 44px;
+    height: 44px;
+  }
+  .podium-column.slot-4 .podium-trophy-svg,
+  .podium-column.slot-5 .podium-trophy-svg {
+    width: 36px;
+    height: 36px;
   }
   .leaderboard-row {
     grid-template-columns: 52px 1fr auto;

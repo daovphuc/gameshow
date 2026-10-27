@@ -18,7 +18,7 @@
         <div>
           <h1 class="section-title">Bảng Xếp Hạng Đội Thi</h1>
           <p class="section-subtitle">
-            Top 5 đội dẫn đầu hiển thị theo tháp vinh danh; điểm số tự động cập nhật mỗi 10 giây.
+            Top 5 đội dẫn đầu vinh danh trên bục cúp chiến thắng; điểm số tự động cập nhật mỗi 10 giây.
           </p>
         </div>
 
@@ -30,7 +30,7 @@
         </div>
       </div>
 
-      <section id="pyramid-section" class="pyramid-section" aria-label="Tháp vinh danh Top 5"></section>
+      <section id="podium-section" class="trophy-podium-stage animate-rise" aria-label="Bục vinh danh Top 5"></section>
       <section id="leaderboard-list" class="leaderboard-list" aria-label="Danh sách các đội tiếp theo"></section>
     </main>
   </div>
@@ -44,7 +44,7 @@
       escapeHtml,
       wireStageLayout
     } from "./js/app.js";
-    import { computeLeaderboard } from "./js/leaderboard.js";
+    import { computeLeaderboard, buildPodiumSlots } from "./js/leaderboard.js";
 
     const params = new URLSearchParams(window.location.search);
     let currentMode = params.get("tab") || "total";
@@ -54,16 +54,131 @@
 
     let quizData = null;
     let gameState = null;
+    let lastPodiumSignature = "";
 
-    function renderPyramidCard(entry, isTopOne = false) {
+    function renderTrophySvg(trophyType, slotNumber) {
+      const gradId = `trophy-grad-${trophyType}-${slotNumber}`;
+      const shineId = `trophy-shine-${trophyType}-${slotNumber}`;
+      const palettes = {
+        gold: {
+          stop1: "#FFF3B0",
+          stop2: "#F6BD16",
+          stop3: "#B77900",
+          stroke: "#8C5800",
+          base1: "#9C6500",
+          base2: "#5E3A00",
+          star: "#FFFDF2"
+        },
+        silver: {
+          stop1: "#FFFFFF",
+          stop2: "#CBD5E1",
+          stop3: "#64748B",
+          stroke: "#475569",
+          base1: "#64748B",
+          base2: "#334155",
+          star: "#F8FAFC"
+        },
+        bronze: {
+          stop1: "#FDE0C2",
+          stop2: "#D97742",
+          stop3: "#8C421A",
+          stroke: "#692E0E",
+          base1: "#7C3A16",
+          base2: "#4A2009",
+          star: "#FFF5EB"
+        },
+        clay: {
+          stop1: "#F7C6AE",
+          stop2: "#D97757",
+          stop3: "#9E472A",
+          stroke: "#7A3219",
+          base1: "#8A3E24",
+          base2: "#542210",
+          star: "#FFF3EC"
+        }
+      };
+      const p = palettes[trophyType] || palettes.clay;
+
+      if (trophyType === "clay") {
+        return `
+          <svg class="podium-trophy-svg trophy-svg trophy-${trophyType}" viewBox="0 0 80 84" role="img" aria-label="Cúp hạng ${slotNumber}">
+            <defs>
+              <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="${p.stop1}" />
+                <stop offset="50%" stop-color="${p.stop2}" />
+                <stop offset="100%" stop-color="${p.stop3}" />
+              </linearGradient>
+            </defs>
+            <!-- Handles -->
+            <path d="M22 22 C11 22, 11 40, 24 42" fill="none" stroke="url(#${gradId})" stroke-width="4.5" stroke-linecap="round" />
+            <path d="M58 22 C69 22, 69 40, 56 42" fill="none" stroke="url(#${gradId})" stroke-width="4.5" stroke-linecap="round" />
+            <!-- Cup bowl -->
+            <path d="M20 14 H60 V30 C60 44, 49 52, 40 52 C31 52, 20 44, 20 30 Z" fill="url(#${gradId})" stroke="${p.stroke}" stroke-width="2" />
+            <!-- Star emblem -->
+            <polygon points="40,22 42.6,27.5 48.6,28.3 44.2,32.5 45.3,38.4 40,35.5 34.7,38.4 35.8,32.5 31.4,28.3 37.4,27.5" fill="${p.star}" opacity="0.92" />
+            <!-- Stem -->
+            <rect x="36" y="52" width="8" height="12" rx="2" fill="url(#${gradId})" stroke="${p.stroke}" stroke-width="1.5" />
+            <!-- Base -->
+            <rect x="24" y="64" width="32" height="7" rx="3" fill="${p.base1}" stroke="${p.stroke}" stroke-width="1.5" />
+            <rect x="19" y="71" width="42" height="8" rx="3" fill="${p.base2}" stroke="${p.stroke}" stroke-width="1.5" />
+          </svg>
+        `;
+      }
+
       return `
-        <div class="pyramid-card rank-${entry.rank}">
-          <span class="pyramid-rank-badge">Hạng #${entry.rank}</span>
-          ${renderAvatarHtml(entry, isTopOne ? "team-avatar-lg" : "")}
-          <h2 class="team-card-name" style="margin-top: 0.75rem;">${escapeHtml(entry.name)}</h2>
-          <div class="pyramid-score">${entry.score} <span style="font-size: 0.95rem; font-weight: 600;">điểm</span></div>
-          <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.35rem; font-family: var(--font-mono);">
-            V1: ${entry.round1} • V2: ${entry.round2} • V3: ${entry.round3}
+        <svg class="podium-trophy-svg trophy-svg trophy-${trophyType}" viewBox="0 0 96 100" role="img" aria-label="Cúp vinh danh hạng ${slotNumber}">
+          <defs>
+            <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="${p.stop1}" />
+              <stop offset="52%" stop-color="${p.stop2}" />
+              <stop offset="100%" stop-color="${p.stop3}" />
+            </linearGradient>
+            <linearGradient id="${shineId}" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.65" />
+              <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.0" />
+            </linearGradient>
+          </defs>
+          <!-- Left & Right Handles -->
+          <path d="M24 22 C8 22, 8 48, 27 50" fill="none" stroke="url(#${gradId})" stroke-width="5.5" stroke-linecap="round" />
+          <path d="M72 22 C88 22, 88 48, 69 50" fill="none" stroke="url(#${gradId})" stroke-width="5.5" stroke-linecap="round" />
+          <!-- Rim -->
+          <rect x="20" y="10" width="56" height="6" rx="3" fill="url(#${gradId})" stroke="${p.stroke}" stroke-width="2" />
+          <!-- Bowl -->
+          <path d="M22 16 H74 V36 C74 54, 59 64, 48 64 C37 64, 22 54, 22 36 Z" fill="url(#${gradId})" stroke="${p.stroke}" stroke-width="2.2" />
+          <!-- Highlight shine -->
+          <path d="M28 20 H36 V36 C36 47, 32 54, 28 56 Z" fill="url(#${shineId})" />
+          <!-- Center Star -->
+          <polygon points="48,24 51.5,31.2 59.4,32.3 53.7,37.8 55.1,45.7 48,41.9 40.9,45.7 42.3,37.8 36.6,32.3 44.5,31.2" fill="${p.star}" stroke="${p.stroke}" stroke-width="1" />
+          <!-- Stem -->
+          <path d="M42 64 H54 L56 78 H40 Z" fill="url(#${gradId})" stroke="${p.stroke}" stroke-width="2" />
+          <!-- Collar -->
+          <rect x="33" y="76" width="30" height="6" rx="3" fill="url(#${gradId})" stroke="${p.stroke}" stroke-width="1.8" />
+          <!-- Pedestal Base -->
+          <rect x="24" y="82" width="48" height="12" rx="3.5" fill="${p.base2}" stroke="${p.stroke}" stroke-width="2" />
+          <rect x="32" y="85" width="32" height="5" rx="1.5" fill="url(#${gradId})" />
+        </svg>
+      `;
+    }
+
+    function renderPodiumSlot(slotEntry) {
+      const isWinner = slotEntry.slot === 1;
+      return `
+        <div class="podium-column slot-${slotEntry.slot}" data-slot="${slotEntry.slot}" data-rank="${slotEntry.rank}">
+          <div class="podium-team-card">
+            ${renderAvatarHtml(slotEntry, isWinner ? "team-avatar-lg" : "")}
+            <h2 class="podium-team-name" title="${escapeHtml(slotEntry.name)}">${escapeHtml(slotEntry.name)}</h2>
+            <div class="podium-team-score">${slotEntry.score} <span>điểm</span></div>
+            <div class="podium-team-rounds">
+              V1: ${slotEntry.round1} • V2: ${slotEntry.round2} • V3: ${slotEntry.round3}
+            </div>
+          </div>
+
+          <div class="podium-trophy-figure">
+            ${renderTrophySvg(slotEntry.trophy, slotEntry.slot)}
+          </div>
+
+          <div class="podium-block slot-${slotEntry.slot}" aria-label="Bục vị trí ${slotEntry.slot}, hạng ${slotEntry.rank}">
+            <span class="podium-block-rank">${slotEntry.rank}</span>
           </div>
         </div>
       `;
@@ -75,34 +190,34 @@
       });
 
       const ranked = computeLeaderboard(quizData.teams, gameState, currentMode);
-      const pyramidEl = document.getElementById("pyramid-section");
+      const podiumEl = document.getElementById("podium-section");
       const listEl = document.getElementById("leaderboard-list");
 
-      // Top 5 pyramid: 1 on top, 2-3 in second row, 4-5 in third row
-      const top5 = ranked.slice(0, 5);
+      const podiumSlots = buildPodiumSlots(ranked);
       const rest = ranked.slice(5);
 
-      const row1 = top5.slice(0, 1);
-      const row2 = top5.slice(1, 3);
-      const row3 = top5.slice(3, 5);
+      const nextSignature = `${currentMode}::${podiumSlots
+        .map((s) => `${s.slot}:${s.id}:${s.rank}:${s.score}:${s.round1}:${s.round2}:${s.round3}`)
+        .join("|")}`;
 
-      pyramidEl.innerHTML = `
-        ${
-          row1.length
-            ? `<div class="pyramid-row pyramid-row-1">${row1.map((e) => renderPyramidCard(e, true)).join("")}</div>`
-            : ""
+      if (nextSignature !== lastPodiumSignature) {
+        lastPodiumSignature = nextSignature;
+        podiumEl.classList.remove("animate-rise");
+        // Trigger reflow so the gentle rise animation replays on tab or score change
+        void podiumEl.offsetWidth;
+        podiumEl.classList.add("animate-rise");
+
+        if (podiumSlots.length === 0) {
+          podiumEl.innerHTML = "";
+        } else {
+          podiumEl.innerHTML = `
+            <div class="podium-columns-row">
+              ${podiumSlots.map((slotEntry) => renderPodiumSlot(slotEntry)).join("")}
+            </div>
+            <div class="podium-striped-base" aria-hidden="true"></div>
+          `;
         }
-        ${
-          row2.length
-            ? `<div class="pyramid-row pyramid-row-2">${row2.map((e) => renderPyramidCard(e, false)).join("")}</div>`
-            : ""
-        }
-        ${
-          row3.length
-            ? `<div class="pyramid-row pyramid-row-3">${row3.map((e) => renderPyramidCard(e, false)).join("")}</div>`
-            : ""
-        }
-      `;
+      }
 
       listEl.innerHTML = rest
         .map(

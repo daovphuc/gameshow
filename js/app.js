@@ -8,6 +8,7 @@ import {
   extractSheetId,
   buildTabUrl
 } from "./config.js";
+import { resolvePasswordHash, verifyPassword } from "./auth.js";
 import { normaliseAllData } from "./data.js";
 import { normaliseScores, buildScoresPayload, mergeScores } from "./scores.js";
 import { createInitialState, syncStateWithTeams, exportState, importState } from "./state.js";
@@ -19,8 +20,114 @@ export const STORAGE_KEYS = {
   WEB_APP_URL: "gameshow_web_app_url",
   SIDEBAR_COLLAPSED: "gameshow_sidebar_collapsed",
   STATE: "gameshow_state",
-  DATA_CACHE: "gameshow_data_cache"
+  DATA_CACHE: "gameshow_data_cache",
+  AUTH_HASH: "gameshow_auth_hash"
 };
+
+export function isPasswordUnlocked(config = {}) {
+  try {
+    const storedHash = localStorage.getItem(STORAGE_KEYS.AUTH_HASH);
+    return Boolean(storedHash) && storedHash === resolvePasswordHash(config);
+  } catch {
+    return false;
+  }
+}
+
+export function ensurePasswordUnlocked(config = {}) {
+  const targetHash = resolvePasswordHash(config);
+
+  if (isPasswordUnlocked(config)) {
+    document.body.classList.add("auth-unlocked");
+    document.getElementById("auth-gate-overlay")?.remove();
+    return Promise.resolve(true);
+  }
+
+  document.body.classList.remove("auth-unlocked");
+
+  return new Promise((resolve) => {
+    let overlay = document.getElementById("auth-gate-overlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "auth-gate-overlay";
+      overlay.className = "auth-gate-overlay";
+      document.body.appendChild(overlay);
+    }
+
+    const showTitle = escapeHtml(config.show_title || "Đấu Trường Tri Thức");
+
+    overlay.innerHTML = `
+      <div class="auth-gate-card" role="dialog" aria-modal="true" aria-labelledby="auth-gate-title">
+        <div class="auth-gate-icon" aria-hidden="true">🔒</div>
+        <h1 id="auth-gate-title" class="auth-gate-title">${showTitle}</h1>
+        <p class="auth-gate-subtitle">
+          Vui lòng nhập mật khẩu để mở khóa hệ thống trình chiếu.
+        </p>
+        <form id="auth-gate-form" class="auth-gate-form" novalidate>
+          <input
+            type="password"
+            id="auth-gate-input"
+            class="auth-gate-input"
+            placeholder="Nhập mật khẩu..."
+            autocomplete="current-password"
+            aria-label="Mật khẩu truy cập"
+            required
+          />
+          <div id="auth-gate-error" class="auth-gate-error" role="alert" aria-live="polite"></div>
+          <button type="submit" id="auth-gate-submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
+            Mở khóa
+          </button>
+        </form>
+      </div>
+    `;
+
+    const form = document.getElementById("auth-gate-form");
+    const input = document.getElementById("auth-gate-input");
+    const errorEl = document.getElementById("auth-gate-error");
+    const submitBtn = document.getElementById("auth-gate-submit");
+
+    setTimeout(() => {
+      input?.focus();
+    }, 20);
+
+    form?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!input) return;
+      const candidate = input.value;
+      if (submitBtn) submitBtn.disabled = true;
+      try {
+        const ok = await verifyPassword(candidate, config);
+        if (ok) {
+          try {
+            localStorage.setItem(STORAGE_KEYS.AUTH_HASH, targetHash);
+          } catch {
+            // Ignore storage errors
+          }
+          document.body.classList.add("auth-unlocked");
+          overlay.remove();
+          resolve(true);
+        } else {
+          if (errorEl) {
+            errorEl.textContent = "Mật khẩu không chính xác. Vui lòng thử lại.";
+          }
+          input.select();
+          input.focus();
+        }
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  });
+}
+
+export function lockAppSession(config = {}) {
+  try {
+    localStorage.removeItem(STORAGE_KEYS.AUTH_HASH);
+  } catch {
+    // Ignore storage errors
+  }
+  document.body.classList.remove("auth-unlocked");
+  return ensurePasswordUnlocked(config);
+}
 
 let currentSyncStatus = {
   state: "idle", // "idle" | "saving" | "saved" | "failed"
@@ -160,6 +267,7 @@ export async function fetchQuizData({ forceRefresh = false } = {}) {
         const cached = JSON.parse(cachedRaw);
         if (cached && cached.sheetId === sheetId && cached.data) {
           applyResolvedTheme(cached.data.config);
+          await ensurePasswordUnlocked(cached.data.config);
           return { ...cached.data, sheetId, isSample: !sheetId };
         }
       }
@@ -169,28 +277,33 @@ export async function fetchQuizData({ forceRefresh = false } = {}) {
   }
 
   const fetched = {};
-  await Promise.all(
-    SHEET_TABS.map(async (tab) => {
-      const url = buildTabUrl(tab, sheetId);
-      try {
-        const res = await fetch(url, { cache: forceRefresh ? "no-store" : "default" });
-        if (!res.ok) {
+  try {
+    await Promise.all(
+      SHEET_TABS.map(async (tab) => {
+        const url = buildTabUrl(tab, sheetId);
+        try {
+          const res = await fetch(url, { cache: forceRefresh ? "no-store" : "default" });
+          if (!res.ok) {
+            if (tab === "scores") {
+              fetched.scoresCsv = "";
+              return;
+            }
+            throw new Error(`Không thể tải tab "${tab}" (${res.status})`);
+          }
+          fetched[`${tab}Csv`] = await res.text();
+        } catch (err) {
           if (tab === "scores") {
             fetched.scoresCsv = "";
             return;
           }
-          throw new Error(`Không thể tải tab "${tab}" (${res.status})`);
+          throw err;
         }
-        fetched[`${tab}Csv`] = await res.text();
-      } catch (err) {
-        if (tab === "scores") {
-          fetched.scoresCsv = "";
-          return;
-        }
-        throw err;
-      }
-    })
-  );
+      })
+    );
+  } catch (err) {
+    await ensurePasswordUnlocked({});
+    throw err;
+  }
 
   const data = normaliseAllData(fetched);
   try {
@@ -203,6 +316,7 @@ export async function fetchQuizData({ forceRefresh = false } = {}) {
   }
 
   applyResolvedTheme(data.config);
+  await ensurePasswordUnlocked(data.config);
   return { ...data, sheetId, isSample: !sheetId };
 }
 
@@ -519,12 +633,29 @@ export function wireStageLayout({
         </div>
       </div>
 
-      <div class="sidebar-footer-note" style="font-size: 0.76rem; color: var(--text-muted); padding-top: 1rem;">
-        Phím tắt: <strong>Space</strong> (Bắt đầu giờ), <strong>←</strong> (Quay lại), <strong>→</strong> (Tiếp tục)
+      <div class="sidebar-bottom" style="display: flex; flex-direction: column; gap: 0.65rem; padding-top: 1rem;">
+        <button
+          type="button"
+          id="btn-sidebar-lock"
+          class="sidebar-link"
+          style="width: 100%; border: 1px solid var(--border); background: var(--surface); cursor: pointer; text-align: left;"
+          title="Khóa màn hình (yêu cầu nhập lại mật khẩu)"
+        >
+          <span class="sidebar-link-icon">🔒</span>
+          <span class="sidebar-link-label">Khóa</span>
+        </button>
+
+        <div class="sidebar-footer-note" style="font-size: 0.76rem; color: var(--text-muted);">
+          Phím tắt: <strong>Space</strong> (Bắt đầu giờ), <strong>←</strong> (Quay lại), <strong>→</strong> (Tiếp tục)
+        </div>
       </div>
     `;
 
     updateSidebarSyncBadge();
+
+    document.getElementById("btn-sidebar-lock")?.addEventListener("click", () => {
+      lockAppSession(config);
+    });
 
     document.getElementById("btn-sidebar-toggle")?.addEventListener("click", () => {
       const nextCollapsed = !document.body.classList.contains("sidebar-collapsed");

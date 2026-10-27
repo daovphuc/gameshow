@@ -9,6 +9,10 @@ Toàn bộ danh sách đội thi, câu hỏi, cấu hình và bảng điểm đ�
 ## 1. Hướng dẫn thiết lập Google Sheets & Apps Script (5 bước)
 
 ### Bước 1: Tạo Google Sheet và nhập dữ liệu mẫu (`sheet-template/`)
+
+**Cách nhanh nhất:** tải [`sheet-template/gameshow-template.xlsx`](./sheet-template/gameshow-template.xlsx) lên Google Drive, mở file và chọn **Tệp → Lưu dưới dạng Google Trang tính**. File đã có sẵn đủ 5 tab, ghi chú cho từng cột và tab `huong_dan`. Sửa dữ liệu xong thì chuyển sang Bước 2.
+
+Hoặc tự tạo từ các file CSV:
 1. Truy cập [Google Sheets](https://sheets.google.com) và tạo một bảng tính mới.
 2. Tạo **5 trang tính (tabs)** ở thanh dưới cùng với tên viết thường chính xác như sau:
    - `teams`
@@ -123,16 +127,41 @@ Gồm 2 cột `key` và `value`:
 | `accent_color` | `#D97757` | Màu nhấn đất nung (`--accent`). |
 | `accent_dark_color` | `#C6613F` | Màu nhấn đậm (`--accent-dark`). |
 | `border_color` | `#E3E0D3` | Màu viền (`--border`). |
+| `password_sha256` | *(mặc định của `12345678910`)* | Mã băm SHA-256 (64 ký tự hex, không phân biệt hoa thường) dùng cho màn hình khóa mật khẩu khi vào trang. |
 
 ---
 
-## 3. Phím tắt hỗ trợ MC trên sân khấu
+## 3. Mật khẩu mở khóa khi vào trang (`password_sha256`)
+
+Mọi trang của hệ thống đều yêu cầu nhập mật khẩu trước khi hiển thị nội dung:
+- **Mật khẩu mặc định:** `12345678910` (trong mã nguồn chỉ lưu mã băm SHA-256 `63640264849a87c90356129d99ea165e37aa5fabc1fea46906df1a7ca50db492`, không lưu mật khẩu dạng văn bản thuần).
+- Sau khi nhập đúng, trình duyệt sẽ giữ trạng thái đã mở khóa (lưu trong `localStorage`) cho đến khi bạn nhấn nút **🔒 Khóa** ở cuối thanh điều hướng bên trái (Sidebar) hoặc khi khóa `password_sha256` trong Sheet thay đổi.
+
+### Cách đổi mật khẩu qua tab `config` trên Google Sheet
+1. Tạo mã băm SHA-256 (64 ký tự hex) cho mật khẩu mới bằng một dòng lệnh trong Terminal / Command Prompt (cần cài sẵn Node.js):
+   ```bash
+   node -e "console.log(require('crypto').createHash('sha256').update('MAT_KHAU_MOI_CUA_BAN').digest('hex'))"
+   ```
+   *(Hoặc chạy trực tiếp trong DevTools Console của trình duyệt):*
+   ```js
+   crypto.subtle.digest("SHA-256", new TextEncoder().encode("MAT_KHAU_MOI_CUA_BAN")).then(b => console.log([...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("")))
+   ```
+2. Mở tab `config` trên Google Sheet, thêm một dòng mới với:
+   - Cột `key`: `password_sha256`
+   - Cột `value`: chuỗi 64 ký tự hex vừa tạo ở bước 1.
+3. Trên website, mở mục **⚙ Cài đặt & Dữ liệu → ↻ Tải lại dữ liệu** để áp dụng ngay mật khẩu mới.
+
+> **Lưu ý bảo mật:** Cơ chế mật khẩu phía trình duyệt này chỉ là **lớp chắn cơ bản** nhằm tránh người xem vô tình mở nhầm trang điều khiển trên sân khấu, **không phải bảo mật thực sự (not real security)** vì GitHub Pages phân phối toàn bộ mã nguồn tĩnh và dữ liệu Google Sheet ở chế độ công khai.
+
+---
+
+## 4. Phím tắt hỗ trợ MC trên sân khấu
 
 - `Space` (Phím cách): Bắt đầu đồng hồ đếm ngược khi đang mở câu hỏi.
 - `→` (Mũi tên phải): Nút **Tiếp tục** (hoàn thành gói câu hỏi Vòng 1 / quay về bảng 50 ô Vòng 3).
 - `←` (Mũi tên trái): Nút **Quay lại** (quay về danh sách đội Vòng 1 / bảng 50 ô Vòng 3).
 
-## 4. Kiểm thử tự động
+## 5. Kiểm thử tự động
 
 ```bash
 npm test
