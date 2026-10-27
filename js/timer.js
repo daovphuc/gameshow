@@ -1,5 +1,7 @@
 // Pure countdown timer logic (DOM-free).
 
+export const DEFAULT_WARNING_SECONDS = 5;
+
 /**
  * Computes remaining milliseconds from duration, start time, and current time.
  * Never returns below 0.
@@ -28,19 +30,36 @@ export function getRemainingSeconds(durationSeconds, startTimeMs, nowMs) {
 }
 
 /**
+ * Pure check for whether the timer is in the warning window:
+ * true ONLY within the last `warningSeconds` and strictly before 0 (> 0).
+ * @param {number} remainingSeconds
+ * @param {number} [warningSeconds]
+ * @returns {boolean}
+ */
+export function isTimerWarning(remainingSeconds, warningSeconds = DEFAULT_WARNING_SECONDS) {
+  const rem = Number(remainingSeconds) || 0;
+  const warn = Math.max(0, Number(warningSeconds) ?? DEFAULT_WARNING_SECONDS);
+  return rem > 0 && rem <= warn;
+}
+
+/**
  * Creates an idle timer state for a given duration in seconds.
  * @param {number} durationSeconds
+ * @param {number} [warningSeconds]
  */
-export function createTimer(durationSeconds) {
+export function createTimer(durationSeconds, warningSeconds = DEFAULT_WARNING_SECONDS) {
   const sec = Math.max(0, Number(durationSeconds) || 0);
+  const warnSec = Math.max(0, Number(warningSeconds) ?? DEFAULT_WARNING_SECONDS);
   const durationMs = sec * 1000;
   return {
     durationSeconds: sec,
     durationMs,
+    warningSeconds: warnSec,
     startedAt: null,
     remainingMs: durationMs,
     remainingSeconds: Math.ceil(sec),
     status: "idle",
+    warning: false,
     finished: false
   };
 }
@@ -55,12 +74,14 @@ export function startTimer(timer, startTimeMs) {
   if (!timer) {
     return createTimer(0);
   }
+  const warnSec = timer.warningSeconds ?? DEFAULT_WARNING_SECONDS;
   if (timer.finished || timer.status === "finished") {
     return {
       ...timer,
       remainingMs: 0,
       remainingSeconds: 0,
       status: "finished",
+      warning: false,
       finished: true
     };
   }
@@ -71,40 +92,51 @@ export function startTimer(timer, startTimeMs) {
       remainingMs: 0,
       remainingSeconds: 0,
       status: "finished",
+      warning: false,
       finished: true
     };
   }
+  const remainingSeconds = Math.ceil(timer.durationMs / 1000);
   return {
     ...timer,
     startedAt: startTimeMs,
     remainingMs: timer.durationMs,
-    remainingSeconds: Math.ceil(timer.durationMs / 1000),
+    remainingSeconds,
     status: "running",
+    warning: isTimerWarning(remainingSeconds, warnSec),
     finished: false
   };
 }
 
 /**
  * Advances the timer to `nowMs`.
- * Once it reaches 0, it reports `finished: true` and stays finished on any subsequent tick.
+ * Once it reaches 0, it reports `finished: true` (`warning: false`) and stays finished.
  * @param {object} timer
  * @param {number} nowMs
+ * @param {number} [warningSecondsOverride]
  */
-export function tickTimer(timer, nowMs) {
+export function tickTimer(timer, nowMs, warningSecondsOverride) {
   if (!timer) {
     return createTimer(0);
   }
+  const warnSec =
+    warningSecondsOverride !== undefined
+      ? Math.max(0, Number(warningSecondsOverride) || 0)
+      : timer.warningSeconds ?? DEFAULT_WARNING_SECONDS;
+
   if (timer.finished || timer.status === "finished") {
     return {
       ...timer,
+      warningSeconds: warnSec,
       remainingMs: 0,
       remainingSeconds: 0,
       status: "finished",
+      warning: false,
       finished: true
     };
   }
   if (timer.status !== "running" || timer.startedAt === null) {
-    return { ...timer };
+    return { ...timer, warningSeconds: warnSec, warning: false };
   }
 
   const remainingMs = getRemainingMs(timer.durationSeconds, timer.startedAt, nowMs);
@@ -113,18 +145,22 @@ export function tickTimer(timer, nowMs) {
   if (remainingMs <= 0) {
     return {
       ...timer,
+      warningSeconds: warnSec,
       remainingMs: 0,
       remainingSeconds: 0,
       status: "finished",
+      warning: false,
       finished: true
     };
   }
 
   return {
     ...timer,
+    warningSeconds: warnSec,
     remainingMs,
     remainingSeconds,
     status: "running",
+    warning: isTimerWarning(remainingSeconds, warnSec),
     finished: false
   };
 }

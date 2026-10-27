@@ -4,41 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Vòng 1 - Đấu Trường Tri Thức</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Noto+Serif:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./css/style.css" />
 </head>
 <body>
-  <header class="stage-header">
-    <div class="header-actions">
-      <button id="btn-header-back" class="btn" type="button">
-        ← Quay lại
-      </button>
-    </div>
+  <div class="app-shell">
+    <aside id="app-sidebar" class="app-sidebar" aria-label="Thanh điều hướng bên trái"></aside>
 
-    <div class="header-center">
-      <div id="header-show-title" class="header-show-title">Đấu Trường Tri Thức</div>
-      <nav class="header-nav-bar" aria-label="Điều hướng chính">
-        <a href="./index.html" class="header-nav-link">Trang chủ</a>
-        <a href="./round1.html" class="header-nav-link active">Vòng 1</a>
-        <a href="./round3.html" class="header-nav-link">Vòng 3</a>
-        <a href="./leaderboard.html" class="header-nav-link">Bảng xếp hạng</a>
-        <a href="./scores.html" class="header-nav-link">Điểm số / Quản trị</a>
-        <a href="./settings.html" class="header-nav-link">Cài đặt</a>
-      </nav>
-    </div>
-
-    <div class="header-actions">
-      <button id="btn-reload-data" class="btn btn-sm" type="button">
-        ↻ Tải lại dữ liệu
-      </button>
-      <button id="btn-header-continue" class="btn btn-primary" type="button">
-        Tiếp tục →
-      </button>
-    </div>
-  </header>
-
-  <main class="stage-main">
-    <div id="round1-stage"></div>
-  </main>
+    <main class="stage-main">
+      <div id="round1-stage"></div>
+    </main>
+  </div>
 
   <script type="module">
     import {
@@ -48,15 +26,14 @@
       renderAvatarHtml,
       escapeHtml,
       showToast,
-      wireStageHeader
+      wireStageLayout
     } from "./js/app.js";
     import {
       isTeamLocked,
       getAvailableRound1Packages,
       pickRound1Package,
-      updateRound1Session,
-      finishRound1Package,
-      recordAnswer
+      cancelRound1Session,
+      finishRound1Package
     } from "./js/state.js";
     import { createTimer, startTimer, tickTimer, formatTimer } from "./js/timer.js";
 
@@ -79,10 +56,11 @@
     }
 
     function ensureQuestionTimer(questionKey, durationSeconds) {
+      const warnSec = Number(quizData?.config?.warning_seconds) || 5;
       if (activeTimerKey !== questionKey || !currentTimer) {
         stopTimerLoop();
         activeTimerKey = questionKey;
-        currentTimer = createTimer(durationSeconds);
+        currentTimer = createTimer(durationSeconds, warnSec);
       }
     }
 
@@ -90,11 +68,12 @@
       if (!currentTimer || currentTimer.finished || currentTimer.status === "running") {
         return false;
       }
+      const warnSec = Number(quizData?.config?.warning_seconds) || 5;
       currentTimer = startTimer(currentTimer, Date.now());
       updateTimerDom();
       stopTimerLoop();
       timerInterval = setInterval(() => {
-        currentTimer = tickTimer(currentTimer, Date.now());
+        currentTimer = tickTimer(currentTimer, Date.now(), warnSec);
         updateTimerDom();
         if (currentTimer.finished) {
           stopTimerLoop();
@@ -104,31 +83,27 @@
     }
 
     function updateTimerDom() {
-      const panel = document.getElementById("r1-timer-panel");
+      const box = document.getElementById("r1-timer-box");
       const digits = document.getElementById("r1-timer-digits");
-      const status = document.getElementById("r1-timer-status");
-      const bar = document.getElementById("r1-timer-bar");
+      const warnText = document.getElementById("r1-timer-warning");
       const startBtn = document.getElementById("btn-start-timer");
-      if (!panel || !currentTimer) return;
+      if (!box || !currentTimer) return;
 
-      panel.classList.toggle("running", currentTimer.status === "running");
-      panel.classList.toggle("finished", currentTimer.finished);
+      box.classList.toggle("running", currentTimer.status === "running" && !currentTimer.warning);
+      box.classList.toggle("warning", Boolean(currentTimer.warning));
+      box.classList.toggle("finished", Boolean(currentTimer.finished));
+
       if (digits) {
         digits.textContent = formatTimer(currentTimer.remainingSeconds);
       }
-      if (status) {
-        status.textContent = currentTimer.finished
-          ? "HẾT GIỜ!"
-          : currentTimer.status === "running"
-            ? "Đang đếm ngược..."
-            : "Sẵn sàng";
-      }
-      if (bar) {
-        const pct =
-          currentTimer.durationMs > 0
-            ? Math.max(0, Math.min(100, (currentTimer.remainingMs / currentTimer.durationMs) * 100))
-            : 0;
-        bar.style.width = `${pct}%`;
+      if (warnText) {
+        if (currentTimer.finished) {
+          warnText.textContent = "HẾT GIỜ!";
+        } else if (currentTimer.warning) {
+          warnText.textContent = `⚠ Còn ${currentTimer.remainingSeconds} giây!`;
+        } else {
+          warnText.textContent = "";
+        }
       }
       if (startBtn) {
         startBtn.disabled = currentTimer.status === "running" || currentTimer.finished;
@@ -136,7 +111,7 @@
           ? "Đã hết giờ"
           : currentTimer.status === "running"
             ? "Đang chạy..."
-            : "▶ Bắt đầu đếm ngược (Space)";
+            : "▶ Bắt đầu";
       }
     }
 
@@ -149,20 +124,15 @@
       }
     }
 
+    // Back on the package-choice and question screens returns to the team list, not to home.
     function handleBack() {
-      const session = gameState.round1.activeSession;
-      if (session) {
-        if (session.questionIndex > 0) {
-          gameState = updateRound1Session(gameState, {
-            questionIndex: session.questionIndex - 1,
-            revealed: false
-          });
-          saveAppState(gameState);
-          renderStage();
-          return;
-        }
-        // Back to team grid from question 1 (keeps session or lets host switch view)
-        window.location.href = "./index.html";
+      if (gameState.round1.activeSession) {
+        gameState = cancelRound1Session(gameState, { releasePackage: true });
+        saveAppState(gameState);
+        setPendingTeam(null);
+        stopTimerLoop();
+        activeTimerKey = null;
+        renderStage();
         return;
       }
       if (pendingTeamId) {
@@ -174,28 +144,18 @@
       window.location.href = "./index.html";
     }
 
+    // Continue on the question screen finishes the package, locks the team, and returns to the team list.
     function handleContinue() {
       const session = gameState.round1.activeSession;
       if (session) {
-        const pkg = quizData.round1Packages.find((p) => p.id === session.packageId);
-        const totalQuestions = pkg ? pkg.questions.length : 0;
-        if (session.questionIndex + 1 < totalQuestions) {
-          gameState = updateRound1Session(gameState, {
-            questionIndex: session.questionIndex + 1,
-            revealed: false
-          });
-          saveAppState(gameState);
-          renderStage();
-        } else {
-          const team = quizData.teams.find((t) => t.id === session.teamId);
-          gameState = finishRound1Package(gameState, session.teamId);
-          saveAppState(gameState);
-          setPendingTeam(null);
-          stopTimerLoop();
-          activeTimerKey = null;
-          showToast(`Đã hoàn thành gói câu hỏi của ${team ? team.name : session.teamId}!`);
-          renderStage();
-        }
+        const team = quizData.teams.find((t) => t.id === session.teamId);
+        gameState = finishRound1Package(gameState, session.teamId);
+        saveAppState(gameState);
+        setPendingTeam(null);
+        stopTimerLoop();
+        activeTimerKey = null;
+        showToast(`Đã hoàn thành gói câu hỏi của ${team ? team.name : session.teamId}!`);
+        renderStage();
         return;
       }
 
@@ -207,7 +167,6 @@
         return;
       }
 
-      // From team grid, Continue goes to Round 3
       window.location.href = "./round3.html";
     }
 
@@ -227,12 +186,12 @@
       stopTimerLoop();
       activeTimerKey = null;
 
-      const lockedCount = gameState.round1.lockedTeams.length;
       const cardsHtml = quizData.teams
         .map((team) => {
           const locked = isTeamLocked(gameState, team.id);
-          const r1Score = gameState.scores[team.id]?.round1 ?? 0;
-          const pickedPkg = gameState.round1.teamPackages?.[team.id] || "";
+          const pickedPkgId = gameState.round1.teamPackages?.[team.id] || "";
+          const pickedPkg = quizData.round1Packages.find((p) => p.id === pickedPkgId);
+          const pickedLabel = pickedPkg ? pickedPkg.package : pickedPkgId;
           return `
             <button
               type="button"
@@ -242,9 +201,8 @@
             >
               ${renderAvatarHtml(team, "team-avatar-lg")}
               <div class="team-card-name">${escapeHtml(team.name)}</div>
-              <div class="team-card-score">Điểm Vòng 1: ${r1Score}</div>
               <div class="team-card-status">
-                ${locked ? `✓ Đã hoàn thành${pickedPkg ? ` (${escapeHtml(pickedPkg)})` : ""}` : "Bấm để chọn gói câu hỏi"}
+                ${locked ? `✓ Đã hoàn thành${pickedLabel ? ` (${escapeHtml(pickedLabel)})` : ""}` : "Bấm để chọn gói câu hỏi"}
               </div>
             </button>
           `;
@@ -256,11 +214,8 @@
           <div>
             <h1 class="section-title">${escapeHtml(quizData.config.round1_name)}</h1>
             <p class="section-subtitle">
-              Chọn đội thi trên sân khấu để nhận 2 gói câu hỏi đề xuất (${lockedCount}/${quizData.teams.length} đội đã hoàn thành).
+              Chọn đội thi trên sân khấu để nhận 2 gói câu hỏi đề xuất.
             </p>
-          </div>
-          <div>
-            <a href="./leaderboard.html?tab=round1" class="btn">Xem Bảng xếp hạng Vòng 1</a>
           </div>
         </div>
         <div class="teams-grid">
@@ -275,11 +230,6 @@
           renderStage();
         });
       });
-
-      const continueBtn = document.getElementById("btn-header-continue");
-      if (continueBtn) {
-        continueBtn.textContent = "Sang Vòng 3 →";
-      }
     }
 
     function renderPackagePickStage(container, teamId) {
@@ -300,6 +250,8 @@
 
       const renderPkgCard = (pkg, idx, isPrimary) => {
         const isTeamSpecific = Boolean(pkg.team_id);
+        const timeSec = pkg.time_seconds || pkg.questions?.[0]?.time_seconds || quizData.config.round1_time_seconds;
+        const pts = pkg.points ?? pkg.questions?.[0]?.points ?? quizData.config.round1_default_points;
         return `
           <button type="button" class="package-card" data-package-id="${escapeHtml(pkg.id)}">
             <div>
@@ -308,12 +260,12 @@
               </span>
               <h2 class="package-card-title">${escapeHtml(pkg.package)}</h2>
               <p class="package-card-meta">
-                Số lượng: <strong>${pkg.questions.length} câu hỏi</strong> •
-                Thời gian: <strong>${pkg.questions[0]?.time_seconds || quizData.config.round1_time_seconds} giây/câu</strong>
+                Điểm câu hỏi: <strong>${pts} điểm</strong> •
+                Thời gian: <strong>${timeSec} giây</strong>
               </p>
             </div>
             <div class="nav-card-footer">
-              <span>Khóa gói và bắt đầu thi</span>
+              <span>Mở câu hỏi của gói</span>
               <span>Chọn gói này →</span>
             </div>
           </button>
@@ -321,16 +273,25 @@
       };
 
       container.innerHTML = `
-        <div class="question-topbar" style="margin-bottom: 1.75rem;">
-          <div class="question-team-banner">
-            ${renderAvatarHtml(team)}
-            <div>
-              <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">ĐỘI ĐANG LỰA CHỌN GÓI CÂU HỎI</div>
-              <div style="font-family: var(--font-serif); font-size: 1.65rem; font-weight: 700;">${escapeHtml(team.name)}</div>
+        <div class="screen-action-bar">
+          <div class="screen-left-group">
+            <button type="button" id="btn-screen-back" class="btn">
+              ← Quay lại danh sách đội
+            </button>
+            <div class="question-team-banner">
+              ${renderAvatarHtml(team, "team-avatar-sm")}
+              <strong style="font-family: var(--font-serif); font-size: 1.35rem;">${escapeHtml(team.name)}</strong>
             </div>
           </div>
-          <div class="question-meta-pills">
-            <button type="button" id="btn-change-team" class="btn btn-sm">← Đổi đội khác</button>
+
+          <div class="screen-right-group">
+            ${
+              extraAvailable.length > 0
+                ? `<button type="button" id="btn-toggle-extra-pkgs" class="btn btn-sm">
+                    ${showAllSharedPackages ? "Ẩn bớt gói chung" : `Xem thêm ${extraAvailable.length} gói chung khác`}
+                  </button>`
+                : ""
+            }
           </div>
         </div>
 
@@ -338,24 +299,17 @@
           <div>
             <h1 class="section-title">Chọn 1 trong ${primaryOffered.length} gói câu hỏi</h1>
             <p class="section-subtitle">
-              Gói câu hỏi chung sau khi được chọn sẽ tự động khóa đối với các đội thi tiếp theo.
+              Mỗi gói gồm 1 câu hỏi. Gói câu hỏi chung sau khi chọn sẽ khóa đối với các đội khác.
             </p>
           </div>
-          ${
-            extraAvailable.length > 0
-              ? `<button type="button" id="btn-toggle-extra-pkgs" class="btn btn-sm">
-                  ${showAllSharedPackages ? "Ẩn bớt gói chung" : `Xem thêm ${extraAvailable.length} gói chung khác`}
-                </button>`
-              : ""
-          }
         </div>
 
         ${
           primaryOffered.length === 0
             ? `<div class="panel-card">
                 <h2 class="panel-title">Không còn gói câu hỏi khả dụng</h2>
-                <p class="panel-desc">Tất cả các gói câu hỏi cho đội này đã được sử dụng. Bạn có thể mở khóa gói trong trang Quản trị.</p>
-                <a href="./scores.html" class="btn btn-primary">Mở trang Quản trị</a>
+                <p class="panel-desc">Tất cả các gói câu hỏi cho đội này đã được sử dụng. Bạn có thể mở khóa gói trong trang Điểm số.</p>
+                <a href="./scores.html" class="btn btn-primary">Mở trang Điểm số</a>
               </div>`
             : `<div class="packages-grid">
                 ${primaryOffered.map((pkg, idx) => renderPkgCard(pkg, idx, true)).join("")}
@@ -365,7 +319,7 @@
         ${
           showAllSharedPackages && extraAvailable.length > 0
             ? `<div style="margin-top: 2rem;">
-                <h3 class="section-title" style="font-size: 1.35rem; margin-bottom: 1rem;">Các gói câu hỏi chung còn lại trong kho</h3>
+                <h3 class="section-title" style="font-size: 1.35rem; margin-bottom: 1rem;">Các gói câu hỏi chung còn lại</h3>
                 <div class="packages-grid">
                   ${extraAvailable.map((pkg, idx) => renderPkgCard(pkg, idx + offeredLimit, false)).join("")}
                 </div>
@@ -374,10 +328,7 @@
         }
       `;
 
-      document.getElementById("btn-change-team")?.addEventListener("click", () => {
-        setPendingTeam(null);
-        renderStage();
-      });
+      document.getElementById("btn-screen-back")?.addEventListener("click", handleBack);
 
       document.getElementById("btn-toggle-extra-pkgs")?.addEventListener("click", () => {
         showAllSharedPackages = !showAllSharedPackages;
@@ -389,11 +340,6 @@
           selectPackageForTeam(teamId, card.dataset.packageId);
         });
       });
-
-      const continueBtn = document.getElementById("btn-header-continue");
-      if (continueBtn) {
-        continueBtn.textContent = "Chọn gói đầu tiên →";
-      }
     }
 
     function renderQuestionStage(container, session) {
@@ -403,63 +349,51 @@
         color: "#D97757"
       };
       const pkg = quizData.round1Packages.find((p) => p.id === session.packageId);
-      if (!pkg || pkg.questions.length === 0) {
-        gameState = finishRound1Package(gameState, session.teamId);
+      if (!pkg) {
+        gameState = cancelRound1Session(gameState);
         saveAppState(gameState);
         renderStage();
         return;
       }
 
-      const qIndex = Math.min(Math.max(0, session.questionIndex || 0), pkg.questions.length - 1);
-      const question = pkg.questions[qIndex];
-      const questionKey = `r1__${pkg.id}__${qIndex}`;
-      const recorded = gameState.answeredQuestions?.[questionKey] || null;
-      const teamScore = gameState.scores[team.id]?.round1 ?? 0;
-      const isLastQuestion = qIndex + 1 >= pkg.questions.length;
+      const question = pkg.questions?.[0] || pkg;
+      const questionKey = `r1__${pkg.id}`;
 
       ensureQuestionTimer(questionKey, question.time_seconds);
 
       container.innerHTML = `
         <div class="question-stage">
-          <div class="question-topbar">
-            <div class="question-team-banner">
-              ${renderAvatarHtml(team)}
-              <div>
-                <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">
-                  ${escapeHtml(pkg.package)}
-                </div>
-                <div style="font-family: var(--font-serif); font-size: 1.55rem; font-weight: 700;">
-                  ${escapeHtml(team.name)} <span style="color: var(--accent); font-family: var(--font-mono);">(${teamScore} điểm)</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="question-meta-pills">
-              <span class="meta-pill">Câu ${qIndex + 1} / ${pkg.questions.length}</span>
-              <span class="meta-pill accent">+${question.points} điểm</span>
-              <span class="meta-pill">${question.time_seconds} giây</span>
-            </div>
-          </div>
-
-          <div id="r1-timer-panel" class="timer-panel">
-            <div class="timer-display-group">
-              <div id="r1-timer-digits" class="timer-digits">${formatTimer(currentTimer.remainingSeconds)}</div>
-              <div>
-                <span id="r1-timer-status" class="timer-status-badge">Sẵn sàng</span>
-                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.35rem;">
-                  Khi hết giờ, màn hình giữ nguyên câu hỏi cho đến khi MC bấm Tiếp tục.
-                </div>
-              </div>
-            </div>
-
-            <div class="header-actions">
-              <button type="button" id="btn-start-timer" class="btn btn-primary btn-lg">
-                ▶ Bắt đầu đếm ngược (Space)
+          <!-- Top Bar: Back top-left; Countdown + Continue top-right -->
+          <div class="screen-action-bar">
+            <div class="screen-left-group">
+              <button type="button" id="btn-screen-back" class="btn">
+                ← Quay lại
               </button>
+              <div class="question-team-banner">
+                ${renderAvatarHtml(team, "team-avatar-sm")}
+                <div>
+                  <div style="font-size: 0.78rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
+                    ${escapeHtml(pkg.package)} • ${question.points} điểm
+                  </div>
+                  <div style="font-family: var(--font-serif); font-size: 1.3rem; font-weight: 700;">
+                    ${escapeHtml(team.name)}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div class="timer-progress-track">
-              <div id="r1-timer-bar" class="timer-progress-bar" style="width: 100%;"></div>
+            <div class="screen-right-group">
+              <div id="r1-timer-box" class="top-timer-box">
+                <span id="r1-timer-digits" class="top-timer-digits">${formatTimer(currentTimer.remainingSeconds)}</span>
+                <span id="r1-timer-warning" class="top-timer-warning-text"></span>
+                <button type="button" id="btn-start-timer" class="btn btn-primary btn-sm">
+                  ▶ Bắt đầu
+                </button>
+              </div>
+
+              <button type="button" id="btn-screen-continue" class="btn btn-primary btn-lg">
+                Tiếp tục →
+              </button>
             </div>
           </div>
 
@@ -473,92 +407,16 @@
                 : ""
             }
           </article>
-
-          ${
-            session.revealed
-              ? `<div class="answer-panel">
-                  <div class="answer-label">ĐÁP ÁN CHÍNH THỨC</div>
-                  <p class="answer-text">${escapeHtml(question.answer)}</p>
-                </div>`
-              : ""
-          }
-
-          <div class="host-controls">
-            <div class="scoring-buttons">
-              <button type="button" id="btn-reveal-answer" class="btn btn-lg">
-                ${session.revealed ? "Ẩn đáp án" : "👁 Hiện đáp án"}
-              </button>
-              <button
-                type="button"
-                id="btn-mark-correct"
-                class="btn btn-success btn-lg ${recorded?.correct === true ? "selected-outcome" : ""}"
-              >
-                ✓ Đúng (+${question.points} điểm)
-              </button>
-              <button
-                type="button"
-                id="btn-mark-wrong"
-                class="btn btn-danger btn-lg ${recorded?.correct === false ? "selected-outcome" : ""}"
-              >
-                ✕ Sai (0 điểm)
-              </button>
-            </div>
-
-            <div>
-              <button type="button" id="btn-next-question" class="btn btn-primary btn-lg">
-                ${isLastQuestion ? "✓ Hoàn thành gói & Khóa đội →" : "Câu tiếp theo →"}
-              </button>
-            </div>
-          </div>
         </div>
       `;
 
       updateTimerDom();
 
+      document.getElementById("btn-screen-back")?.addEventListener("click", handleBack);
+      document.getElementById("btn-screen-continue")?.addEventListener("click", handleContinue);
       document.getElementById("btn-start-timer")?.addEventListener("click", () => {
         triggerStartTimer();
       });
-
-      document.getElementById("btn-reveal-answer")?.addEventListener("click", () => {
-        gameState = updateRound1Session(gameState, { revealed: !session.revealed });
-        saveAppState(gameState);
-        renderStage();
-      });
-
-      document.getElementById("btn-mark-correct")?.addEventListener("click", () => {
-        gameState = recordAnswer(gameState, {
-          round: 1,
-          teamId: team.id,
-          points: question.points,
-          correct: true,
-          questionKey
-        });
-        saveAppState(gameState);
-        showToast(`Đã cộng +${question.points} điểm Vòng 1 cho ${team.name}`);
-        renderStage();
-      });
-
-      document.getElementById("btn-mark-wrong")?.addEventListener("click", () => {
-        gameState = recordAnswer(gameState, {
-          round: 1,
-          teamId: team.id,
-          points: question.points,
-          correct: false,
-          questionKey
-        });
-        saveAppState(gameState);
-        showToast(`Đã ghi nhận trả lời Sai (0 điểm) cho ${team.name}`);
-        renderStage();
-      });
-
-      document.getElementById("btn-next-question")?.addEventListener("click", () => {
-        handleContinue();
-      });
-
-      const continueBtn = document.getElementById("btn-header-continue");
-      if (continueBtn) {
-        continueBtn.textContent = isLastQuestion ? "Hoàn thành gói →" : "Câu tiếp theo →";
-      }
     }
 
     function renderStage() {
@@ -573,7 +431,8 @@
         renderTeamGridStage(container);
       }
 
-      wireStageHeader({
+      wireStageLayout({
+        activePage: "round1",
         config: quizData.config,
         onBack: handleBack,
         onContinue: handleContinue,
@@ -589,7 +448,7 @@
 
     async function initRound1(forceRefresh = false) {
       quizData = await fetchQuizData({ forceRefresh });
-      gameState = loadAppState(quizData.teams);
+      gameState = loadAppState(quizData.teams, quizData.scores);
       document.title = `${quizData.config.round1_name} - ${quizData.config.show_title}`;
       renderStage();
     }

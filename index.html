@@ -4,175 +4,66 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Trang chủ - Đấu Trường Tri Thức</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Noto+Serif:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./css/style.css" />
 </head>
 <body>
-  <header class="stage-header">
-    <div class="header-actions">
-      <button id="btn-header-back" class="btn" type="button" disabled title="Đang ở Trang chủ">
-        ← Quay lại
-      </button>
-    </div>
+  <div class="app-shell">
+    <aside id="app-sidebar" class="app-sidebar" aria-label="Thanh điều hướng bên trái"></aside>
 
-    <div class="header-center">
-      <div id="header-show-title" class="header-show-title">Đấu Trường Tri Thức</div>
-      <nav class="header-nav-bar" aria-label="Điều hướng chính">
-        <a href="./index.html" class="header-nav-link active">Trang chủ</a>
-        <a href="./round1.html" class="header-nav-link">Vòng 1</a>
-        <a href="./round3.html" class="header-nav-link">Vòng 3</a>
-        <a href="./leaderboard.html" class="header-nav-link">Bảng xếp hạng</a>
-        <a href="./scores.html" class="header-nav-link">Điểm số / Quản trị</a>
-        <a href="./settings.html" class="header-nav-link">Cài đặt</a>
-      </nav>
-    </div>
+    <main class="stage-main">
+      <section class="stage-hero">
+        <h1 id="hero-title" class="stage-title">Đấu Trường Tri Thức</h1>
+        <p id="hero-subtitle" class="stage-subtitle">Hội thi tìm hiểu kiến thức tổng hợp</p>
+      </section>
 
-    <div class="header-actions">
-      <button id="btn-reload-data" class="btn btn-sm" type="button" title="Tải lại câu hỏi & cấu hình từ Sheet">
-        ↻ Tải lại dữ liệu
-      </button>
-      <button id="btn-header-continue" class="btn btn-primary" type="button">
-        Tiếp tục (Vòng 1) →
-      </button>
-    </div>
-  </header>
+      <section class="rounds-info-grid" aria-label="Thông tin các vòng thi">
+        <article class="round-info-card">
+          <span class="round-info-badge">Vòng 1</span>
+          <h2 id="info-round1-name" class="round-info-title">Vòng 1: Khởi Động</h2>
+          <p id="info-round1-desc" class="round-info-desc"></p>
+        </article>
 
-  <main class="stage-main">
-    <section class="stage-hero">
-      <span id="data-source-badge" class="stage-eyebrow">Đang tải dữ liệu...</span>
-      <h1 id="hero-title" class="stage-title">Đấu Trường Tri Thức</h1>
-      <p id="hero-subtitle" class="stage-subtitle">Hội thi tìm hiểu kiến thức tổng hợp</p>
-    </section>
+        <article class="round-info-card">
+          <span class="round-info-badge">Vòng 2</span>
+          <h2 id="info-round2-name" class="round-info-title">Vòng 2: Vượt Chướng Ngại Vật</h2>
+          <p id="info-round2-desc" class="round-info-desc"></p>
+        </article>
 
-    <section class="home-grid" aria-label="Danh mục màn hình">
-      <a href="./round1.html" class="nav-card">
-        <div>
-          <span class="nav-card-badge">Vòng thi mở màn</span>
-          <h2 id="card-round1-title" class="nav-card-title">Vòng 1: Khởi Động</h2>
-          <p class="nav-card-desc">
-            Chọn đội thi, lựa chọn 1 trong 2 gói câu hỏi được đề xuất và bấm giờ trả lời từng câu hỏi trên sân khấu.
-          </p>
-        </div>
-        <div class="nav-card-footer">
-          <span id="stat-round1">0 / 12 đội đã thi</span>
-          <span>Vào Vòng 1 →</span>
-        </div>
-      </a>
-
-      <a href="./scores.html" class="nav-card">
-        <div>
-          <span class="nav-card-badge">Nhập điểm thủ công</span>
-          <h2 id="card-round2-title" class="nav-card-title">Vòng 2: Vượt Chướng Ngại Vật</h2>
-          <p class="nav-card-desc">
-            Vòng 2 diễn ra trực tiếp trên sân khấu. Ban tổ chức nhập điểm Vòng 2 của từng đội tại trang Điểm số / Quản trị.
-          </p>
-        </div>
-        <div class="nav-card-footer">
-          <span>Quản lý điểm Vòng 2</span>
-          <span>Nhập điểm →</span>
-        </div>
-      </a>
-
-      <a href="./round3.html" class="nav-card">
-        <div>
-          <span class="nav-card-badge">Bảng 50 ô số</span>
-          <h2 id="card-round3-title" class="nav-card-title">Vòng 3: Tăng Tốc &amp; Về Đích</h2>
-          <p class="nav-card-desc">
-            Bảng 50 ô câu hỏi bí mật. Chọn đội trả lời (hoặc đội cướp điểm), mở ô số, đếm ngược và chấm Đúng / Sai.
-          </p>
-        </div>
-        <div class="nav-card-footer">
-          <span id="stat-round3">0 / 50 ô đã mở</span>
-          <span>Vào Vòng 3 →</span>
-        </div>
-      </a>
-
-      <a href="./leaderboard.html" class="nav-card">
-        <div>
-          <span class="nav-card-badge">Trình chiếu sân khấu</span>
-          <h2 class="nav-card-title">Bảng Xếp Hạng</h2>
-          <p class="nav-card-desc">
-            Xem thứ hạng trực quan theo từng vòng (Vòng 1, Vòng 2, Vòng 3) và Tổng điểm chung cuộc với bục vinh danh.
-          </p>
-        </div>
-        <div class="nav-card-footer">
-          <span id="stat-leader">Xem xếp hạng</span>
-          <span>Mở bảng vàng →</span>
-        </div>
-      </a>
-
-      <a href="./scores.html" class="nav-card">
-        <div>
-          <span class="nav-card-badge">Điều khiển &amp; Sao lưu</span>
-          <h2 class="nav-card-title">Điểm Số &amp; Quản Trị</h2>
-          <p class="nav-card-desc">
-            Chỉnh sửa điểm từng vòng, mở khóa đội / ô câu hỏi, đặt lại trạng thái hoặc xuất / nhập file JSON dự phòng.
-          </p>
-        </div>
-        <div class="nav-card-footer">
-          <span>Bảng điều khiển MC</span>
-          <span>Quản trị →</span>
-        </div>
-      </a>
-
-      <a href="./settings.html" class="nav-card">
-        <div>
-          <span class="nav-card-badge">Kết nối &amp; Giao diện</span>
-          <h2 class="nav-card-title">Cài Đặt Hệ Thống</h2>
-          <p class="nav-card-desc">
-            Cấu hình Google Sheet ID, chuyển đổi giao diện Sáng ấm / Tối sân khấu và tùy chỉnh bảng màu trình chiếu.
-          </p>
-        </div>
-        <div class="nav-card-footer">
-          <span>Sheet &amp; Bảng màu</span>
-          <span>Cấu hình →</span>
-        </div>
-      </a>
-    </section>
-  </main>
+        <article class="round-info-card">
+          <span class="round-info-badge">Vòng 3</span>
+          <h2 id="info-round3-name" class="round-info-title">Vòng 3: Tăng Tốc &amp; Về Đích</h2>
+          <p id="info-round3-desc" class="round-info-desc"></p>
+        </article>
+      </section>
+    </main>
+  </div>
 
   <script type="module">
-    import { fetchQuizData, loadAppState, wireStageHeader } from "./js/app.js";
-    import { computeLeaderboard } from "./js/leaderboard.js";
+    import { fetchQuizData, wireStageLayout } from "./js/app.js";
 
     async function renderHome(forceRefresh = false) {
       const data = await fetchQuizData({ forceRefresh });
-      const state = loadAppState(data.teams);
+      const cfg = data.config;
 
-      document.title = `${data.config.show_title} - Trang chủ`;
-      document.getElementById("hero-title").textContent = data.config.show_title;
-      document.getElementById("hero-subtitle").textContent = data.config.show_subtitle || "";
-      document.getElementById("card-round1-title").textContent = data.config.round1_name;
-      document.getElementById("card-round2-title").textContent = data.config.round2_name;
-      document.getElementById("card-round3-title").textContent = data.config.round3_name;
+      document.title = `${cfg.show_title} - Trang chủ`;
+      document.getElementById("hero-title").textContent = cfg.show_title;
+      document.getElementById("hero-subtitle").textContent = cfg.show_subtitle || "";
 
-      const sourceBadge = document.getElementById("data-source-badge");
-      sourceBadge.textContent = data.isSample
-        ? `Dữ liệu mẫu tích hợp (${data.teams.length} đội thi)`
-        : `Đã kết nối Google Sheet (${data.teams.length} đội thi)`;
+      document.getElementById("info-round1-name").textContent = cfg.round1_name;
+      document.getElementById("info-round1-desc").textContent = cfg.round1_description || "";
 
-      const lockedCount = state.round1.lockedTeams.length;
-      document.getElementById("stat-round1").textContent =
-        `${lockedCount} / ${data.teams.length} đội đã hoàn thành`;
+      document.getElementById("info-round2-name").textContent = cfg.round2_name;
+      document.getElementById("info-round2-desc").textContent = cfg.round2_description || "";
 
-      const openedCount = state.round3.openedTiles.length;
-      document.getElementById("stat-round3").textContent =
-        `${openedCount} / ${data.round3Questions.length} ô đã mở`;
+      document.getElementById("info-round3-name").textContent = cfg.round3_name;
+      document.getElementById("info-round3-desc").textContent = cfg.round3_description || "";
 
-      const leaders = computeLeaderboard(data.teams, state, "total");
-      const topTeam = leaders[0];
-      if (topTeam && topTeam.total > 0) {
-        document.getElementById("stat-leader").textContent =
-          `Dẫn đầu: ${topTeam.name} (${topTeam.total} đ)`;
-      } else {
-        document.getElementById("stat-leader").textContent = `${data.teams.length} đội sẵn sàng`;
-      }
-
-      wireStageHeader({
-        config: data.config,
-        onBack: null,
-        onContinue: () => {
-          window.location.href = "./round1.html";
-        },
+      wireStageLayout({
+        activePage: "home",
+        config: cfg,
         onReload: () => renderHome(true)
       });
     }

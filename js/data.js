@@ -2,6 +2,7 @@
 
 import { DEFAULT_CONFIG, TEAM_PALETTE } from "./config.js";
 import { parseCsv } from "./csv.js";
+import { normaliseScores } from "./scores.js";
 
 function toRows(input) {
   if (typeof input === "string") {
@@ -40,7 +41,8 @@ export function normaliseConfig(input = []) {
     "round3_time_seconds",
     "round1_default_points",
     "round3_default_points",
-    "round1_packages_offered"
+    "round1_packages_offered",
+    "warning_seconds"
   ]);
 
   for (const row of rows) {
@@ -80,7 +82,7 @@ export function normaliseTeams(input = []) {
     seenIds.add(id);
     const image_url = row?.image_url ? String(row.image_url).trim() : "";
     const rawColor = row?.color ? String(row.color).trim() : "";
-    const color = rawColor || TEAM_PALETTE[(teams.length) % TEAM_PALETTE.length];
+    const color = rawColor || TEAM_PALETTE[teams.length % TEAM_PALETTE.length];
 
     teams.push({
       id,
@@ -94,12 +96,25 @@ export function normaliseTeams(input = []) {
 }
 
 /**
- * Normalises rows from the `round1` tab into grouped, ordered packages.
- * Required fields per row: package, question, answer.
- * Optional fields: team_id, order, image_url, time_seconds, points.
+ * Normalises rows from the `round1` tab into single-question packages.
+ * - Required fields per row: `package`, `question`.
+ * - Optional fields: `team_id`, `answer`, `image_url`, `time_seconds`, `points`.
+ * - Team-specific packages are keyed as `<team_id>::<package>` so different teams can have a "Gói A".
+ * - Rule for duplicate rows of the same package key: the FIRST valid row wins; extra rows for the
+ *   same package are ignored so a package never has more than one question.
  * @param {Array<Record<string, any>>|string} input
  * @param {Record<string, any>} [config]
- * @returns {Array<{id: string, package: string, team_id: string, questions: Array<any>}>}
+ * @returns {Array<{
+ *   id: string,
+ *   package: string,
+ *   team_id: string,
+ *   question: string,
+ *   answer: string,
+ *   image_url: string,
+ *   time_seconds: number,
+ *   points: number,
+ *   questions: Array<any>
+ * }>}
  */
 export function normaliseRound1(input = [], config = DEFAULT_CONFIG) {
   const rows = toRows(input);
@@ -114,15 +129,15 @@ export function normaliseRound1(input = [], config = DEFAULT_CONFIG) {
 
   const packageMap = new Map();
 
-  rows.forEach((row, rowIndex) => {
+  for (const row of rows) {
     const pkgName = row?.package !== undefined && row?.package !== null ? String(row.package).trim() : "";
     const question = row?.question !== undefined && row?.question !== null ? String(row.question).trim() : "";
-    const answer = row?.answer !== undefined && row?.answer !== null ? String(row.answer).trim() : "";
 
-    if (!pkgName || !question || !answer) {
-      return;
+    if (!pkgName || !question) {
+      continue;
     }
 
+    const answer = row?.answer !== undefined && row?.answer !== null ? String(row.answer).trim() : "";
     const team_id = row?.team_id !== undefined && row?.team_id !== null ? String(row.team_id).trim() : "";
     const image_url = row?.image_url !== undefined && row?.image_url !== null ? String(row.image_url).trim() : "";
     const time_seconds = parsePositiveNumber(row?.time_seconds, defaultTime);
@@ -130,61 +145,38 @@ export function normaliseRound1(input = [], config = DEFAULT_CONFIG) {
 
     // Team-specific packages are keyed per team so every team may have its own "Gói A".
     const pkgKey = team_id ? `${team_id}::${pkgName}` : pkgName;
-    if (!packageMap.has(pkgKey)) {
-      packageMap.set(pkgKey, {
-        id: pkgKey,
-        package: pkgName,
-        team_id: team_id,
-        rawQuestions: []
-      });
+
+    // First valid row for a package wins; extra rows for the same package are ignored.
+    if (packageMap.has(pkgKey)) {
+      continue;
     }
 
-    const pkgEntry = packageMap.get(pkgKey);
-
-    const fallbackOrder = pkgEntry.rawQuestions.length + 1;
-    const order = parseNumber(row?.order, fallbackOrder);
-
-    pkgEntry.rawQuestions.push({
-      _rowIndex: rowIndex,
+    const singleQuestion = {
+      id: `${pkgKey}__1`,
       package: pkgName,
-      team_id: pkgEntry.team_id,
-      order,
+      team_id,
+      order: 1,
       question,
       answer,
       image_url,
       time_seconds,
       points
-    });
-  });
+    };
 
-  const packages = [];
-  for (const pkgEntry of packageMap.values()) {
-    const sorted = pkgEntry.rawQuestions
-      .slice()
-      .sort((a, b) => {
-        if (a.order !== b.order) {
-          return a.order - b.order;
-        }
-        return a._rowIndex - b._rowIndex;
-      })
-      .map((q, idx) => {
-        const { _rowIndex, ...rest } = q;
-        return {
-          ...rest,
-          team_id: pkgEntry.team_id,
-          id: `${pkgEntry.id}__${idx + 1}`
-        };
-      });
-
-    packages.push({
-      id: pkgEntry.id,
-      package: pkgEntry.package,
-      team_id: pkgEntry.team_id,
-      questions: sorted
+    packageMap.set(pkgKey, {
+      id: pkgKey,
+      package: pkgName,
+      team_id,
+      question,
+      answer,
+      image_url,
+      time_seconds,
+      points,
+      questions: [singleQuestion]
     });
   }
 
-  return packages;
+  return Array.from(packageMap.values());
 }
 
 /**
@@ -196,7 +188,7 @@ export function normaliseRound1(input = [], config = DEFAULT_CONFIG) {
  * @param {string} teamId
  * @param {Iterable<string>} [pickedPackages]
  * @param {number|null} [limit]
- * @returns {Array<{id: string, package: string, team_id: string, questions: Array<any>}>}
+ * @returns {Array<any>}
  */
 export function getOfferedPackages(packages = [], teamId, pickedPackages = [], limit = null) {
   const cleanTeamId = teamId ? String(teamId).trim() : "";
@@ -229,8 +221,8 @@ export const getPackagesForTeam = getOfferedPackages;
 
 /**
  * Normalises rows from the `round3` tab into ordered question tiles.
- * Required fields: number, question, answer.
- * Optional fields: image_url, time_seconds, points.
+ * Required fields: number, question.
+ * Optional fields: answer, image_url, time_seconds, points.
  * @param {Array<Record<string, any>>|string} input
  * @param {Record<string, any>} [config]
  * @returns {Array<{number: number, question: string, answer: string, image_url: string, time_seconds: number, points: number}>}
@@ -253,7 +245,7 @@ export function normaliseRound3(input = [], config = DEFAULT_CONFIG) {
     const question = row?.question !== undefined && row?.question !== null ? String(row.question).trim() : "";
     const answer = row?.answer !== undefined && row?.answer !== null ? String(row.answer).trim() : "";
 
-    if (!rawNum || !question || !answer) {
+    if (!rawNum || !question) {
       continue;
     }
 
@@ -280,19 +272,27 @@ export function normaliseRound3(input = [], config = DEFAULT_CONFIG) {
 }
 
 /**
- * Normalises all 4 sheet tabs together.
- * @param {{teamsCsv?: any, round1Csv?: any, round3Csv?: any, configCsv?: any}} raw
+ * Normalises all sheet tabs together.
+ * @param {{teamsCsv?: any, round1Csv?: any, round3Csv?: any, configCsv?: any, scoresCsv?: any}} raw
  */
-export function normaliseAllData({ teamsCsv = [], round1Csv = [], round3Csv = [], configCsv = [] } = {}) {
+export function normaliseAllData({
+  teamsCsv = [],
+  round1Csv = [],
+  round3Csv = [],
+  configCsv = [],
+  scoresCsv = []
+} = {}) {
   const config = normaliseConfig(configCsv);
   const teams = normaliseTeams(teamsCsv);
   const round1Packages = normaliseRound1(round1Csv, config);
   const round3Questions = normaliseRound3(round3Csv, config);
+  const scores = normaliseScores(scoresCsv, teams);
 
   return {
     config,
     teams,
     round1Packages,
-    round3Questions
+    round3Questions,
+    scores
   };
 }

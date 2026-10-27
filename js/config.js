@@ -1,20 +1,28 @@
 // Default configuration and Google Sheets URL helpers.
 
 export const DEFAULT_SHEET_ID = "";
+export const DEFAULT_WEB_APP_URL = "";
 
-export const SHEET_TABS = ["teams", "round1", "round3", "config"];
+export const SHEET_TABS = ["teams", "round1", "round3", "config", "scores"];
 
 export const DEFAULT_CONFIG = {
   show_title: "Đấu Trường Tri Thức",
   show_subtitle: "Hội thi tìm hiểu kiến thức tổng hợp",
   round1_name: "Vòng 1: Khởi Động",
+  round1_description:
+    "Mỗi đội lựa chọn 1 trong 2 gói câu hỏi được đề xuất và suy nghĩ trả lời câu hỏi trong thời gian đếm ngược.",
   round2_name: "Vòng 2: Vượt Chướng Ngại Vật",
+  round2_description:
+    "Phần thi tương tác trực tiếp trên sân khấu. Điểm số của từng đội được Ban thư ký cập nhật vào bảng điểm.",
   round3_name: "Vòng 3: Tăng Tốc & Về Đích",
+  round3_description:
+    "Bảng 50 ô câu hỏi bí mật với các mức điểm khác nhau. Đội thi chọn ô số và trả lời trong thời gian quy định.",
   round1_time_seconds: 15,
   round3_time_seconds: 20,
   round1_default_points: 10,
   round3_default_points: 20,
-  round1_packages_offered: 2
+  round1_packages_offered: 2,
+  warning_seconds: 5
 };
 
 export const TEAM_PALETTE = [

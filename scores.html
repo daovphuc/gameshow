@@ -3,132 +3,93 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Điểm số &amp; Quản trị - Đấu Trường Tri Thức</title>
+  <title>Điểm số - Đấu Trường Tri Thức</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Noto+Serif:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./css/style.css" />
 </head>
 <body>
-  <header class="stage-header">
-    <div class="header-actions">
-      <button id="btn-header-back" class="btn" type="button">
-        ← Quay lại
-      </button>
-    </div>
+  <div class="app-shell">
+    <aside id="app-sidebar" class="app-sidebar" aria-label="Thanh điều hướng bên trái"></aside>
 
-    <div class="header-center">
-      <div id="header-show-title" class="header-show-title">Đấu Trường Tri Thức</div>
-      <nav class="header-nav-bar" aria-label="Điều hướng chính">
-        <a href="./index.html" class="header-nav-link">Trang chủ</a>
-        <a href="./round1.html" class="header-nav-link">Vòng 1</a>
-        <a href="./round3.html" class="header-nav-link">Vòng 3</a>
-        <a href="./leaderboard.html" class="header-nav-link">Bảng xếp hạng</a>
-        <a href="./scores.html" class="header-nav-link active">Điểm số / Quản trị</a>
-        <a href="./settings.html" class="header-nav-link">Cài đặt</a>
-      </nav>
-    </div>
-
-    <div class="header-actions">
-      <button id="btn-reload-data" class="btn btn-sm" type="button">
-        ↻ Tải lại dữ liệu
-      </button>
-      <button id="btn-header-continue" class="btn btn-primary" type="button">
-        Cài đặt →
-      </button>
-    </div>
-  </header>
-
-  <main class="stage-main">
-    <div class="section-header">
-      <div>
-        <h1 class="section-title">Quản Lý Điểm Số &amp; Điều Khiển Trận Đấu</h1>
-        <p class="section-subtitle">
-          Nhập điểm Vòng 2, điều chỉnh điểm các vòng, mở khóa đội / ô câu hỏi hoặc sao lưu trạng thái sang máy tính khác.
-        </p>
-      </div>
-    </div>
-
-    <!-- Score Adjustment Table -->
-    <section class="panel-card">
-      <h2 class="panel-title">Bảng Điểm Các Đội Thi (Bao gồm nhập điểm Vòng 2)</h2>
-      <p class="panel-desc">
-        Mọi thay đổi điểm số được lưu tự động vào trình duyệt và cập nhật ngay trên Bảng xếp hạng.
-      </p>
-      <div class="scores-table-wrap">
-        <table class="scores-table">
-          <thead>
-            <tr>
-              <th>Đội thi</th>
-              <th>Vòng 1</th>
-              <th>Vòng 2 (Nhập thủ công)</th>
-              <th>Vòng 3</th>
-              <th>Tổng điểm</th>
-              <th>Trạng thái Vòng 1</th>
-            </tr>
-          </thead>
-          <tbody id="scores-tbody"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Unlock Controls -->
-    <section class="panel-card">
-      <h2 class="panel-title">Mở Khóa Gói Câu Hỏi Vòng 1 &amp; Ô Số Vòng 3</h2>
-      <p class="panel-desc">
-        Bấm vào bất kỳ gói câu hỏi hoặc ô số nào đã khóa bên dưới để mở khóa lại nếu chọn nhầm.
-      </p>
-
-      <div style="margin-bottom: 1.5rem;">
-        <h3 style="font-size: 1.1rem; margin: 0 0 0.6rem;">Gói câu hỏi Vòng 1 đã chọn:</h3>
-        <div id="picked-packages-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
-      </div>
-
-      <div>
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem;">
-          <h3 style="font-size: 1.1rem; margin: 0;">Ô số Vòng 3 đã mở:</h3>
-          <button type="button" id="btn-unlock-all-tiles" class="btn btn-sm">Mở khóa tất cả ô Vòng 3</button>
+    <main class="stage-main">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Quản Lý Điểm Số &amp; Điều Khiển Trận Đấu</h1>
+          <p class="section-subtitle">
+            Nhập điểm Vòng 1, Vòng 2, Vòng 3 cho từng đội và đồng bộ trực tiếp lên tab <code>scores</code> của Google Sheet.
+          </p>
         </div>
-        <div id="opened-tiles-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
-      </div>
-    </section>
 
-    <!-- Export / Import / Reset -->
-    <section class="panel-card">
-      <h2 class="panel-title">Sao Lưu Dự Phòng (JSON) &amp; Đặt Lại Trận Đấu</h2>
-      <p class="panel-desc">
-        Xuất toàn bộ điểm số và tiến độ ra file JSON để chuyển sang laptop dự phòng, hoặc khôi phục từ bản sao lưu.
-      </p>
-
-      <div style="display: flex; flex-wrap: wrap; gap: 0.85rem; margin-bottom: 1.25rem;">
-        <button type="button" id="btn-export-file" class="btn btn-primary">
-          ⬇ Tải xuống file JSON sao lưu
-        </button>
-        <label class="btn" style="cursor: pointer;">
-          ⬆ Nhập từ file JSON...
-          <input type="file" id="input-import-file" accept=".json,application/json" style="display: none;" />
-        </label>
-        <button type="button" id="btn-apply-json" class="btn">
-          ✓ Áp dụng JSON trong ô văn bản
-        </button>
-        <button type="button" id="btn-reset-all" class="btn btn-danger" style="margin-left: auto;">
-          ✕ Đặt lại toàn bộ về 0
-        </button>
+        <div>
+          <button type="button" id="btn-reset-all" class="btn btn-danger">
+            ✕ Đặt lại trận đấu
+          </button>
+        </div>
       </div>
 
-      <div class="form-group" style="margin-bottom: 0;">
-        <label class="form-label" for="json-state-box">Dữ liệu trạng thái hiện tại (JSON):</label>
-        <textarea id="json-state-box" class="form-textarea" spellcheck="false"></textarea>
-      </div>
-    </section>
-  </main>
+      <!-- Sync Status Banner -->
+      <div id="page-sync-banner" class="sync-status-banner"></div>
+
+      <!-- Score Adjustment Table -->
+      <section class="panel-card">
+        <h2 class="panel-title">Bảng Điểm Các Đội Thi</h2>
+        <p class="panel-desc">
+          Nhập số trực tiếp hoặc dùng nút <code>-10</code> / <code>+10</code> để cập nhật điểm từng vòng.
+        </p>
+        <div class="scores-table-wrap">
+          <table class="scores-table">
+            <thead>
+              <tr>
+                <th>Đội thi</th>
+                <th>Vòng 1</th>
+                <th>Vòng 2</th>
+                <th>Vòng 3</th>
+                <th>Tổng điểm</th>
+                <th>Trạng thái Vòng 1</th>
+              </tr>
+            </thead>
+            <tbody id="scores-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Unlock Controls -->
+      <section class="panel-card">
+        <h2 class="panel-title">Mở Khóa Gói Câu Hỏi Vòng 1 &amp; Ô Số Vòng 3</h2>
+        <p class="panel-desc">
+          Bấm vào gói câu hỏi hoặc ô số bên dưới để mở khóa lại nếu chọn nhầm.
+        </p>
+
+        <div style="margin-bottom: 1.5rem;">
+          <h3 style="font-size: 1.05rem; margin: 0 0 0.6rem;">Gói câu hỏi Vòng 1 đã chọn:</h3>
+          <div id="picked-packages-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+        </div>
+
+        <div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem;">
+            <h3 style="font-size: 1.05rem; margin: 0;">Ô số Vòng 3 đã mở:</h3>
+            <button type="button" id="btn-unlock-all-tiles" class="btn btn-sm">Mở khóa tất cả ô Vòng 3</button>
+          </div>
+          <div id="opened-tiles-list" style="display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+        </div>
+      </section>
+    </main>
+  </div>
 
   <script type="module">
     import {
       fetchQuizData,
       loadAppState,
       saveAppState,
+      syncScoresToSheet,
+      onSyncStatusChange,
+      getWebAppUrl,
       renderAvatarHtml,
       escapeHtml,
       showToast,
-      wireStageHeader
+      wireStageLayout
     } from "./js/app.js";
     import {
       isTeamLocked,
@@ -137,13 +98,65 @@
       unlockRound1Team,
       unlockRound1Package,
       unlockRound3Tile,
-      resetState,
-      exportState,
-      importState
+      resetState
     } from "./js/state.js";
 
     let quizData = null;
     let gameState = null;
+
+    function renderSyncBanner(status) {
+      const banner = document.getElementById("page-sync-banner");
+      if (!banner) return;
+      const webAppUrl = getWebAppUrl();
+
+      banner.classList.remove("saving", "saved", "failed");
+
+      if (!webAppUrl) {
+        banner.innerHTML = `
+          <span>💾 Đang lưu điểm cục bộ trên trình duyệt (localStorage). Dán <strong>Apps Script Web App URL</strong> trong mục Cài đặt ở thanh bên trái để ghi điểm lên Google Sheet.</span>
+        `;
+        return;
+      }
+
+      if (status.state === "saving") {
+        banner.classList.add("saving");
+        banner.innerHTML = `<span>⏳ ${escapeHtml(status.message || "Đang lưu điểm lên Google Sheet...")}</span>`;
+      } else if (status.state === "saved") {
+        banner.classList.add("saved");
+        banner.innerHTML = `<span>${escapeHtml(status.message || "✓ Đã lưu điểm lên Google Sheet")}</span>`;
+      } else if (status.state === "failed") {
+        banner.classList.add("failed");
+        banner.innerHTML = `
+          <span>${escapeHtml(status.message || "⚠ Lỗi lưu điểm lên Google Sheet (đã giữ điểm trên máy).")}</span>
+          <button type="button" id="btn-banner-retry" class="btn btn-sm">Thử lại ngay</button>
+        `;
+        document.getElementById("btn-banner-retry")?.addEventListener("click", () => {
+          if (typeof status.retryFn === "function") {
+            status.retryFn();
+          } else if (gameState && quizData) {
+            syncScoresToSheet(gameState, quizData.teams);
+          }
+        });
+      } else {
+        banner.innerHTML = `
+          <span>☁ Đã kết nối Apps Script Web App — mọi thay đổi điểm số sẽ tự động ghi lên tab <code>scores</code> của Google Sheet.</span>
+          <button type="button" id="btn-push-now" class="btn btn-sm">Đồng bộ ngay</button>
+        `;
+        document.getElementById("btn-push-now")?.addEventListener("click", () => {
+          if (gameState && quizData) {
+            syncScoresToSheet(gameState, quizData.teams);
+          }
+        });
+      }
+    }
+
+    onSyncStatusChange(renderSyncBanner);
+
+    async function persistAndSyncScores() {
+      saveAppState(gameState);
+      renderAdminPage();
+      await syncScoresToSheet(gameState, quizData.teams);
+    }
 
     function renderAdminPage() {
       const tbody = document.getElementById("scores-tbody");
@@ -199,32 +212,26 @@
         })
         .join("");
 
-      // Wire score adjustment buttons
       tbody.querySelectorAll("[data-adj-team]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const teamId = btn.dataset.adjTeam;
           const round = Number(btn.dataset.adjRound);
           const delta = Number(btn.dataset.adjDelta);
           gameState = adjustRoundScore(gameState, teamId, round, delta);
-          saveAppState(gameState);
-          renderAdminPage();
+          persistAndSyncScores();
         });
       });
 
-      // Wire direct score inputs
       tbody.querySelectorAll("[data-input-team]").forEach((input) => {
         input.addEventListener("change", () => {
           const teamId = input.dataset.inputTeam;
           const round = Number(input.dataset.inputRound);
           const val = Number(input.value) || 0;
           gameState = setRoundScore(gameState, teamId, round, val);
-          saveAppState(gameState);
-          renderAdminPage();
-          showToast("Đã cập nhật điểm số.");
+          persistAndSyncScores();
         });
       });
 
-      // Wire unlock team buttons
       tbody.querySelectorAll("[data-unlock-team]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const teamId = btn.dataset.unlockTeam;
@@ -287,12 +294,6 @@
           });
         });
       }
-
-      // Update JSON textarea
-      const jsonBox = document.getElementById("json-state-box");
-      if (jsonBox) {
-        jsonBox.value = exportState(gameState);
-      }
     }
 
     document.getElementById("btn-unlock-all-tiles")?.addEventListener("click", () => {
@@ -304,73 +305,32 @@
       showToast("Đã mở khóa toàn bộ 50 ô Vòng 3.");
     });
 
-    document.getElementById("btn-export-file")?.addEventListener("click", () => {
-      const json = exportState(gameState);
-      const blob = new Blob([json], { type: "application/json;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `gameshow-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      showToast("Đã tải xuống file sao lưu JSON.");
-    });
-
-    document.getElementById("input-import-file")?.addEventListener("change", async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        gameState = importState(text);
-        saveAppState(gameState);
-        renderAdminPage();
-        showToast("Đã khôi phục dữ liệu từ file JSON thành công!");
-      } catch (err) {
-        showToast(`Lỗi đọc file JSON: ${err.message || err}`);
-      } finally {
-        e.target.value = "";
-      }
-    });
-
-    document.getElementById("btn-apply-json")?.addEventListener("click", () => {
-      const jsonBox = document.getElementById("json-state-box");
-      try {
-        gameState = importState(jsonBox.value);
-        saveAppState(gameState);
-        renderAdminPage();
-        showToast("Đã nhập trạng thái từ văn bản JSON thành công!");
-      } catch (err) {
-        showToast(`JSON không hợp lệ: ${err.message || err}`);
-      }
-    });
-
-    document.getElementById("btn-reset-all")?.addEventListener("click", () => {
+    document.getElementById("btn-reset-all")?.addEventListener("click", async () => {
       const confirmed = window.confirm(
-        "Bạn có chắc chắn muốn ĐẶT LẠI TOÀN BỘ điểm số, khóa đội Vòng 1 và các ô Vòng 3 về 0 không?"
+        "Bạn có chắc chắn muốn ĐẶT LẠI TRẬN ĐẤU (xóa toàn bộ điểm số, mở khóa các đội Vòng 1 và các ô Vòng 3) về 0 không?"
       );
       if (!confirmed) return;
       gameState = resetState(quizData.teams);
-      saveAppState(gameState);
       sessionStorage.removeItem("gameshow_r1_pending_team");
-      renderAdminPage();
-      showToast("Đã đặt lại toàn bộ dữ liệu thi đấu về trạng thái ban đầu.");
+      await persistAndSyncScores();
+      showToast("Đã đặt lại toàn bộ trận đấu về trạng thái ban đầu.");
     });
 
     async function initScoresPage(forceRefresh = false) {
       quizData = await fetchQuizData({ forceRefresh });
-      gameState = loadAppState(quizData.teams);
-      document.title = `Điểm số & Quản trị - ${quizData.config.show_title}`;
+      gameState = loadAppState(quizData.teams, quizData.scores);
+      document.title = `Điểm số - ${quizData.config.show_title}`;
       renderAdminPage();
+      renderSyncBanner({ state: "idle" });
 
-      wireStageHeader({
+      wireStageLayout({
+        activePage: "scores",
         config: quizData.config,
         onBack: () => {
           window.location.href = "./leaderboard.html";
         },
         onContinue: () => {
-          window.location.href = "./settings.html";
+          window.location.href = "./index.html";
         },
         onReload: () => initScoresPage(true)
       });

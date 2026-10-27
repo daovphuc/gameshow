@@ -4,3 +4,4 @@ import "./state.test.js";
 import "./leaderboard.test.js";
 import "./timer.test.js";
 import "./theme.test.js";
+import "./scores.test.js";

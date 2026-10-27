@@ -159,6 +159,30 @@ export function updateRound1Session(state, patch = {}) {
 }
 
 /**
+ * Cancels the active Round 1 question session and returns to the team list
+ * without locking the team (releasing the picked package).
+ * @param {object} state
+ * @param {{releasePackage?: boolean}} [options]
+ */
+export function cancelRound1Session(state, { releasePackage = true } = {}) {
+  const next = cloneState(state);
+  const session = next.round1.activeSession;
+  if (!session) {
+    return next;
+  }
+  if (releasePackage && session.packageId) {
+    next.round1.pickedPackages = next.round1.pickedPackages.filter(
+      (p) => p !== session.packageId
+    );
+    if (next.round1.teamPackages && session.teamId) {
+      delete next.round1.teamPackages[session.teamId];
+    }
+  }
+  next.round1.activeSession = null;
+  return next;
+}
+
+/**
  * Clears an unstarted/aborted Round 1 team selection before a package is finished,
  * or finishes the package and locks the team.
  * @param {object} state
