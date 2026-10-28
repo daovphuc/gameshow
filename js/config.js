@@ -4,7 +4,7 @@ export const DEFAULT_SHEET_ID = "";
 export const DEFAULT_PASSWORD_SHA256 =
   "2e696ebeea42795bc212e5bae856a9854206e2099d0762231eb4271774037239";
 
-export const SHEET_TABS = ["teams", "round1", "round2", "round3", "judges", "config"];
+export const SHEET_TABS = ["teams", "round1", "round2", "round3", "judges", "accounts", "config"];
 
 export const DEFAULT_CONFIG = {
   show_title: "Hội thi cán bộ tuyên truyền, kiểm tra giỏi về PCCC và CNCH",
@@ -31,10 +31,7 @@ export const DEFAULT_CONFIG = {
   round3_default_points: 20,
   round3_max_content: 25,
   round3_max_manner: 5,
-  warning_seconds: 5,
-  password_host_sha256: "",
-  password_judge_sha256: "",
-  password_team_sha256: ""
+  warning_seconds: 5
 };
 
 export const TEAM_PALETTE = [

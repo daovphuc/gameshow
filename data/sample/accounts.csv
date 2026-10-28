@@ -1,0 +1,17 @@
+username,password,role,ref_id,display_name
+mc,122345678910,host,,Dẫn chương trình
+gk1,122345678910,judge,gk-01,Ban Giám khảo 1
+gk2,122345678910,judge,gk-02,Ban Giám khảo 2
+gk3,122345678910,judge,gk-03,Ban Giám khảo 3
+doi01,122345678910,team,doi-01,Đội Sao Vàng
+doi02,122345678910,team,doi-02,Đội Hồng Hà
+doi03,122345678910,team,doi-03,Đội Cửu Long
+doi04,122345678910,team,doi-04,Đội Trường Sơn
+doi05,122345678910,team,doi-05,Đội Đông Đô
+doi06,122345678910,team,doi-06,Đội Lam Sơn
+doi07,122345678910,team,doi-07,Đội Bạch Đằng
+doi08,122345678910,team,doi-08,Đội Thăng Long
+doi09,122345678910,team,doi-09,Đội Phù Đổng
+doi10,122345678910,team,doi-10,Đội Vạn Xuân
+doi11,122345678910,team,doi-11,Đội Đại Việt
+doi12,122345678910,team,doi-12,Đội Âu Lạc

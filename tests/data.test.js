@@ -164,11 +164,13 @@ test("sample CSV files in data/sample parse and normalise cleanly with 12 teams,
   const round2Csv = fs.readFileSync(path.join(sampleDir, "round2.csv"), "utf8");
   const round3Csv = fs.readFileSync(path.join(sampleDir, "round3.csv"), "utf8");
   const judgesCsv = fs.readFileSync(path.join(sampleDir, "judges.csv"), "utf8");
+  const accountsCsv = fs.readFileSync(path.join(sampleDir, "accounts.csv"), "utf8");
   const configCsv = fs.readFileSync(path.join(sampleDir, "config.csv"), "utf8");
 
-  const data = normaliseAllData({ teamsCsv, round1Csv, round2Csv, round3Csv, judgesCsv, configCsv });
+  const data = normaliseAllData({ teamsCsv, round1Csv, round2Csv, round3Csv, judgesCsv, accountsCsv, configCsv });
   assert.equal(data.teams.length, 12);
   assert.equal(data.judges.length, 3);
+  assert.equal(data.accounts.length, 16);
   assert.equal(data.round1Packages.length, 24);
   for (const pkg of data.round1Packages) {
     assert.ok(pkg.team_id);

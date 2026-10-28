@@ -146,8 +146,8 @@
       if (gameState.round1.activeSession) {
         gameState = cancelRound1Session(gameState, { releasePackage: true });
         saveAppState(gameState);
-        syncLiveState();
         setPendingTeam(null);
+        syncLiveState();
         stopTimerLoop();
         activeTimerKey = null;
         renderStage();
@@ -167,8 +167,8 @@
         const team = quizData.teams.find((t) => t.id === session.teamId);
         gameState = finishRound1Package(gameState, session.teamId);
         saveAppState(gameState);
-        syncLiveState();
         setPendingTeam(null);
+        syncLiveState();
         stopTimerLoop();
         activeTimerKey = null;
         showToast(`Đã hoàn thành phần thi của ${team ? team.name : session.teamId}!`);

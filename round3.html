@@ -139,7 +139,7 @@
     function syncLiveState() {
       update("live", {
         currentRound: "round3",
-        stageTeamId: selectedTeamId || null,
+        stageTeamId: gameState.round3.activeTile ? (gameState.round3.activeTile.selectedTeamId || selectedTeamId || null) : null,
         "round3/openedTiles": gameState.round3.openedTiles || [],
         "round3/activeTile": gameState.round3.activeTile || null
       });

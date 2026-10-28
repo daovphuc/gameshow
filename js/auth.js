@@ -1,9 +1,6 @@
-// Password gate verification using Web Crypto SHA-256 (DOM-free).
-// Plain-text default password is never stored in source code; only its SHA-256 hex digest is kept.
+// Account-based authentication and portal session management (DOM-free).
 
-import { DEFAULT_PASSWORD_SHA256 } from "./config.js";
-
-export { DEFAULT_PASSWORD_SHA256 };
+export const DEFAULT_PASSWORD = "122345678910";
 
 export const PORTALS = {
   HOST: "host",
@@ -11,105 +8,324 @@ export const PORTALS = {
   TEAM: "team"
 };
 
-function getSubtleCrypto(customSubtle) {
-  if (customSubtle) return customSubtle;
-  if (globalThis.crypto && globalThis.crypto.subtle) {
-    return globalThis.crypto.subtle;
-  }
-  throw new Error("Web Crypto API (crypto.subtle) is not available.");
-}
+export const VALID_ROLES = new Set(["host", "judge", "team"]);
+
+export const PORTAL_URLS = {
+  host: "./host.html",
+  judge: "./judge.html",
+  team: "./team.html"
+};
+
+export const AUTH_STORAGE_KEY = "gameshow_auth_session";
 
 /**
- * Computes the lowercase hex SHA-256 digest of a string using Web Crypto.
- * @param {string} text
- * @param {SubtleCrypto} [subtleCrypto]
- * @returns {Promise<string>}
- */
-export async function sha256Hex(text, subtleCrypto) {
-  const subtle = getSubtleCrypto(subtleCrypto);
-  const bytes = new TextEncoder().encode(String(text ?? ""));
-  const digestBuffer = await subtle.digest("SHA-256", bytes);
-  const hashArray = Array.from(new Uint8Array(digestBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/**
- * Resolves the active SHA-256 password hash for a specific portal:
- * Checks `config.password_<portal>_sha256`, falls back to `config.password_sha256`, falls back to `defaultHash`.
- * Normalises to lowercase trimmed hex.
- * @param {"host"|"judge"|"team"|string} portal
- * @param {Record<string, any>} [config]
- * @param {string} [defaultHash]
+ * Maps an account role to its corresponding portal entry URL.
+ * @param {"host"|"judge"|"team"|string} role
  * @returns {string}
  */
-export function resolvePortalPasswordHash(portal = "host", config = {}, defaultHash = DEFAULT_PASSWORD_SHA256) {
-  const portalKey = `password_${String(portal).toLowerCase()}_sha256`;
-  const portalOverride =
-    config && config[portalKey] !== undefined && config[portalKey] !== null
-      ? String(config[portalKey]).trim().toLowerCase()
-      : "";
-  if (portalOverride) {
-    return portalOverride;
-  }
-
-  const generalOverride =
-    config && config.password_sha256 !== undefined && config.password_sha256 !== null
-      ? String(config.password_sha256).trim().toLowerCase()
-      : "";
-  if (generalOverride) {
-    return generalOverride;
-  }
-
-  return String(defaultHash || DEFAULT_PASSWORD_SHA256).trim().toLowerCase();
+export function getPortalUrl(role) {
+  const cleanRole = String(role || "").toLowerCase().trim();
+  return PORTAL_URLS[cleanRole] || "./index.html";
 }
 
 /**
- * Resolves the active SHA-256 password hash (defaults to host portal).
- * @param {Record<string, any>} [config]
- * @param {string} [defaultHash]
- * @returns {string}
+ * Normalises raw accounts from sheet rows or parsed CSV.
+ * - Role must be "host", "judge", or "team".
+ * - If role is "judge", ref_id must exist in judges list.
+ * - If role is "team", ref_id must exist in teams list.
+ * - Blank/empty rows or rows missing username or password are skipped.
+ * - Duplicate usernames (case-insensitive): first valid row wins.
+ * - Trims strings.
+ * - display_name defaults if empty.
+ * @param {Array<Record<string, any>>} rows
+ * @param {{ judges?: Array<any>, teams?: Array<any> }} [context]
+ * @returns {Array<{username: string, password: string, role: "host"|"judge"|"team", ref_id: string, display_name: string}>}
  */
-export function resolvePasswordHash(config = {}, defaultHash = DEFAULT_PASSWORD_SHA256) {
-  return resolvePortalPasswordHash("host", config, defaultHash);
-}
+export function normaliseAccounts(rows = [], { judges = [], teams = [] } = {}) {
+  const validJudges = new Set((judges || []).map((j) => String(j?.id || "").trim()).filter(Boolean));
+  const validTeams = new Set((teams || []).map((t) => String(t?.id || "").trim()).filter(Boolean));
+  const judgeNames = new Map((judges || []).map((j) => [String(j?.id || "").trim(), String(j?.name || "").trim()]));
+  const teamNames = new Map((teams || []).map((t) => [String(t?.id || "").trim(), String(t?.name || "").trim()]));
 
-/**
- * Checks whether a candidate password matches the expected SHA-256 hash for a specific portal.
- * @param {string} candidatePassword
- * @param {"host"|"judge"|"team"|string} portal
- * @param {Record<string, any>} [config]
- * @param {string} [defaultHash]
- * @param {SubtleCrypto} [subtleCrypto]
- * @returns {Promise<boolean>}
- */
-export async function verifyPortalPassword(
-  candidatePassword,
-  portal = "host",
-  config = {},
-  defaultHash = DEFAULT_PASSWORD_SHA256,
-  subtleCrypto
-) {
-  if (typeof candidatePassword !== "string" || candidatePassword.length === 0) {
-    return false;
+  const accounts = [];
+  const seenUsernames = new Set();
+
+  for (const row of rows || []) {
+    if (!row || typeof row !== "object") continue;
+    const rawUsername = row.username !== undefined && row.username !== null ? String(row.username).trim() : "";
+    const rawPassword = row.password !== undefined && row.password !== null ? String(row.password).trim() : "";
+    const rawRole = row.role !== undefined && row.role !== null ? String(row.role).trim().toLowerCase() : "";
+    const rawRefId = row.ref_id !== undefined && row.ref_id !== null ? String(row.ref_id).trim() : "";
+    const rawDisplayName = row.display_name !== undefined && row.display_name !== null ? String(row.display_name).trim() : "";
+
+    // Blank rows or missing required fields skipped
+    if (!rawUsername || !rawPassword || !rawRole) {
+      continue;
+    }
+
+    // Role validation
+    if (!VALID_ROLES.has(rawRole)) {
+      continue;
+    }
+
+    // ref_id validation
+    if (rawRole === "judge") {
+      if (!rawRefId || !validJudges.has(rawRefId)) {
+        continue;
+      }
+    } else if (rawRole === "team") {
+      if (!rawRefId || !validTeams.has(rawRefId)) {
+        continue;
+      }
+    }
+
+    // Duplicate username check: first wins (case-insensitive)
+    const lowerUsername = rawUsername.toLowerCase();
+    if (seenUsernames.has(lowerUsername)) {
+      continue;
+    }
+    seenUsernames.add(lowerUsername);
+
+    let displayName = rawDisplayName;
+    if (!displayName) {
+      if (rawRole === "host") {
+        displayName = "Dẫn chương trình";
+      } else if (rawRole === "judge") {
+        displayName = judgeNames.get(rawRefId) || "Ban Giám khảo";
+      } else if (rawRole === "team") {
+        displayName = teamNames.get(rawRefId) || "Đội thi";
+      }
+    }
+
+    accounts.push({
+      username: rawUsername,
+      password: rawPassword,
+      role: rawRole,
+      ref_id: rawRole === "host" ? "" : rawRefId,
+      display_name: displayName
+    });
   }
-  const expected = resolvePortalPasswordHash(portal, config, defaultHash);
-  const actual = await sha256Hex(candidatePassword, subtleCrypto);
-  return actual.toLowerCase() === expected.toLowerCase();
+
+  return accounts;
 }
 
 /**
- * Checks whether a candidate password matches the expected SHA-256 hash (defaults to host portal).
- * @param {string} candidatePassword
- * @param {Record<string, any>} [config]
- * @param {string} [defaultHash]
- * @param {SubtleCrypto} [subtleCrypto]
- * @returns {Promise<boolean>}
+ * Generates default accounts when accounts tab is missing or empty.
+ * Defaults:
+ * - mc (host, ref_id: "")
+ * - gk1, gk2, ... per judge (ref_id: judge.id)
+ * - doi01, doi02, ... per team (ref_id: team.id)
+ * All with password: 122345678910
+ * @param {{ judges?: Array<any>, teams?: Array<any> }} [context]
+ * @returns {Array<{username: string, password: string, role: string, ref_id: string, display_name: string}>}
  */
-export async function verifyPassword(
-  candidatePassword,
-  config = {},
-  defaultHash = DEFAULT_PASSWORD_SHA256,
-  subtleCrypto
-) {
-  return verifyPortalPassword(candidatePassword, "host", config, defaultHash, subtleCrypto);
+export function generateDefaultAccounts({ judges = [], teams = [] } = {}) {
+  const accounts = [
+    {
+      username: "mc",
+      password: DEFAULT_PASSWORD,
+      role: "host",
+      ref_id: "",
+      display_name: "Dẫn chương trình"
+    }
+  ];
+
+  (judges || []).forEach((j, idx) => {
+    if (!j || !j.id) return;
+    const num = idx + 1;
+    accounts.push({
+      username: `gk${num}`,
+      password: DEFAULT_PASSWORD,
+      role: "judge",
+      ref_id: String(j.id).trim(),
+      display_name: String(j.name || `Ban Giám khảo ${num}`).trim()
+    });
+  });
+
+  (teams || []).forEach((t, idx) => {
+    if (!t || !t.id) return;
+    const num = String(idx + 1).padStart(2, "0");
+    accounts.push({
+      username: `doi${num}`,
+      password: DEFAULT_PASSWORD,
+      role: "team",
+      ref_id: String(t.id).trim(),
+      display_name: String(t.name || `Đội ${idx + 1}`).trim()
+    });
+  });
+
+  return accounts;
+}
+
+/**
+ * Resolves accounts: normalises input; if empty or null, falls back to default accounts.
+ * @param {Array<any>|string} rawInput
+ * @param {{ judges?: Array<any>, teams?: Array<any> }} [context]
+ * @returns {Array<any>}
+ */
+export function resolveAccounts(rawInput = [], { judges = [], teams = [] } = {}) {
+  let rows = rawInput;
+  if (typeof rawInput === "string") {
+    // If passed a CSV string, parse it using toRows
+    try {
+      const lines = rawInput.split(/\r?\n/).filter((l) => l.trim());
+      if (lines.length <= 1) {
+        return generateDefaultAccounts({ judges, teams });
+      }
+    } catch {
+      return generateDefaultAccounts({ judges, teams });
+    }
+  }
+  const normalised = normaliseAccounts(rows, { judges, teams });
+  if (normalised && normalised.length > 0) {
+    return normalised;
+  }
+  return generateDefaultAccounts({ judges, teams });
+}
+
+/**
+ * Verifies username and password against accounts list.
+ * Username comparison is case-insensitive and trimmed.
+ * Password comparison is trimmed.
+ * @param {string} username
+ * @param {string} password
+ * @param {Array<any>} accounts
+ * @returns {{ ok: boolean, account?: any, error?: string, portalUrl?: string }}
+ */
+export function authenticate(username, password, accounts = []) {
+  const u = String(username ?? "").trim();
+  const p = String(password ?? "").trim();
+
+  if (!u || !p) {
+    return {
+      ok: false,
+      error: "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu."
+    };
+  }
+
+  const uLower = u.toLowerCase();
+  const match = (accounts || []).find(
+    (acc) => String(acc.username).trim().toLowerCase() === uLower
+  );
+
+  if (!match || String(match.password).trim() !== p) {
+    return {
+      ok: false,
+      error: "Tên đăng nhập hoặc mật khẩu không chính xác."
+    };
+  }
+
+  return {
+    ok: true,
+    account: match,
+    portalUrl: getPortalUrl(match.role)
+  };
+}
+
+/**
+ * Checks whether an active session is valid against the current accounts list and optional required role.
+ * Returns the matching account if valid, or null if invalid.
+ * @param {any} session
+ * @param {Array<any>} accounts
+ * @param {"host"|"judge"|"team"|string} [requiredRole]
+ * @returns {any|null}
+ */
+export function validateSession(session, accounts = [], requiredRole = null) {
+  if (!session || typeof session !== "object") {
+    return null;
+  }
+  const u = String(session.username ?? "").trim();
+  const p = String(session.password ?? "").trim();
+  if (!u || !p) {
+    return null;
+  }
+
+  const uLower = u.toLowerCase();
+  const match = (accounts || []).find(
+    (acc) => String(acc.username).trim().toLowerCase() === uLower
+  );
+
+  // Account disappeared
+  if (!match) {
+    return null;
+  }
+
+  // Password changed
+  if (String(match.password).trim() !== p) {
+    return null;
+  }
+
+  // Role changed
+  if (match.role !== session.role) {
+    return null;
+  }
+
+  // Required role mismatch
+  if (requiredRole && match.role !== String(requiredRole).toLowerCase().trim()) {
+    return null;
+  }
+
+  // ref_id changed for judge or team
+  if ((match.role === "judge" || match.role === "team") && match.ref_id !== session.ref_id) {
+    return null;
+  }
+
+  return match;
+}
+
+// Each role has its own slot so one browser can hold host, judge and team
+// logins in separate tabs (single-machine testing). The plain key holds the
+// most recent login, used by the home page.
+function sessionKey(role) {
+  return role ? `${AUTH_STORAGE_KEY}_${String(role).trim().toLowerCase()}` : AUTH_STORAGE_KEY;
+}
+
+/**
+ * Reads stored session from storage: the login for `role`, or the latest login.
+ * @param {Storage} [storage]
+ * @param {string} [role]
+ * @returns {any|null}
+ */
+export function getActiveSession(storage = globalThis.localStorage, role = null) {
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(sessionKey(role));
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Saves active session to storage, in its role slot and as the latest login.
+ * @param {any} session
+ * @param {Storage} [storage]
+ */
+export function saveActiveSession(session, storage = globalThis.localStorage) {
+  if (!storage) return;
+  try {
+    const raw = JSON.stringify(session);
+    storage.setItem(AUTH_STORAGE_KEY, raw);
+    if (session?.role) storage.setItem(sessionKey(session.role), raw);
+  } catch {
+    // Ignore storage quota error
+  }
+}
+
+/**
+ * Clears the session for `role` (or the latest login when no role is given).
+ * @param {Storage} [storage]
+ * @param {string} [role]
+ */
+export function clearActiveSession(storage = globalThis.localStorage, role = null) {
+  if (!storage) return;
+  try {
+    const latest = getActiveSession(storage);
+    const target = role || latest?.role || null;
+    if (target) storage.removeItem(sessionKey(target));
+    if (!role || latest?.role === target) storage.removeItem(AUTH_STORAGE_KEY);
+  } catch {
+    // Ignore storage error
+  }
 }

@@ -117,8 +117,10 @@ function updatePathValue(tree, path = "", data = {}) {
 }
 
 function notifyLocalPath(path, tree) {
+  const isRoot = !path || path === "/";
   for (const [subPath, callbacks] of localListeners.entries()) {
     if (
+      isRoot ||
       subPath === "" ||
       subPath === "/" ||
       subPath === path ||
@@ -213,12 +215,24 @@ export async function initBackend() {
       // BroadcastChannel unsupported or blocked
     }
 
+    const resumeSync = () => {
+      const tree = getLocalTree();
+      notifyLocalPath("", tree);
+    };
+
     window.addEventListener("storage", (e) => {
       if (e.key === LOCAL_STORAGE_KEY) {
-        const tree = getLocalTree();
-        notifyLocalPath("", tree);
+        resumeSync();
       }
     });
+
+    window.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        resumeSync();
+      }
+    });
+    window.addEventListener("focus", resumeSync);
+    window.addEventListener("pageshow", resumeSync);
   }
 
   return { isFirebase: false, status: currentStatus };

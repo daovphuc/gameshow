@@ -8,7 +8,7 @@ import {
   extractSheetId,
   buildTabUrl
 } from "./config.js";
-import { resolvePortalPasswordHash, resolvePasswordHash, verifyPortalPassword, verifyPassword } from "./auth.js";
+import { getActiveSession, saveActiveSession, clearActiveSession, validateSession } from "./auth.js";
 import { normaliseAllData, resolveImageUrl } from "./data.js";
 import { createInitialState, syncStateWithTeams, exportState, importState, computeTeamScores } from "./state.js";
 import { getTeamInitials, computeLeaderboard, diffLeaderboard } from "./leaderboard.js";
@@ -19,165 +19,45 @@ export const STORAGE_KEYS = {
   SHEET_ID: "gameshow_sheet_id",
   SIDEBAR_COLLAPSED: "gameshow_sidebar_collapsed",
   STATE: "gameshow_state",
-  DATA_CACHE: "gameshow_data_cache",
-  AUTH_HASH_HOST: "gameshow_auth_host",
-  AUTH_HASH_JUDGE: "gameshow_auth_judge",
-  AUTH_HASH_TEAM: "gameshow_auth_team",
-  AUTH_HASH: "gameshow_auth_host",
+  DATA_CACHE: "gameshow_data_cache_v3",
+  AUTH_SESSION: "gameshow_auth_session",
   LEADERBOARD_DRAWER_OPEN: "gameshow_lb_panel_open"
 };
 
 /**
- * Checks whether a specific portal session is unlocked.
- * @param {"host"|"judge"|"team"|Record<string, any>} [portal]
- * @param {Record<string, any>} [config]
- * @returns {boolean}
+ * Ensures user has an active, valid session for the requested portal role.
+ * If invalid, redirects immediately to index.html and clears storage.
+ * @param {"host"|"judge"|"team"|string} portal
+ * @param {Array<any>} [accounts]
+ * @returns {any|null}
  */
-export function isPasswordUnlocked(portal = "host", config = {}) {
-  let targetPortal = portal;
-  let targetConfig = config;
-  if (typeof portal === "object" && portal !== null) {
-    targetConfig = portal;
-    targetPortal = "host";
+export function ensurePortalSession(portal = "host", accounts = []) {
+  if (typeof window === "undefined") return null;
+  const session = getActiveSession(undefined, portal);
+  const validAccount = validateSession(session, accounts, portal);
+  if (!validAccount) {
+    clearActiveSession(undefined, portal);
+    window.location.href = "./index.html";
+    return null;
   }
-  const cleanPortal = String(targetPortal || "host").toLowerCase();
-  const storageKey = `gameshow_auth_${cleanPortal}`;
-  try {
-    const storedHash = localStorage.getItem(storageKey);
-    const targetHash = resolvePortalPasswordHash(cleanPortal, targetConfig);
-    return Boolean(storedHash) && storedHash.toLowerCase() === targetHash.toLowerCase();
-  } catch {
-    return false;
+  // Valid login: reveal the page (css hides .app-shell until then).
+  document.body.classList.add("auth-unlocked");
+  // Refresh display_name if updated in sheet
+  if (validAccount.display_name && session.display_name !== validAccount.display_name) {
+    session.display_name = validAccount.display_name;
+    saveActiveSession(session);
   }
+  return session;
 }
 
 /**
- * Ensures a portal is unlocked before displaying page content.
- * @param {"host"|"judge"|"team"|Record<string, any>} [portal]
- * @param {Record<string, any>} [config]
- * @returns {Promise<boolean>}
+ * Logs out the current session and redirects to index.html.
  */
-export function ensurePasswordUnlocked(portal = "host", config = {}) {
-  let targetPortal = portal;
-  let targetConfig = config;
-  if (typeof portal === "object" && portal !== null) {
-    targetConfig = portal;
-    targetPortal = "host";
+export function logoutUser(role = null) {
+  clearActiveSession(undefined, role);
+  if (typeof window !== "undefined") {
+    window.location.href = "./index.html";
   }
-  const cleanPortal = String(targetPortal || "host").toLowerCase();
-  const targetHash = resolvePortalPasswordHash(cleanPortal, targetConfig);
-  const storageKey = `gameshow_auth_${cleanPortal}`;
-
-  if (isPasswordUnlocked(cleanPortal, targetConfig)) {
-    document.body.classList.add("auth-unlocked");
-    document.getElementById("auth-gate-overlay")?.remove();
-    return Promise.resolve(true);
-  }
-
-  document.body.classList.remove("auth-unlocked");
-
-  return new Promise((resolve) => {
-    let overlay = document.getElementById("auth-gate-overlay");
-    if (!overlay) {
-      overlay = document.createElement("div");
-      overlay.id = "auth-gate-overlay";
-      overlay.className = "auth-gate-overlay";
-      document.body.appendChild(overlay);
-    }
-
-    const showTitle = escapeHtml(targetConfig.show_title || "Hội thi PCCC và CNCH");
-    const portalLabels = {
-      host: "Màn hình Dẫn chương trình",
-      judge: "Cổng Ban Giám khảo",
-      team: "Cổng Đội thi"
-    };
-    const portalLabel = portalLabels[cleanPortal] || "Cổng truy cập";
-
-    overlay.innerHTML = `
-      <div class="auth-gate-card" role="dialog" aria-modal="true" aria-labelledby="auth-gate-title">
-        <div class="auth-gate-icon" aria-hidden="true">🔒</div>
-        <h1 id="auth-gate-title" class="auth-gate-title">${showTitle}</h1>
-        <p class="auth-gate-subtitle" style="font-weight: 600; color: var(--accent); margin-bottom: 0.35rem;">
-          ${escapeHtml(portalLabel)}
-        </p>
-        <p class="auth-gate-subtitle">
-          Vui lòng nhập mật khẩu để mở khóa thiết bị.
-        </p>
-        <form id="auth-gate-form" class="auth-gate-form" novalidate>
-          <input
-            type="password"
-            id="auth-gate-input"
-            class="auth-gate-input"
-            placeholder="Nhập mật khẩu..."
-            autocomplete="current-password"
-            aria-label="Mật khẩu truy cập"
-            required
-          />
-          <div id="auth-gate-error" class="auth-gate-error" role="alert" aria-live="polite"></div>
-          <button type="submit" id="auth-gate-submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
-            Mở khóa
-          </button>
-        </form>
-      </div>
-    `;
-
-    const form = document.getElementById("auth-gate-form");
-    const input = document.getElementById("auth-gate-input");
-    const errorEl = document.getElementById("auth-gate-error");
-    const submitBtn = document.getElementById("auth-gate-submit");
-
-    setTimeout(() => {
-      input?.focus();
-    }, 25);
-
-    form?.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      if (!input) return;
-      const candidate = input.value;
-      if (submitBtn) submitBtn.disabled = true;
-      try {
-        const ok = await verifyPortalPassword(candidate, cleanPortal, targetConfig);
-        if (ok) {
-          try {
-            localStorage.setItem(storageKey, targetHash);
-          } catch {
-            // Ignore storage errors
-          }
-          document.body.classList.add("auth-unlocked");
-          overlay.remove();
-          resolve(true);
-        } else {
-          if (errorEl) {
-            errorEl.textContent = "Mật khẩu không chính xác. Vui lòng thử lại.";
-          }
-          input.select();
-          input.focus();
-        }
-      } finally {
-        if (submitBtn) submitBtn.disabled = false;
-      }
-    });
-  });
-}
-
-/**
- * Locks the current portal session, requiring password re-entry.
- */
-export function lockAppSession(portal = "host", config = {}) {
-  let targetPortal = portal;
-  let targetConfig = config;
-  if (typeof portal === "object" && portal !== null) {
-    targetConfig = portal;
-    targetPortal = "host";
-  }
-  const cleanPortal = String(targetPortal || "host").toLowerCase();
-  try {
-    localStorage.removeItem(`gameshow_auth_${cleanPortal}`);
-  } catch {
-    // Ignore storage errors
-  }
-  document.body.classList.remove("auth-unlocked");
-  return ensurePasswordUnlocked(cleanPortal, targetConfig);
 }
 
 export function escapeHtml(value) {
@@ -282,8 +162,8 @@ export async function fetchQuizData({ forceRefresh = false, portal = "host" } = 
         const cached = JSON.parse(cachedRaw);
         if (cached && cached.sheetId === sheetId && cached.data) {
           applyResolvedTheme(cached.data.config);
-          await ensurePasswordUnlocked(portal, cached.data.config);
-          return { ...cached.data, sheetId, isSample: !sheetId };
+          const session = portal ? ensurePortalSession(portal, cached.data.accounts) : getActiveSession();
+          return { ...cached.data, sheetId, isSample: !sheetId, session };
         }
       }
     } catch {
@@ -308,7 +188,7 @@ export async function fetchQuizData({ forceRefresh = false, portal = "host" } = 
       })
     );
   } catch (err) {
-    await ensurePasswordUnlocked(portal, {});
+    // Keep the login on a network error; the page shows the load error instead.
     throw err;
   }
 
@@ -323,8 +203,8 @@ export async function fetchQuizData({ forceRefresh = false, portal = "host" } = 
   }
 
   applyResolvedTheme(data.config);
-  await ensurePasswordUnlocked(portal, data.config);
-  return { ...data, sheetId, isSample: !sheetId };
+  const session = portal ? ensurePortalSession(portal, data.accounts) : getActiveSession();
+  return { ...data, sheetId, isSample: !sheetId, session };
 }
 
 export function loadAppState(teams = []) {
@@ -547,6 +427,8 @@ export function wireStageLayout({
 
     const sheetIdVal = escapeHtml(getSheetId());
     const showTitle = escapeHtml(config.show_title || "Hội thi PCCC và CNCH");
+    const session = getActiveSession(undefined, "host");
+    const displayName = session?.display_name || session?.username || "Dẫn chương trình";
 
     sidebar.innerHTML = `
       <div class="sidebar-top">
@@ -566,8 +448,8 @@ export function wireStageLayout({
         </div>
 
         <!-- Connection Status -->
-        <div style="padding: 0 0.2rem 0.65rem;">
-          <div id="sidebar-conn-badge" class="conn-status-badge local">
+        <div class="sidebar-conn-wrap">
+          <div id="sidebar-conn-badge" class="conn-status-badge local" title="Chế độ thử trên 1 máy">
             <span class="conn-status-dot"></span>
             <span id="sidebar-conn-label">Đang kết nối...</span>
           </div>
@@ -620,11 +502,10 @@ export function wireStageLayout({
         </div>
       </div>
 
-      <div class="sidebar-bottom" style="display: flex; flex-direction: column; gap: 0.65rem; padding-top: 1rem;">
+      <div class="sidebar-bottom">
         <a
           href="./index.html"
           class="sidebar-link"
-          style="width: 100%; border: 1px solid var(--border); background: var(--surface); text-decoration: none;"
           title="Về màn hình chọn cổng"
         >
           <span class="sidebar-link-icon">🚪</span>
@@ -633,13 +514,12 @@ export function wireStageLayout({
 
         <button
           type="button"
-          id="btn-sidebar-lock"
+          id="btn-sidebar-logout"
           class="sidebar-link"
-          style="width: 100%; border: 1px solid var(--border); background: var(--surface); cursor: pointer; text-align: left;"
-          title="Khóa màn hình (yêu cầu nhập lại mật khẩu)"
+          title="Đăng xuất (${escapeHtml(displayName)})"
         >
-          <span class="sidebar-link-icon">🔒</span>
-          <span class="sidebar-link-label">Khóa</span>
+          <span class="sidebar-link-icon">⎋</span>
+          <span class="sidebar-link-label">Đăng xuất (${escapeHtml(displayName)})</span>
         </button>
 
         <div class="sidebar-footer-note" style="font-size: 0.76rem; color: var(--text-muted);">
@@ -654,11 +534,12 @@ export function wireStageLayout({
     onStatusChange((status) => {
       if (!connBadge || !connLabel) return;
       connBadge.className = `conn-status-badge ${status.code || "local"}`;
+      connBadge.title = status.label || "Chế độ thử trên 1 máy";
       connLabel.textContent = status.label || "Chế độ thử trên 1 máy";
     });
 
-    document.getElementById("btn-sidebar-lock")?.addEventListener("click", () => {
-      lockAppSession("host", config);
+    document.getElementById("btn-sidebar-logout")?.addEventListener("click", () => {
+      logoutUser("host");
     });
 
     document.getElementById("btn-sidebar-toggle")?.addEventListener("click", () => {

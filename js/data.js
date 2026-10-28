@@ -4,6 +4,7 @@ import { DEFAULT_CONFIG, TEAM_PALETTE } from "./config.js";
 import { parseCsv } from "./csv.js";
 import { normaliseRound2 } from "./round2.js";
 import { normaliseJudges } from "./judges.js";
+import { normaliseAccounts, resolveAccounts } from "./auth.js";
 
 function toRows(input) {
   if (typeof input === "string") {
@@ -289,6 +290,8 @@ export function normaliseRound3(input = [], config = DEFAULT_CONFIG) {
   return Array.from(byNumber.values()).sort((a, b) => a.number - b.number);
 }
 
+export { normaliseAccounts, resolveAccounts };
+
 /**
  * Normalises all sheet tabs together.
  * @param {{
@@ -297,6 +300,7 @@ export function normaliseRound3(input = [], config = DEFAULT_CONFIG) {
  *   round2Csv?: any,
  *   round3Csv?: any,
  *   judgesCsv?: any,
+ *   accountsCsv?: any,
  *   configCsv?: any
  * }} raw
  */
@@ -306,6 +310,7 @@ export function normaliseAllData({
   round2Csv = [],
   round3Csv = [],
   judgesCsv = [],
+  accountsCsv = [],
   configCsv = []
 } = {}) {
   const config = normaliseConfig(configCsv);
@@ -314,6 +319,7 @@ export function normaliseAllData({
   const round2Questions = normaliseRound2(round2Csv, config);
   const round3Questions = normaliseRound3(round3Csv, config);
   const judges = normaliseJudges(judgesCsv);
+  const accounts = resolveAccounts(toRows(accountsCsv), { judges, teams });
 
   return {
     config,
@@ -322,6 +328,7 @@ export function normaliseAllData({
     round2Questions,
     round3Questions,
     judges,
+    accounts,
     scores: {}
   };
 }

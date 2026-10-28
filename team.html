@@ -20,23 +20,27 @@
       renderAvatarHtml,
       escapeHtml,
       showToast,
-      lockAppSession
+      logoutUser
     } from "./js/app.js";
     import { resolveImageUrl } from "./js/data.js";
     import { formatTimer } from "./js/timer.js";
-    import { set, listen, getServerTime, serverTimestamp } from "./js/backend.js";
-
-    const TEAM_ID_KEY = "gameshow_team_id";
+    import { set, listen, getServerTime, serverTimestamp, onStatusChange } from "./js/backend.js";
+    import { getActiveSession } from "./js/auth.js";
 
     let quizData = null;
-    let selectedTeamId = localStorage.getItem(TEAM_ID_KEY) || "";
+    let selectedTeamId = "";
+    let teamDisplayName = "";
     let myAnswers = {};
     let currentTeamAnswerUnsub = null;
     let lastSubscribedQKey = null;
 
+    let connStatus = { code: "local", label: "Chế độ thử trên 1 máy" };
+
     // Live state mirror
-    let liveState = {
+    const initialLiveState = () => ({
       currentRound: "round1",
+      stageTeamId: null,
+      round1: {},
       round2: {
         status: "idle",
         questionKey: null,
@@ -45,57 +49,15 @@
         deadline: null,
         answers: {},
         results: null
-      }
-    };
+      },
+      round3: {}
+    });
+    let liveState = initialLiveState();
 
     let timerInterval = null;
 
-    function saveSelectedTeam(teamId) {
-      selectedTeamId = teamId;
-      if (teamId) {
-        localStorage.setItem(TEAM_ID_KEY, teamId);
-      } else {
-        localStorage.removeItem(TEAM_ID_KEY);
-      }
-      renderTeamPortal();
-    }
-
-    function renderTeamPicker(root) {
-      const teams = quizData.teams || [];
-      const cardsHtml = teams
-        .map(
-          (t) => `
-          <button type="button" class="btn btn-lg" style="width: 100%; justify-content: flex-start; gap: 1rem; padding: 1.1rem 1.4rem; font-size: 1.15rem;" data-pick-team="${escapeHtml(t.id)}">
-            ${renderAvatarHtml(t, "team-avatar-sm")}
-            <span style="font-weight: 700;">${escapeHtml(t.name)}</span>
-          </button>
-        `
-        )
-        .join("");
-
-      root.innerHTML = `
-        <div class="tablet-stage-card" style="margin-top: 1.5rem;">
-          <h1 style="font-family: var(--font-serif); font-size: 1.8rem; margin: 0 0 0.5rem; text-align: center;">
-            Đăng Nhập Thiết Bị Đội Thi
-          </h1>
-          <p style="text-align: center; color: var(--text-muted); margin: 0 0 1.8rem;">
-            Theo quy định Điều lệ, mỗi đội thi sử dụng 01 thiết bị đăng nhập bằng tên đội của mình.
-          </p>
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.85rem;">
-            ${cardsHtml}
-          </div>
-        </div>
-      `;
-
-      root.querySelectorAll("[data-pick-team]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          saveSelectedTeam(btn.dataset.pickTeam);
-        });
-      });
-    }
-
     function renderTeamHeader() {
-      const team = quizData.teams.find((t) => t.id === selectedTeamId) || { name: selectedTeamId };
+      const team = quizData.teams.find((t) => t.id === selectedTeamId) || { name: teamDisplayName || selectedTeamId };
 
       return `
         <header class="tablet-header">
@@ -109,12 +71,14 @@
             </div>
           </div>
 
-          <div style="display: flex; gap: 0.5rem;">
-            <button type="button" id="btn-change-team" class="btn btn-sm">
-              Đổi đội
-            </button>
-            <button type="button" id="btn-lock-team" class="btn btn-sm">
-              🔒 Khóa
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div class="conn-status-badge ${connStatus.code || 'local'}" title="${escapeHtml(connStatus.label)}">
+              <span class="conn-status-dot"></span>
+              <span style="font-size: 0.8rem;">${escapeHtml(connStatus.label)}</span>
+            </div>
+
+            <button type="button" id="btn-team-logout" class="btn btn-sm">
+              ⎋ Đăng xuất (${escapeHtml(team.name)})
             </button>
           </div>
         </header>
@@ -184,7 +148,7 @@
       const statusNote = document.getElementById("team-answer-status");
       if (statusNote) {
         statusNote.innerHTML = `
-          <div style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.25rem; border-radius: 100px; background-color: rgba(46, 125, 79, 0.12); color: #2E7D4F; font-weight: 700;">
+          <div style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.25rem; border-radius: 100px; background-color: rgba(46, 125, 79, 0.12); color: var(--success); font-weight: 700;">
             <span>✓ Đã ghi nhận đáp án: <strong>${letter}</strong></span>
           </div>
         `;
@@ -205,18 +169,106 @@
       }
     }
 
-    function renderWaitingScreen(root) {
+    function renderRound1Or3WaitingScreen(root, roundKey) {
+      stopTimerLoop();
+      const isR1 = roundKey === "round1";
+      const roundName = isR1 ? quizData.config.round1_name : quizData.config.round3_name;
+
+      let isMyTurn = false;
+      let stageTeam = null;
+      let topicText = "";
+
+      if (isR1) {
+        const stageTeamId = liveState.round1?.activeSession?.teamId || liveState.stageTeamId;
+        isMyTurn = Boolean(stageTeamId && stageTeamId === selectedTeamId);
+        stageTeam = stageTeamId ? quizData.teams.find((t) => t.id === stageTeamId) : null;
+        if (liveState.round1?.activeSession?.packageId) {
+          const pkg = quizData.round1Packages.find((p) => p.id === liveState.round1.activeSession.packageId);
+          if (pkg) topicText = `${pkg.package}: ${pkg.question}`;
+        }
+      } else {
+        const activeTile = liveState.round3?.activeTile;
+        const activeTeamId = activeTile?.selectedTeamId || (activeTile ? liveState.stageTeamId : null);
+        isMyTurn = Boolean(activeTeamId && activeTeamId === selectedTeamId);
+        stageTeam = activeTeamId ? quizData.teams.find((t) => t.id === activeTeamId) : null;
+        if (activeTile?.number) {
+          const tile = quizData.round3Questions.find((q) => q.number === activeTile.number);
+          if (tile) topicText = `Ô số #${tile.number}: ${tile.question}`;
+        }
+      }
+
+      root.innerHTML = `
+        ${renderTeamHeader()}
+
+        <main class="tablet-stage-card" style="text-align: center; padding: 3.5rem 1.5rem;">
+          <div style="margin-bottom: 1rem;">
+            <span class="meta-pill accent">${escapeHtml(roundName)}</span>
+          </div>
+
+          ${
+            isMyTurn
+              ? `
+                <div style="font-size: 3.8rem; margin-bottom: 1rem; animation: pulse 1.5s infinite;">★</div>
+                <h2 style="font-family: var(--font-serif); font-size: clamp(1.6rem, 3.2vw, 2.2rem); color: var(--accent); margin: 0 0 0.8rem;">
+                  ĐẾN LƯỢT ĐỘI CỦA BẠN LÊN SÂN KHẤU!
+                </h2>
+                <p style="font-size: 1.15rem; font-weight: 600; color: var(--text); max-width: 600px; margin: 0 auto 1.5rem;">
+                  Đội của bạn đang thực hiện phần thi trên sân khấu. Hãy chuẩn bị và theo dõi chỉ dẫn của MC.
+                </p>
+                ${
+                  topicText
+                    ? `<div style="background-color: var(--surface); border: 2px solid var(--accent); border-radius: var(--radius-md); padding: 1.25rem 1.5rem; max-width: 650px; margin: 0 auto; text-align: left;">
+                        <div style="font-size: 0.82rem; font-weight: 700; color: var(--accent); text-transform: uppercase; margin-bottom: 0.35rem;">
+                          ${isR1 ? "Gói chủ đề của đội bạn" : "Tình huống bốc thăm"}
+                        </div>
+                        <div style="font-size: 1.15rem; font-weight: 700; line-height: 1.45;">
+                          ${escapeHtml(topicText)}
+                        </div>
+                      </div>`
+                    : ""
+                }
+              `
+              : stageTeam
+                ? `
+                  <div style="font-size: 3.2rem; margin-bottom: 1rem;">🎤</div>
+                  <h2 style="font-family: var(--font-serif); font-size: 1.6rem; margin: 0 0 0.6rem;">
+                    Đang thi đấu: <strong>${escapeHtml(stageTeam.name)}</strong>
+                  </h2>
+                  <p style="color: var(--text-muted); font-size: 1.05rem; max-width: 500px; margin: 0 auto;">
+                    Đội của bạn đang ở hàng ghế chờ. Màn hình sẽ tự động thông báo khi đến lượt đội của bạn.
+                  </p>
+                `
+                : `
+                  <div style="font-size: 3.2rem; margin-bottom: 1rem;">⏳</div>
+                  <h2 style="font-family: var(--font-serif); font-size: 1.6rem; margin: 0 0 0.6rem;">
+                    Đang Chờ Lệnh Thi Đấu
+                  </h2>
+                  <p style="color: var(--text-muted); font-size: 1.05rem; max-width: 500px; margin: 0 auto;">
+                    Ban tổ chức chuẩn bị bắt đầu phần thi. Màn hình sẽ tự động cập nhật theo tiến trình hội thi.
+                  </p>
+                `
+          }
+        </main>
+      `;
+
+      wireHeaderControls();
+    }
+
+    function renderRound2WaitingScreen(root) {
       stopTimerLoop();
       root.innerHTML = `
         ${renderTeamHeader()}
 
         <main class="tablet-stage-card" style="text-align: center; padding: 4rem 1.5rem;">
-          <div style="font-size: 3.5rem; margin-bottom: 1rem;">⏳</div>
-          <h2 style="font-family: var(--font-serif); font-size: 1.6rem; margin: 0 0 0.6rem;">
-            Đang Chờ Lệnh Thi Đấu
+          <div style="margin-bottom: 1rem;">
+            <span class="meta-pill accent">${escapeHtml(quizData.config.round2_name)}</span>
+          </div>
+          <div style="font-size: 3.5rem; margin-bottom: 1rem;">⚡</div>
+          <h2 style="font-family: var(--font-serif); font-size: 1.7rem; margin: 0 0 0.6rem;">
+            Chuẩn Bị Trả Lời Trắc Nghiệm
           </h2>
-          <p style="color: var(--text-muted); font-size: 1.05rem; max-width: 480px; margin: 0 auto;">
-            Màn hình sẽ tự động hiển thị câu hỏi và 4 nút chọn đáp án A / B / C / D khi Ban tổ chức bắt đầu phần thi trắc nghiệm.
+          <p style="color: var(--text-muted); font-size: 1.1rem; max-width: 520px; margin: 0 auto;">
+            Màn hình sẽ tự động hiển thị câu hỏi và 4 nút chọn A / B / C / D khi MC phát lệnh tính giờ.
           </p>
         </main>
       `;
@@ -228,7 +280,7 @@
       const r2 = liveState.round2;
       const q = r2.activeQuestion;
       if (!q) {
-        renderWaitingScreen(root);
+        renderRound2WaitingScreen(root);
         return;
       }
 
@@ -271,10 +323,10 @@
               data-choice="${opt.letter}"
               ${shouldDisable ? "disabled" : ""}
             >
-              <span style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 10px; background: rgba(0,0,0,0.2); font-size: 1.4rem; font-weight: 900;">
+              <span style="display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 12px; background: rgba(0,0,0,0.22); font-size: 1.5rem; font-weight: 900;">
                 ${opt.letter}
               </span>
-              <span style="flex: 1; font-size: 1.15rem; line-height: 1.3;">
+              <span style="flex: 1; font-size: 1.15rem; line-height: 1.35;">
                 ${escapeHtml(opt.text)}
               </span>
             </button>
@@ -297,7 +349,7 @@
 
           <!-- Question Text -->
           <div style="margin-bottom: 1.5rem;">
-            <p style="font-size: clamp(1.2rem, 2.2vw, 1.6rem); font-weight: 700; line-height: 1.35; margin: 0 0 1rem;">
+            <p style="font-size: clamp(1.25rem, 2.3vw, 1.65rem); font-weight: 700; line-height: 1.35; margin: 0 0 1rem;">
               ${escapeHtml(q.question)}
             </p>
             ${
@@ -310,10 +362,10 @@
           </div>
 
           <!-- Status Banner -->
-          <div id="team-answer-status" style="text-align: center; min-height: 42px; margin-bottom: 1rem;">
+          <div id="team-answer-status" style="text-align: center; min-height: 44px; margin-bottom: 1rem;">
             ${
               isRevealed && result
-                ? `<div style="display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.75rem 1.5rem; border-radius: 100px; font-weight: 800; font-size: 1.1rem; background-color: ${result.isCorrect ? "rgba(46, 125, 79, 0.15)" : "rgba(201, 74, 56, 0.15)"}; color: ${result.isCorrect ? "#2E7D4F" : "#C94A38"};">
+                ? `<div style="display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.75rem 1.5rem; border-radius: 100px; font-weight: 800; font-size: 1.15rem; background-color: ${result.isCorrect ? "rgba(46, 125, 79, 0.15)" : "rgba(201, 74, 56, 0.15)"}; color: ${result.isCorrect ? "#2E7D4F" : "#C94A38"};">
                     <span>${result.isCorrect ? `✓ Chính xác! (+${result.points} điểm)` : `✕ Rất tiếc! Đáp án đúng là ${correctLetter}`}</span>
                   </div>`
                 : hasAnswered
@@ -321,8 +373,8 @@
                       <span>✓ Đã ghi nhận đáp án: <strong>${chosenLetter}</strong></span>
                     </div>`
                   : isLocked
-                    ? `<div style="color: var(--text-muted); font-weight: 700;">Đã hết giờ làm bài</div>`
-                    : `<div style="color: var(--text-muted); font-weight: 600;">Chạm vào 1 trong 4 đáp án bên dưới để trả lời:</div>`
+                    ? `<div style="color: var(--text-muted); font-weight: 700; font-size: 1.05rem;">Đã hết giờ làm bài</div>`
+                    : `<div style="color: var(--text-muted); font-weight: 600; font-size: 1.05rem;">Chạm vào 1 trong 4 đáp án bên dưới để trả lời:</div>`
             }
           </div>
 
@@ -351,11 +403,8 @@
     }
 
     function wireHeaderControls() {
-      document.getElementById("btn-change-team")?.addEventListener("click", () => {
-        saveSelectedTeam("");
-      });
-      document.getElementById("btn-lock-team")?.addEventListener("click", () => {
-        lockAppSession("team", quizData.config);
+      document.getElementById("btn-team-logout")?.addEventListener("click", () => {
+        logoutUser("team");
       });
     }
 
@@ -363,27 +412,50 @@
       const root = document.getElementById("team-app-root");
       if (!root || !quizData) return;
 
-      if (!selectedTeamId) {
-        renderTeamPicker(root);
-        return;
-      }
-
-      const r2 = liveState.round2;
-      if (liveState.currentRound === "round2" && (r2.status === "open" || r2.status === "locked" || r2.status === "revealed")) {
-        renderQuestionScreen(root);
+      const curRound = liveState.currentRound || "round1";
+      if (curRound === "round2") {
+        const r2 = liveState.round2;
+        if (r2?.status === "open" || r2?.status === "locked" || r2?.status === "revealed") {
+          renderQuestionScreen(root);
+        } else {
+          renderRound2WaitingScreen(root);
+        }
       } else {
-        renderWaitingScreen(root);
+        renderRound1Or3WaitingScreen(root, curRound);
       }
     }
 
     async function initTeam() {
       quizData = await fetchQuizData({ portal: "team" });
-      document.title = `Đội Thi - ${quizData.config.show_title}`;
+
+      const session = getActiveSession(undefined, "team");
+      selectedTeamId = session?.ref_id || "";
+      const matchedTeam = quizData.teams.find((t) => t.id === selectedTeamId);
+      teamDisplayName = matchedTeam ? matchedTeam.name : (session?.display_name || "Đội thi");
+
+      document.title = `Đội Thi (${teamDisplayName}) - ${quizData.config.show_title}`;
+
+      onStatusChange((st) => {
+        connStatus = st;
+        const badge = document.querySelector(".tablet-header .conn-status-badge");
+        if (badge) {
+          badge.className = `conn-status-badge ${st.code || 'local'}`;
+          badge.title = st.label || "Chế độ thử trên 1 máy";
+          const labelSpan = badge.querySelector("span:not(.conn-status-dot)");
+          if (labelSpan) labelSpan.textContent = st.label || "Chế độ thử trên 1 máy";
+        }
+      });
 
       // Listen for live round and question broadcasts
       listen("live", (data) => {
         if (!data) return;
-        liveState = { ...liveState, ...data };
+        // Replace (not merge) so fields the host removed, e.g. after a reset, disappear here too;
+        // keep answers that arrive on their own listener for the same question.
+        const prevRound2 = liveState.round2 || {};
+        liveState = { ...initialLiveState(), ...data };
+        if (prevRound2.answers && liveState.round2 && liveState.round2.questionKey === prevRound2.questionKey && !liveState.round2.answers) {
+          liveState.round2 = { ...liveState.round2, answers: prevRound2.answers };
+        }
         const qKey = liveState.round2?.questionKey;
         if (qKey && selectedTeamId && qKey !== lastSubscribedQKey) {
           lastSubscribedQKey = qKey;

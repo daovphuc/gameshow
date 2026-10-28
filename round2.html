@@ -679,6 +679,22 @@
       // Republish totals rebuilt from stored answers, so a reload never loses them.
       await updateAccumulatedScores();
 
+      listen("live", (remoteLive) => {
+        if (!remoteLive) return;
+        // If contest was reset
+        if (remoteLive.currentRound === "round1" && !remoteLive.round2?.setStarted && remoteLive.round2?.status === "idle") {
+          stopTimerTick();
+          currentQuestionIdx = 0;
+          liveR2.status = "idle";
+          liveR2.setStarted = false;
+          liveR2.activeQuestion = null;
+          liveR2.answers = {};
+          liveR2.results = null;
+          liveR2.history = [];
+          renderStage();
+        }
+      });
+
       renderStage();
     }
 

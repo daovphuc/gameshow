@@ -20,92 +20,56 @@
       renderAvatarHtml,
       escapeHtml,
       showToast,
-      lockAppSession
+      logoutUser
     } from "./js/app.js";
     import { clampScore } from "./js/judges.js";
-    import { set, update, listen, get } from "./js/backend.js";
-
-    const JUDGE_ID_KEY = "gameshow_judge_id";
+    import { set, listen, onStatusChange } from "./js/backend.js";
+    import { getActiveSession } from "./js/auth.js";
 
     let quizData = null;
-    let selectedJudgeId = localStorage.getItem(JUDGE_ID_KEY) || "";
+    let selectedJudgeId = "";
+    let judgeDisplayName = "";
+
+    // Track active team selected for scoring (either from host or tapped by judge)
+    let manuallySelectedTeamId = null;
+
+    // Track saved timestamps: teamId -> timestamp string
+    const lastSavedTimestamps = {};
 
     // Live state mirror
-    let liveState = {
+    const initialLiveState = () => ({
       currentRound: "round1",
       stageTeamId: null,
       round1: {},
       round2: {},
       round3: {},
       judgeScores: { round1: {}, round3: {} }
-    };
+    });
+    let liveState = initialLiveState();
 
-    function saveSelectedJudge(judgeId) {
-      selectedJudgeId = judgeId;
-      if (judgeId) {
-        localStorage.setItem(JUDGE_ID_KEY, judgeId);
-      } else {
-        localStorage.removeItem(JUDGE_ID_KEY);
-      }
-      renderJudgePortal();
-    }
-
-    function renderJudgePicker(root) {
-      const judges = quizData.judges || [];
-      const judgesHtml = judges
-        .map(
-          (j) => `
-          <button type="button" class="btn btn-lg" style="width: 100%; justify-content: space-between; padding: 1.2rem 1.4rem; font-size: 1.15rem;" data-pick-judge="${escapeHtml(j.id)}">
-            <span style="font-weight: 700;">${escapeHtml(j.name)}</span>
-            <span style="color: var(--accent);">Chọn →</span>
-          </button>
-        `
-        )
-        .join("");
-
-      root.innerHTML = `
-        <div class="tablet-stage-card" style="margin-top: 2rem;">
-          <h1 style="font-family: var(--font-serif); font-size: 1.8rem; margin: 0 0 0.5rem; text-align: center;">
-            Chọn Danh Tính Giám Khảo
-          </h1>
-          <p style="text-align: center; color: var(--text-muted); margin: 0 0 1.8rem;">
-            Vui lòng chọn danh xưng của bạn trong Ban Giám khảo để bắt đầu chấm điểm.
-          </p>
-          <div style="display: flex; flex-direction: column; gap: 0.85rem;">
-            ${judgesHtml}
-          </div>
-        </div>
-      `;
-
-      root.querySelectorAll("[data-pick-judge]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          saveSelectedJudge(btn.dataset.pickJudge);
-        });
-      });
-    }
+    let connStatus = { code: "local", label: "Chế độ thử trên 1 máy" };
 
     function renderJudgeHeader() {
-      const judgeObj = quizData.judges.find((j) => j.id === selectedJudgeId);
-      const judgeName = judgeObj ? judgeObj.name : "Giám khảo";
-
       return `
         <header class="tablet-header">
           <div class="tablet-identity-banner">
-            <span style="font-size: 1.5rem;">📋</span>
+            <span style="font-size: 1.6rem;" aria-hidden="true">📋</span>
             <div>
               <div style="font-size: 0.78rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
                 Ban Giám Khảo
               </div>
-              <div class="tablet-identity-name">${escapeHtml(judgeName)}</div>
+              <div class="tablet-identity-name">${escapeHtml(judgeDisplayName)}</div>
             </div>
           </div>
 
-          <div style="display: flex; gap: 0.5rem;">
-            <button type="button" id="btn-change-judge" class="btn btn-sm">
-              Đổi giám khảo
-            </button>
-            <button type="button" id="btn-lock-judge" class="btn btn-sm">
-              🔒 Khóa
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div class="conn-status-badge ${connStatus.code || 'local'}" title="${escapeHtml(connStatus.label)}">
+              <span class="conn-status-dot"></span>
+              <span style="font-size: 0.8rem;">${escapeHtml(connStatus.label)}</span>
+            </div>
+
+            <button type="button" id="btn-judge-logout" class="btn btn-sm">
+              ⎋ Đăng xuất (${escapeHtml(judgeDisplayName)})
             </button>
           </div>
         </header>
@@ -122,192 +86,404 @@
         ? Number(quizData.config.round1_max_manner) || 5
         : Number(quizData.config.round3_max_manner) || 5;
 
-      const activeTeamId =
-        liveState.stageTeamId ||
-        (isR1
-          ? liveState.round1?.activeSession?.teamId
-          : liveState.round3?.activeTile?.selectedTeamId);
+      // Stage team from host
+      const stageTeamId = isR1
+        ? (liveState.round1?.activeSession?.teamId || liveState.stageTeamId)
+        : (liveState.round3?.activeTile?.selectedTeamId || (liveState.round3?.activeTile ? liveState.stageTeamId : null));
 
+      // Effective team being scored
+      const activeTeamId = manuallySelectedTeamId || stageTeamId;
       const activeTeam = quizData.teams.find((t) => t.id === activeTeamId);
 
-      // Check if team round is locked by host
-      const isLocked = isR1 && liveState.round1?.lockedTeams?.includes(activeTeamId);
+      // Lock status for the active team
+      const isLocked = isR1
+        ? Boolean(liveState.round1?.lockedTeams?.includes(activeTeamId))
+        : false;
 
-      // Current judge score for this team
-      const existing =
-        liveState.judgeScores?.[roundKey]?.[activeTeamId]?.[selectedJudgeId] || {
-          content: 0,
-          manner: 0
-        };
+      // Existing saved score from live database
+      const savedScore = liveState.judgeScores?.[roundKey]?.[activeTeamId]?.[selectedJudgeId];
+      const hasSavedScore = Boolean(savedScore && (savedScore.content !== undefined || savedScore.manner !== undefined));
 
-      let contentVal = clampScore(existing.content, maxContent);
-      let mannerVal = clampScore(existing.manner, maxManner);
+      let contentVal = hasSavedScore ? clampScore(savedScore.content, maxContent) : maxContent;
+      let mannerVal = hasSavedScore ? clampScore(savedScore.manner, maxManner) : maxManner;
 
-      // Title or question being answered
+      // Topic or question text
       let topicText = "";
-      if (isR1 && liveState.round1?.activeSession) {
-        const pkg = quizData.round1Packages.find(
-          (p) => p.id === liveState.round1.activeSession.packageId
-        );
-        topicText = pkg ? `${pkg.package}: ${pkg.question}` : "";
-      } else if (!isR1 && liveState.round3?.activeTile) {
-        const tile = quizData.round3Questions.find(
-          (q) => q.number === liveState.round3.activeTile.number
-        );
-        topicText = tile ? `Ô số #${tile.number}: ${tile.question}` : "";
+      if (isR1) {
+        if (liveState.round1?.activeSession && liveState.round1.activeSession.teamId === activeTeamId) {
+          const pkg = quizData.round1Packages.find((p) => p.id === liveState.round1.activeSession.packageId);
+          topicText = pkg ? `${pkg.package}: ${pkg.question}` : "";
+        } else if (liveState.round1?.teamPackages?.[activeTeamId]) {
+          const pkgId = liveState.round1.teamPackages[activeTeamId];
+          const pkg = quizData.round1Packages.find((p) => p.id === pkgId);
+          topicText = pkg ? `${pkg.package}: ${pkg.question}` : "";
+        }
+      } else {
+        if (liveState.round3?.activeTile && (!liveState.round3.activeTile.selectedTeamId || liveState.round3.activeTile.selectedTeamId === activeTeamId)) {
+          const tile = quizData.round3Questions.find((q) => q.number === liveState.round3.activeTile.number);
+          topicText = tile ? `Ô số #${tile.number}: ${tile.question}` : "";
+        }
       }
+
+      // Overview teams list items
+      const overviewTeams = quizData.teams.map((t) => {
+        const tScore = liveState.judgeScores?.[roundKey]?.[t.id]?.[selectedJudgeId];
+        const tHasScore = Boolean(tScore && (tScore.content !== undefined || tScore.manner !== undefined));
+        const tLocked = isR1 ? Boolean(liveState.round1?.lockedTeams?.includes(t.id)) : false;
+        const isCurrent = t.id === activeTeamId;
+        const isStage = t.id === stageTeamId;
+        const totalScore = tHasScore ? (Number(tScore.content || 0) + Number(tScore.manner || 0)).toFixed(1) : null;
+
+        return {
+          ...t,
+          hasScore: tHasScore,
+          score: totalScore,
+          locked: tLocked,
+          isCurrent,
+          isStage
+        };
+      });
+
+      const scoredCount = overviewTeams.filter((t) => t.hasScore).length;
+      const totalTeams = overviewTeams.length;
+
+      const lastSavedTime = lastSavedTimestamps[activeTeamId] || (hasSavedScore ? "trước đó" : "");
 
       root.innerHTML = `
         ${renderJudgeHeader()}
 
-        <main class="tablet-stage-card">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
-            <span class="meta-pill accent">${escapeHtml(roundName)}</span>
-            <span style="font-size: 0.88rem; color: var(--text-muted); font-weight: 600;">
-              ${isLocked ? "🔒 Đã khóa phần thi" : "Đang mở chấm điểm"}
+        <!-- Main Scoring Card (Top) -->
+        <main class="judge-stage-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.65rem;">
+              <span class="meta-pill accent">${escapeHtml(roundName)}</span>
+              ${
+                manuallySelectedTeamId && manuallySelectedTeamId !== stageTeamId && stageTeamId
+                  ? `<button type="button" id="btn-back-to-stage" class="btn btn-sm" style="color: var(--accent);">
+                      ↩ Về đội đang trên sân khấu
+                    </button>`
+                  : ""
+              }
+            </div>
+            <span style="font-size: 0.9rem; font-weight: 700; color: ${isLocked ? 'var(--danger)' : 'var(--success)'};">
+              ${isLocked ? "🔒 Phần thi đã khóa điểm" : "● Đang mở chấm điểm"}
             </span>
           </div>
 
           ${
             !activeTeam
-              ? `<div style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted);">
-                  <div style="font-size: 2.5rem; margin-bottom: 0.8rem;">⏳</div>
-                  <h2 style="font-size: 1.25rem; margin: 0 0 0.5rem; color: var(--text);">Đang chờ MC mời đội lên sân khấu</h2>
-                  <p style="font-size: 0.95rem; margin: 0;">Phiếu chấm điểm sẽ tự động xuất hiện khi MC chọn đội thi.</p>
+              ? `<div style="text-align: center; padding: 3rem 1.5rem; color: var(--text-muted);">
+                  <div style="font-size: 3rem; margin-bottom: 0.8rem;">⏳</div>
+                  <h2 style="font-family: var(--font-serif); font-size: 1.45rem; margin: 0 0 0.5rem; color: var(--text);">
+                    ${isR1 ? "Đang chờ MC mời đội lên sân khấu" : "Đang chờ MC mở ô tình huống"}
+                  </h2>
+                  <p style="font-size: 1rem; margin: 0 0 1.5rem;">
+                    Phiếu chấm điểm sẽ tự động mở khi MC bắt đầu. Bạn cũng có thể chọn đội bên dưới để xem lại điểm.
+                  </p>
                 </div>`
               : `
-              <div style="display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.2rem;">
+              <!-- Team on stage header -->
+              <div class="judge-team-hero">
                 ${renderAvatarHtml(activeTeam, "team-avatar-lg")}
-                <div>
-                  <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
-                    Đội đang thi đấu
+                <div style="flex: 1;">
+                  <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                    <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
+                      ${activeTeam.id === stageTeamId ? "Đội đang thi đấu trên sân khấu" : "Đội được chọn để xem lại"}
+                    </span>
+                    ${isLocked ? `<span class="badge badge-locked" style="font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; background: rgba(0,0,0,0.06); font-weight: 700;">Đã khóa</span>` : ""}
                   </div>
-                  <h2 style="font-family: var(--font-serif); font-size: 1.5rem; margin: 0;">
+                  <h1 style="font-family: var(--font-serif); font-size: clamp(1.4rem, 2.8vw, 1.9rem); margin: 0; line-height: 1.2;">
                     ${escapeHtml(activeTeam.name)}
-                  </h2>
+                  </h1>
                 </div>
               </div>
 
+              <!-- Topic / Question callout -->
               ${
                 topicText
-                  ? `<div style="background-color: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem 1rem; margin-bottom: 1.5rem; font-size: 0.96rem; line-height: 1.45;">
-                      <strong>Nội dung:</strong> ${escapeHtml(topicText)}
+                  ? `<div class="judge-topic-callout">
+                      <strong>${isR1 ? "Nội dung tuyên truyền:" : "Tình huống:"}</strong> ${escapeHtml(topicText)}
                     </div>`
-                  : ""
+                  : `<div class="judge-topic-callout" style="border-left-color: var(--border); color: var(--text-muted);">
+                      <em>${isR1 ? "Đang chờ MC chọn gói chủ đề..." : "Đang chờ MC mở nội dung ô..."}</em>
+                    </div>`
               }
 
-              <!-- Content Score Input -->
-              <div class="judge-score-input-group">
-                <div style="display: flex; justify-content: space-between; font-weight: 700;">
-                  <span>Điểm nội dung:</span>
-                  <span style="color: var(--accent); font-family: var(--font-mono);">Tối đa ${maxContent}đ</span>
-                </div>
-                <div class="judge-stepper-wrap">
-                  <button type="button" class="judge-stepper-btn" id="btn-content-minus" ${isLocked ? "disabled" : ""}>-1</button>
+              <!-- Touch-first Score Controls -->
+              <div class="judge-score-section">
+                <!-- Content Score -->
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.2rem;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                      <div style="font-weight: 800; font-size: 1.1rem; color: var(--text);">1. Điểm Nội dung</div>
+                      <div style="font-size: 0.85rem; color: var(--text-muted);">Tối đa ${maxContent} điểm (bước 0.5đ)</div>
+                    </div>
+                    <div style="display: flex; align-items: baseline; gap: 0.25rem;">
+                      <span id="judge-display-content" class="judge-score-value-display">${contentVal.toFixed(1)}</span>
+                      <span style="font-size: 1.1rem; font-weight: 700; color: var(--text-muted);">/ ${maxContent}đ</span>
+                    </div>
+                  </div>
+
+                  <!-- Quick Steppers -->
+                  <div class="judge-touch-steppers" style="margin-top: 1rem;">
+                    <button type="button" class="judge-btn-step" data-step-content="-5" ${isLocked ? "disabled" : ""}>-5</button>
+                    <button type="button" class="judge-btn-step" data-step-content="-1" ${isLocked ? "disabled" : ""}>-1</button>
+                    <button type="button" class="judge-btn-step" data-step-content="-0.5" ${isLocked ? "disabled" : ""}>-0.5</button>
+                    <button type="button" class="judge-btn-step" data-step-content="+0.5" ${isLocked ? "disabled" : ""}>+0.5</button>
+                    <button type="button" class="judge-btn-step" data-step-content="+1" ${isLocked ? "disabled" : ""}>+1</button>
+                    <button type="button" class="judge-btn-step" data-step-content="+5" ${isLocked ? "disabled" : ""}>+5</button>
+                  </div>
+
                   <input
-                    type="number"
-                    id="input-content"
-                    class="judge-score-input"
-                    value="${contentVal}"
+                    type="range"
+                    id="slider-content"
+                    class="judge-range-slider"
                     min="0"
                     max="${maxContent}"
                     step="0.5"
+                    value="${contentVal}"
                     ${isLocked ? "disabled" : ""}
                   />
-                  <button type="button" class="judge-stepper-btn" id="btn-content-plus" ${isLocked ? "disabled" : ""}>+1</button>
                 </div>
-              </div>
 
-              <!-- Manner Score Input -->
-              <div class="judge-score-input-group">
-                <div style="display: flex; justify-content: space-between; font-weight: 700;">
-                  <span>Điểm hình thức / tác phong:</span>
-                  <span style="color: var(--accent); font-family: var(--font-mono);">Tối đa ${maxManner}đ</span>
-                </div>
-                <div class="judge-stepper-wrap">
-                  <button type="button" class="judge-stepper-btn" id="btn-manner-minus" ${isLocked ? "disabled" : ""}>-0.5</button>
+                <!-- Manner Score -->
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.2rem;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                      <div style="font-weight: 800; font-size: 1.1rem; color: var(--text);">2. Điểm Hình thức &amp; Tác phong</div>
+                      <div style="font-size: 0.85rem; color: var(--text-muted);">Tối đa ${maxManner} điểm (bước 0.5đ)</div>
+                    </div>
+                    <div style="display: flex; align-items: baseline; gap: 0.25rem;">
+                      <span id="judge-display-manner" class="judge-score-value-display">${mannerVal.toFixed(1)}</span>
+                      <span style="font-size: 1.1rem; font-weight: 700; color: var(--text-muted);">/ ${maxManner}đ</span>
+                    </div>
+                  </div>
+
+                  <!-- Quick Steppers for Manner -->
+                  <div class="judge-touch-steppers" style="margin-top: 1rem;">
+                    <button type="button" class="judge-btn-step" data-step-manner="-1" ${isLocked ? "disabled" : ""}>-1</button>
+                    <button type="button" class="judge-btn-step" data-step-manner="-0.5" ${isLocked ? "disabled" : ""}>-0.5</button>
+                    <button type="button" class="judge-btn-step" data-step-manner="+0.5" ${isLocked ? "disabled" : ""}>+0.5</button>
+                    <button type="button" class="judge-btn-step" data-step-manner="+1" ${isLocked ? "disabled" : ""}>+1</button>
+                    <div style="display: flex; gap: 0.35rem; margin-left: auto;">
+                      <button type="button" class="judge-btn-step" data-set-manner="3" ${isLocked ? "disabled" : ""}>3đ</button>
+                      <button type="button" class="judge-btn-step" data-set-manner="4" ${isLocked ? "disabled" : ""}>4đ</button>
+                      <button type="button" class="judge-btn-step" data-set-manner="4.5" ${isLocked ? "disabled" : ""}>4.5đ</button>
+                      <button type="button" class="judge-btn-step" data-set-manner="5" ${isLocked ? "disabled" : ""}>5đ</button>
+                    </div>
+                  </div>
+
                   <input
-                    type="number"
-                    id="input-manner"
-                    class="judge-score-input"
-                    value="${mannerVal}"
+                    type="range"
+                    id="slider-manner"
+                    class="judge-range-slider"
                     min="0"
                     max="${maxManner}"
                     step="0.5"
+                    value="${mannerVal}"
                     ${isLocked ? "disabled" : ""}
                   />
-                  <button type="button" class="judge-stepper-btn" id="btn-manner-plus" ${isLocked ? "disabled" : ""}>+0.5</button>
                 </div>
               </div>
 
-              <!-- Live Total -->
-              <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; background-color: var(--surface); border: 2px dashed var(--border); border-radius: var(--radius-md); margin-top: 1.5rem;">
-                <span style="font-weight: 700; font-size: 1.15rem;">Tổng điểm của bạn:</span>
-                <span id="judge-live-total" style="font-family: var(--font-mono); font-size: 2rem; font-weight: 900; color: var(--accent);">
-                  ${(contentVal + mannerVal).toFixed(1)}đ
-                </span>
+              <!-- Live Total Banner -->
+              <div class="judge-total-banner">
+                <div>
+                  <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
+                    Tổng điểm của bạn
+                  </div>
+                  <div style="font-size: 0.95rem; color: var(--text-muted);">Nội dung (${contentVal.toFixed(1)}) + Hình thức (${mannerVal.toFixed(1)})</div>
+                </div>
+                <div style="display: flex; align-items: baseline; gap: 0.35rem;">
+                  <span id="judge-live-total" style="font-family: var(--font-mono); font-size: clamp(2rem, 4vw, 2.6rem); font-weight: 900; color: var(--accent);">
+                    ${(contentVal + mannerVal).toFixed(1)}
+                  </span>
+                  <span style="font-size: 1.25rem; font-weight: 800; color: var(--accent);">/ ${(maxContent + maxManner)}đ</span>
+                </div>
               </div>
 
-              <div style="margin-top: 1.5rem;">
-                <button type="button" id="btn-save-score" class="btn btn-primary btn-lg" style="width: 100%; justify-content: center;" ${isLocked ? "disabled" : ""}>
+              <!-- Save button and saved status -->
+              <div class="judge-save-row">
+                <button
+                  type="button"
+                  id="btn-save-score"
+                  class="btn btn-primary btn-lg"
+                  style="width: 100%; justify-content: center; font-size: 1.2rem; padding: 1.1rem;"
+                  ${isLocked ? "disabled" : ""}
+                >
                   ✓ Lưu điểm cho ${escapeHtml(activeTeam.name)}
                 </button>
+
+                <div id="judge-saved-status" class="judge-saved-status ${hasSavedScore ? 'saved' : ''}">
+                  ${
+                    hasSavedScore
+                      ? `✓ Đã lưu ${lastSavedTime ? `lúc ${escapeHtml(lastSavedTime)}` : ""} (${(contentVal + mannerVal).toFixed(1)}đ)`
+                      : `<span style="color: var(--text-muted);">Chưa lưu điểm cho đội này</span>`
+                  }
+                </div>
               </div>
             `
           }
         </main>
+
+        <!-- Teams Overview Section (Below) -->
+        <section class="judge-stage-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.65rem;">
+            <div>
+              <h2 style="font-family: var(--font-serif); font-size: 1.25rem; margin: 0;">
+                Danh Sách Các Đội Thi
+              </h2>
+              <span style="font-size: 0.85rem; color: var(--text-muted);">
+                Bấm vào đội bất kỳ để xem lại hoặc điều chỉnh điểm trước khi MC khóa phần thi.
+              </span>
+            </div>
+            <span class="meta-pill" style="font-weight: 700;">
+              Đã chấm: ${scoredCount}/${totalTeams} đội
+            </span>
+          </div>
+
+          <div class="judge-teams-overview-grid">
+            ${overviewTeams
+              .map(
+                (t) => `
+                <button
+                  type="button"
+                  class="judge-team-row-btn ${t.isCurrent ? 'active' : ''} ${t.locked ? 'locked' : ''}"
+                  data-select-team="${escapeHtml(t.id)}"
+                >
+                  <div style="display: flex; align-items: center; gap: 0.65rem;">
+                    ${renderAvatarHtml(t, "team-avatar-sm")}
+                    <div>
+                      <div style="font-weight: 700; font-size: 0.98rem; line-height: 1.2;">
+                        ${escapeHtml(t.name)}
+                      </div>
+                      ${
+                        t.isStage
+                          ? `<span style="font-size: 0.72rem; color: var(--accent); font-weight: 700;">★ Trên sân khấu</span>`
+                          : ""
+                      }
+                    </div>
+                  </div>
+
+                  <div style="text-align: right;">
+                    ${
+                      t.hasScore
+                        ? `<span style="font-family: var(--font-mono); font-weight: 800; font-size: 1.1rem; color: var(--success);">
+                            ${t.score}đ
+                          </span>`
+                        : `<span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 600;">Chưa chấm</span>`
+                    }
+                    ${
+                      t.locked
+                        ? `<div style="font-size: 0.72rem; color: var(--text-muted);">🔒 Đã khóa</div>`
+                        : ""
+                    }
+                  </div>
+                </button>
+              `
+              )
+              .join("")}
+          </div>
+        </section>
       `;
 
       wireHeaderControls();
 
+      // Back to stage button
+      document.getElementById("btn-back-to-stage")?.addEventListener("click", () => {
+        manuallySelectedTeamId = null;
+        renderJudgePortal();
+      });
+
+      // Tapping a team from overview list
+      root.querySelectorAll("[data-select-team]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          manuallySelectedTeamId = btn.dataset.selectTeam;
+          renderJudgePortal();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+      });
+
       if (!activeTeam || isLocked) return;
 
-      const contentInput = document.getElementById("input-content");
-      const mannerInput = document.getElementById("input-manner");
+      const sliderContent = document.getElementById("slider-content");
+      const sliderManner = document.getElementById("slider-manner");
+      const displayContent = document.getElementById("judge-display-content");
+      const displayManner = document.getElementById("judge-display-manner");
       const totalDisplay = document.getElementById("judge-live-total");
+      const statusEl = document.getElementById("judge-saved-status");
 
-      function updateTotal() {
-        const c = clampScore(contentInput?.value, maxContent);
-        const m = clampScore(mannerInput?.value, maxManner);
-        if (totalDisplay) {
-          totalDisplay.textContent = `${(c + m).toFixed(1)}đ`;
+      function syncDomScores() {
+        const c = clampScore(contentVal, maxContent);
+        const m = clampScore(mannerVal, maxManner);
+        contentVal = c;
+        mannerVal = m;
+
+        if (displayContent) displayContent.textContent = c.toFixed(1);
+        if (sliderContent) sliderContent.value = c;
+        if (displayManner) displayManner.textContent = m.toFixed(1);
+        if (sliderManner) sliderManner.value = m;
+        if (totalDisplay) totalDisplay.textContent = (c + m).toFixed(1);
+
+        if (statusEl) {
+          statusEl.className = "judge-saved-status dirty";
+          statusEl.innerHTML = `⚠ Điểm chưa được lưu (${(c + m).toFixed(1)}đ)`;
         }
       }
 
-      document.getElementById("btn-content-minus")?.addEventListener("click", () => {
-        if (!contentInput) return;
-        contentInput.value = Math.max(0, (Number(contentInput.value) || 0) - 1);
-        updateTotal();
+      // Content steppers
+      root.querySelectorAll("[data-step-content]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const delta = Number(btn.dataset.stepContent) || 0;
+          contentVal = clampScore(contentVal + delta, maxContent);
+          syncDomScores();
+        });
       });
 
-      document.getElementById("btn-content-plus")?.addEventListener("click", () => {
-        if (!contentInput) return;
-        contentInput.value = Math.min(maxContent, (Number(contentInput.value) || 0) + 1);
-        updateTotal();
+      sliderContent?.addEventListener("input", (e) => {
+        contentVal = Number(e.target.value) || 0;
+        syncDomScores();
       });
 
-      document.getElementById("btn-manner-minus")?.addEventListener("click", () => {
-        if (!mannerInput) return;
-        mannerInput.value = Math.max(0, (Number(mannerInput.value) || 0) - 0.5);
-        updateTotal();
+      // Manner steppers
+      root.querySelectorAll("[data-step-manner]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const delta = Number(btn.dataset.stepManner) || 0;
+          mannerVal = clampScore(mannerVal + delta, maxManner);
+          syncDomScores();
+        });
       });
 
-      document.getElementById("btn-manner-plus")?.addEventListener("click", () => {
-        if (!mannerInput) return;
-        mannerInput.value = Math.min(maxManner, (Number(mannerInput.value) || 0) + 0.5);
-        updateTotal();
+      root.querySelectorAll("[data-set-manner]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          mannerVal = Number(btn.dataset.setManner) || 0;
+          syncDomScores();
+        });
       });
 
-      contentInput?.addEventListener("input", updateTotal);
-      mannerInput?.addEventListener("input", updateTotal);
+      sliderManner?.addEventListener("input", (e) => {
+        mannerVal = Number(e.target.value) || 0;
+        syncDomScores();
+      });
 
+      // Save score
       document.getElementById("btn-save-score")?.addEventListener("click", async () => {
-        const c = clampScore(contentInput?.value, maxContent);
-        const m = clampScore(mannerInput?.value, maxManner);
-        const path = `live/judgeScores/${roundKey}/${activeTeamId}/${selectedJudgeId}`;
+        const c = clampScore(contentVal, maxContent);
+        const m = clampScore(mannerVal, maxManner);
+        const total = (c + m).toFixed(1);
 
+        const timeStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        lastSavedTimestamps[activeTeamId] = timeStr;
+
+        const path = `live/judgeScores/${roundKey}/${activeTeamId}/${selectedJudgeId}`;
         await set(path, { content: c, manner: m });
-        showToast(`Đã lưu điểm cho ${activeTeam.name}: ${(c + m).toFixed(1)}đ`);
+
+        if (statusEl) {
+          statusEl.className = "judge-saved-status saved";
+          statusEl.innerHTML = `✓ Đã lưu lúc ${timeStr} (${total}đ)`;
+        }
+
+        showToast(`Đã lưu điểm cho ${activeTeam.name}: ${total}đ!`);
       });
     }
 
@@ -323,19 +499,19 @@
           const resRecord = results[team.id];
           const answered = Boolean(ansRecord);
           return `
-          <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.65rem 0.85rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background-color: var(--surface);">
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0.95rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background-color: var(--surface-elevated);">
+            <div style="display: flex; align-items: center; gap: 0.65rem;">
               ${renderAvatarHtml(team, "team-avatar-sm")}
-              <span style="font-weight: 600; font-size: 0.95rem;">${escapeHtml(team.name)}</span>
+              <span style="font-weight: 700; font-size: 0.95rem;">${escapeHtml(team.name)}</span>
             </div>
             <div>
               ${
                 status === "revealed" && resRecord
-                  ? `<span style="font-family: var(--font-mono); font-weight: 800; color: ${resRecord.isCorrect ? "#2E7D4F" : "#C94A38"};">
-                      ${resRecord.answer} (${resRecord.isCorrect ? `+${resRecord.points}đ` : "0đ"})
+                  ? `<span style="font-family: var(--font-mono); font-weight: 800; color: ${resRecord.isCorrect ? 'var(--success)' : 'var(--danger)'};">
+                      ${resRecord.answer} (${resRecord.isCorrect ? `+${resRecord.points}đ` : '0đ'})
                     </span>`
                   : answered
-                    ? `<span style="color: var(--success); font-weight: 700; font-size: 0.88rem;">✓ Đã trả lời</span>`
+                    ? `<span style="color: var(--success); font-weight: 700; font-size: 0.9rem;">✓ Đã trả lời</span>`
                     : `<span style="color: var(--text-muted); font-size: 0.88rem;">Chưa chọn</span>`
               }
             </div>
@@ -347,23 +523,27 @@
       root.innerHTML = `
         ${renderJudgeHeader()}
 
-        <main class="tablet-stage-card">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+        <main class="judge-stage-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
             <span class="meta-pill accent">${escapeHtml(quizData.config.round2_name)}</span>
-            <span style="font-size: 0.88rem; color: var(--text-muted); font-weight: 600;">Theo dõi trực tiếp</span>
+            <span style="font-size: 0.88rem; color: var(--text-muted); font-weight: 700;">
+              Theo dõi trực tiếp
+            </span>
           </div>
 
-          <div style="margin-bottom: 1.5rem;">
+          <div style="margin-bottom: 1.75rem;">
             <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
               Câu hỏi hiện tại
             </div>
-            <p style="font-size: 1.15rem; font-weight: 700; margin: 0.35rem 0 0;">
+            <p style="font-size: 1.25rem; font-weight: 700; margin: 0.45rem 0 0; line-height: 1.35;">
               ${q ? escapeHtml(q.question) : "MC chưa mở câu hỏi."}
             </p>
           </div>
 
-          <h3 style="font-size: 1rem; margin: 0 0 0.75rem;">Bảng theo dõi các đội thi:</h3>
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.65rem;">
+          <h3 style="font-family: var(--font-serif); font-size: 1.15rem; margin: 0 0 0.85rem;">
+            Bảng theo dõi các đội thi:
+          </h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem;">
             ${teamsListHtml}
           </div>
         </main>
@@ -373,22 +553,14 @@
     }
 
     function wireHeaderControls() {
-      document.getElementById("btn-change-judge")?.addEventListener("click", () => {
-        saveSelectedJudge("");
-      });
-      document.getElementById("btn-lock-judge")?.addEventListener("click", () => {
-        lockAppSession("judge", quizData.config);
+      document.getElementById("btn-judge-logout")?.addEventListener("click", () => {
+        logoutUser("judge");
       });
     }
 
     function renderJudgePortal() {
       const root = document.getElementById("judge-app-root");
       if (!root || !quizData) return;
-
-      if (!selectedJudgeId) {
-        renderJudgePicker(root);
-        return;
-      }
 
       const currentRound = liveState.currentRound || "round1";
       if (currentRound === "round2") {
@@ -400,15 +572,38 @@
 
     async function initJudge() {
       quizData = await fetchQuizData({ portal: "judge" });
-      document.title = `Ban Giám Khảo - ${quizData.config.show_title}`;
+
+      const session = getActiveSession(undefined, "judge");
+      selectedJudgeId = session?.ref_id || "";
+      const matchedJudge = quizData.judges.find((j) => j.id === selectedJudgeId);
+      judgeDisplayName = matchedJudge ? matchedJudge.name : (session?.display_name || "Ban Giám khảo");
+
+      document.title = `Ban Giám Khảo (${judgeDisplayName}) - ${quizData.config.show_title}`;
+
+      onStatusChange((st) => {
+        connStatus = st;
+        const badge = document.querySelector(".tablet-header .conn-status-badge");
+        if (badge) {
+          badge.className = `conn-status-badge ${st.code || 'local'}`;
+          badge.title = st.label || "Chế độ thử trên 1 máy";
+          const labelSpan = badge.querySelector("span:not(.conn-status-dot)");
+          if (labelSpan) labelSpan.textContent = st.label || "Chế độ thử trên 1 máy";
+        }
+      });
 
       let lastJudgeSubscribedQKey = null;
       let judgeAnswersUnsub = null;
 
-      // Subscribe to live state from host and database
+      // Subscribe to live state updates
       listen("live", (data) => {
         if (!data) return;
-        liveState = { ...liveState, ...data };
+        // Replace (not merge) so fields the host removed, e.g. after a reset, disappear here too;
+        // keep answers that arrive on their own listener for the same question.
+        const prevRound2 = liveState.round2 || {};
+        liveState = { ...initialLiveState(), ...data };
+        if (prevRound2.answers && liveState.round2 && liveState.round2.questionKey === prevRound2.questionKey && !liveState.round2.answers) {
+          liveState.round2 = { ...liveState.round2, answers: prevRound2.answers };
+        }
         const qKey = liveState.round2?.questionKey;
         if (qKey && qKey !== lastJudgeSubscribedQKey) {
           lastJudgeSubscribedQKey = qKey;

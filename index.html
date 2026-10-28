@@ -3,88 +3,222 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cổng Truy Cập - Hội Thi PCCC và CNCH</title>
+  <title>Hội Thi PCCC &amp; CNCH</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Noto+Serif:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./css/style.css" />
 </head>
-<body class="auth-unlocked">
-  <div class="portal-chooser-wrap">
-    <header class="portal-chooser-hero">
-      <h1 id="hero-title" class="portal-chooser-title">Hội Thi Cán Bộ PCCC &amp; CNCH</h1>
-      <p id="hero-subtitle" class="portal-chooser-subtitle">
-        Hệ thống điều khiển thi đấu, chấm điểm và trả lời trắc nghiệm trực tiếp đa thiết bị.
-      </p>
+<body class="home-page-body">
+  <div class="home-page-wrap">
+    <header class="home-hero">
+      <h1 id="hero-title" class="home-hero-title">Hội Thi Cán Bộ PCCC &amp; CNCH</h1>
     </header>
 
-    <div class="portal-cards-grid">
-      <!-- Host Portal -->
-      <a href="./host.html" class="portal-card">
-        <div>
-          <span class="portal-card-badge">Máy chiếu PC / Dẫn chương trình</span>
-          <div class="portal-card-icon">🖥</div>
-          <h2 class="portal-card-title">Dẫn Chương Trình</h2>
-          <p class="portal-card-desc">
-            Điều khiển toàn bộ tiến trình hội thi, hiển thị câu hỏi trên màn hình LED lớn, phát lệnh tính giờ và công bố kết quả.
-          </p>
-        </div>
-        <div class="portal-card-cta">
-          <span>Vào màn hình MC</span>
-          <span>→</span>
-        </div>
-      </a>
+    <div class="home-tiles-grid" role="group" aria-label="Các cổng truy cập">
+      <!-- Host Tile -->
+      <button type="button" class="home-tile" data-portal="host">
+        <div class="home-tile-icon" aria-hidden="true">🖥</div>
+        <div class="home-tile-name">Dẫn chương trình</div>
+      </button>
 
-      <!-- Judge Portal -->
-      <a href="./judge.html" class="portal-card">
-        <div>
-          <span class="portal-card-badge">Máy tính bảng iPad / Giám khảo</span>
-          <div class="portal-card-icon">📋</div>
-          <h2 class="portal-card-title">Ban Giám Khảo</h2>
-          <p class="portal-card-desc">
-            Chấm điểm nội dung và hình thức trực tiếp cho các đội thi theo thời gian thực ở Vòng 1 và Vòng 3; theo dõi bảng điểm Vòng 2.
-          </p>
-        </div>
-        <div class="portal-card-cta">
-          <span>Vào cổng Giám khảo</span>
-          <span>→</span>
-        </div>
-      </a>
+      <!-- Judge Tile -->
+      <button type="button" class="home-tile" data-portal="judge">
+        <div class="home-tile-icon" aria-hidden="true">📋</div>
+        <div class="home-tile-name">Ban Giám khảo</div>
+      </button>
 
-      <!-- Team Portal -->
-      <a href="./team.html" class="portal-card">
-        <div>
-          <span class="portal-card-badge">Máy tính bảng iPad / Đội thi</span>
-          <div class="portal-card-icon">📱</div>
-          <h2 class="portal-card-title">Đội Thi Đấu</h2>
-          <p class="portal-card-desc">
-            Đăng nhập theo tên đội, theo dõi câu hỏi và bấm nút A / B / C / D để trả lời trực tiếp trong phần thi trắc nghiệm Vòng 2.
-          </p>
+      <!-- Team Tile -->
+      <button type="button" class="home-tile" data-portal="team">
+        <div class="home-tile-icon" aria-hidden="true">📱</div>
+        <div class="home-tile-name">Đội thi đấu</div>
+      </button>
+    </div>
+
+    <!-- Active session banner if already logged in -->
+    <div id="home-active-session" class="home-active-session" style="display: none;"></div>
+  </div>
+
+  <!-- Login Modal Dialog -->
+  <div id="login-modal" class="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-modal-title" style="display: none;">
+    <div class="login-modal-card">
+      <button type="button" id="login-modal-close" class="login-modal-close" aria-label="Đóng">✕</button>
+      <div class="login-modal-header">
+        <div class="login-modal-icon">🔐</div>
+        <h2 id="login-modal-title" class="login-modal-title">Đăng Nhập</h2>
+      </div>
+
+      <form id="login-form" class="login-form" novalidate>
+        <div class="login-field">
+          <label for="login-username" class="login-label">Tên đăng nhập</label>
+          <input
+            type="text"
+            id="login-username"
+            class="login-input"
+            placeholder="Nhập tên đăng nhập..."
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+            required
+          />
         </div>
-        <div class="portal-card-cta">
-          <span>Vào cổng Đội thi</span>
-          <span>→</span>
+
+        <div class="login-field">
+          <label for="login-password" class="login-label">Mật khẩu</label>
+          <input
+            type="password"
+            id="login-password"
+            class="login-input"
+            placeholder="Nhập mật khẩu..."
+            autocomplete="current-password"
+            required
+          />
         </div>
-      </a>
+
+        <div id="login-error" class="login-error" role="alert" aria-live="polite"></div>
+
+        <button type="submit" id="login-submit" class="btn btn-primary btn-lg" style="width: 100%; justify-content: center;">
+          Đăng nhập
+        </button>
+      </form>
     </div>
   </div>
 
   <script type="module">
-    import { fetchQuizData } from "./js/app.js";
+    import { fetchQuizData, escapeHtml, logoutUser } from "./js/app.js";
+    import {
+      authenticate,
+      getActiveSession,
+      saveActiveSession,
+      validateSession,
+      getPortalUrl
+    } from "./js/auth.js";
+
+    let quizData = null;
+
+    function renderActiveSession(accounts = []) {
+      const banner = document.getElementById("home-active-session");
+      if (!banner) return;
+      const session = getActiveSession();
+      const valid = validateSession(session, accounts);
+      if (valid) {
+        const portalUrl = getPortalUrl(valid.role);
+        const roleLabels = { host: "Dẫn chương trình", judge: "Ban Giám khảo", team: "Đội thi" };
+        const roleName = roleLabels[valid.role] || valid.role;
+        banner.style.display = "inline-flex";
+        banner.innerHTML = `
+          <span>Đang đăng nhập: <strong>${escapeHtml(valid.display_name || valid.username)}</strong> (${escapeHtml(roleName)})</span>
+          <a href="${portalUrl}" class="btn btn-primary btn-sm" style="text-decoration: none;">Vào cổng →</a>
+          <button type="button" id="btn-home-logout" class="btn btn-sm">Đăng xuất</button>
+        `;
+        document.getElementById("btn-home-logout")?.addEventListener("click", () => {
+          logoutUser(valid.role);
+          banner.style.display = "none";
+        });
+      } else {
+        banner.style.display = "none";
+      }
+    }
+
+    function openLoginModal(targetPortal = "") {
+      const modal = document.getElementById("login-modal");
+      const usernameInput = document.getElementById("login-username");
+      const passwordInput = document.getElementById("login-password");
+      const errorEl = document.getElementById("login-error");
+      if (!modal) return;
+
+      if (errorEl) errorEl.textContent = "";
+      modal.style.display = "flex";
+
+      // Hint username if role matches
+      const currentSession = getActiveSession();
+      if (currentSession?.username && targetPortal && currentSession.role === targetPortal) {
+        if (usernameInput) usernameInput.value = currentSession.username;
+        if (passwordInput) {
+          passwordInput.value = "";
+          passwordInput.focus();
+        }
+      } else {
+        if (usernameInput) {
+          usernameInput.value = "";
+          usernameInput.focus();
+        }
+        if (passwordInput) passwordInput.value = "";
+      }
+    }
+
+    function closeLoginModal() {
+      const modal = document.getElementById("login-modal");
+      if (modal) modal.style.display = "none";
+    }
+
+    async function handleLoginFormSubmit(e) {
+      e.preventDefault();
+      const usernameInput = document.getElementById("login-username");
+      const passwordInput = document.getElementById("login-password");
+      const errorEl = document.getElementById("login-error");
+      const submitBtn = document.getElementById("login-submit");
+
+      const u = usernameInput ? usernameInput.value : "";
+      const p = passwordInput ? passwordInput.value : "";
+
+      if (submitBtn) submitBtn.disabled = true;
+      try {
+        const accounts = quizData?.accounts || [];
+        const res = authenticate(u, p, accounts);
+        if (res.ok) {
+          saveActiveSession(res.account);
+          // Redirect directly to account's role portal
+          window.location.href = res.portalUrl;
+        } else {
+          if (errorEl) {
+            errorEl.textContent = res.error || "Tên đăng nhập hoặc mật khẩu không chính xác.";
+          }
+          if (passwordInput) {
+            passwordInput.select();
+            passwordInput.focus();
+          }
+        }
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
 
     async function initHome() {
       try {
-        const data = await fetchQuizData({ portal: "host" });
-        if (data?.config?.show_title) {
-          document.title = `${data.config.show_title} - Cổng truy cập`;
-          document.getElementById("hero-title").textContent = data.config.show_title;
+        quizData = await fetchQuizData({ portal: null });
+        if (quizData?.config?.show_title) {
+          document.title = quizData.config.show_title;
+          const heroEl = document.getElementById("hero-title");
+          if (heroEl) heroEl.textContent = quizData.config.show_title;
         }
-        if (data?.config?.show_subtitle) {
-          document.getElementById("hero-subtitle").textContent = data.config.show_subtitle;
-        }
+        renderActiveSession(quizData?.accounts || []);
       } catch {
         // Fallback to static text
       }
+
+      // Wire tile clicks
+      document.querySelectorAll(".home-tile").forEach((tile) => {
+        tile.addEventListener("click", () => {
+          const targetPortal = tile.dataset.portal || "";
+          openLoginModal(targetPortal);
+        });
+      });
+
+      // Wire modal events
+      document.getElementById("login-modal-close")?.addEventListener("click", closeLoginModal);
+      const modal = document.getElementById("login-modal");
+      modal?.addEventListener("click", (e) => {
+        if (e.target === modal) closeLoginModal();
+      });
+
+      document.getElementById("login-form")?.addEventListener("submit", handleLoginFormSubmit);
+
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && modal?.style.display !== "none") {
+          closeLoginModal();
+        }
+      });
     }
 
     initHome();

@@ -24,14 +24,16 @@ Hệ thống được thiết kế tối ưu cho 3 vai trò sử dụng tại h�
 
 2. **Cổng Ban Giám khảo (`judge.html`)**:
    - Vận hành trên iPad của các thành viên Ban Giám khảo.
-   - Giám khảo chọn danh tính của mình một lần duy nhất lúc đăng nhập.
-   - Giao diện chấm điểm Vòng 1 & Vòng 3 thân thiện cho màn hình cảm ứng: các nút bấm to `+1`, `-1`, `+5`, `-5` để chấm riêng phần **Nội dung** (tối đa 45đ ở V1 / 25đ ở V3) và **Hình thức** (tối đa 5đ).
-   - Ở Vòng 2: Màn hình tự động cập nhật câu hỏi đang thi và hiển thị thống kê tiến độ trả lời của các đội thi.
+   - Đăng nhập bằng tài khoản giám khảo (vd: `gk1`) sẽ vào thẳng danh tính của giám khảo đó, không cần chọn thủ công.
+   - Giao diện chấm điểm Vòng 1 & Vòng 3 thân thiện cho iPad cảm ứng: hiển thị đội đang thi và chủ đề/tình huống nổi bật ở trên, các nút tăng/giảm to `+0.5`, `-0.5`, `+1`, `-1`, `+5`, `-5` và thanh trượt để chấm riêng phần **Nội dung** (tối đa 45đ ở V1 / 25đ ở V3) và **Hình thức** (tối đa 5đ), hiển thị tổng điểm trực tiếp và trạng thái đã lưu rõ ràng.
+   - Phía dưới có bảng tổng quan tiến độ chấm tất cả các đội trong vòng thi; giám khảo có thể chạm vào đội bất kỳ để xem lại hoặc điều chỉnh điểm trước khi MC khóa phần thi.
+   - Ở Vòng 2: Màn hình tự động cập nhật câu hỏi đang thi và hiển thị bảng theo dõi tiến độ trả lời trực tiếp của các đội thi.
 
 3. **Cổng Đội thi (`team.html`)**:
    - Vận hành trên iPad đặt tại bàn của từng đội thi.
-   - Đội thi chọn tên đội một lần duy nhất lúc đăng nhập.
-   - Ở Vòng 2: Khi MC bấm bắt đầu câu hỏi trên sân khấu, iPad của đội lập tức hiển thị nội dung câu hỏi và 4 nút chọn đáp án **A, B, C, D** cỡ lớn.
+   - Đăng nhập bằng tài khoản đội (vd: `doi01`) sẽ vào thẳng danh tính đội của mình, không cần chọn thủ công.
+   - Ở Vòng 1 & Vòng 3: Màn hình chờ thông minh hiển thị rõ tên vòng thi, báo hiệu khi đến lượt đội mình bước lên sân khấu và hiển thị nội dung gói câu hỏi / tình huống bốc thăm.
+   - Ở Vòng 2: Khi MC phát lệnh tính giờ trên sân khấu, iPad của đội lập tức hiển thị nội dung câu hỏi và 4 nút chọn đáp án **A, B, C, D** cỡ lớn.
    - Tự động ghi nhận thời gian trả lời theo mili-giây chuẩn từ máy chủ và khóa nút sau khi chạm để đảm bảo mỗi đội chỉ được gửi một đáp án duy nhất.
 
 ---
@@ -153,35 +155,41 @@ Hệ thống đọc dữ liệu từ một bảng tính Google Sheet được ch
 ### Tạo Sheet từ mẫu có sẵn
 Tải file mẫu [`sheet-template/gameshow-template.xlsx`](./sheet-template/gameshow-template.xlsx) lên Google Drive, mở file và chọn **Tệp → Lưu dưới dạng Google Trang tính**.
 
-Bảng tính gồm 6 tab:
+Bảng tính gồm 7 tab:
 1. `teams`: Danh sách các đội thi (`id`, `name`, `image_url`, `color`).
 2. `round1`: Câu hỏi Vòng 1 theo từng đội (`package`, `team_id`, `question`, `image_url`, `time_seconds`, `points`).
-3. `round2`: Ngân hàng câu hỏi trắc nghiệm Vòng 2 (`set_id`, `question_number`, `question`, `image_url`, `option_a`, `option_b`, `option_c`, `option_d`, `correct`, `time_seconds`).
-4. `round3`: Bảng 50 câu hỏi tình huống Vòng 3 (`number`, `question`, `image_url`, `time_seconds`, `points`).
+3. `round2`: Ngân hàng câu hỏi trắc nghiệm Vòng 2 (`set`, `number`, `question`, `image_url`, `option_a`, `option_b`, `option_c`, `option_d`, `correct`, `time_seconds`).
+4. `round3`: Bảng câu hỏi tình huống Vòng 3 (`number`, `question`, `image_url`, `time_seconds`, `points`).
 5. `judges`: Danh sách Ban Giám khảo (`id`, `name`).
-6. `config`: Cấu hình tên chương trình, thời gian đếm ngược, thang điểm và mật khẩu các cổng.
+6. `accounts`: Danh sách tài khoản người dùng (`username`, `password`, `role`, `ref_id`, `display_name`).
+7. `config`: Cấu hình tên chương trình, thời gian đếm ngược, thang điểm và giao diện.
 
 ---
 
-## 4. Quản Lý Mật Khẩu Các Cổng Truy Cập
+## 4. Quản Lý Tài Khoản Đăng Nhập (Tab `accounts`)
 
-Để ngăn khán giả hoặc người lạ mở nhầm trang điều khiển của MC hoặc trang chấm điểm của Ban Giám khảo, hệ thống tích hợp sẵn màn hình khóa mật khẩu:
+Thay vì dùng mật khẩu chung cho từng cổng, hệ thống sử dụng cơ chế tài khoản riêng biệt trong tab `accounts`. Vai trò của tài khoản sẽ tự động quyết định cổng mà người dùng truy cập:
 
-- **Mật khẩu mặc định:** `122345678910` (áp dụng cho mọi cổng nếu chưa cấu hình mật khẩu riêng).
-- Khi nhập đúng mật khẩu, thiết bị sẽ ghi nhớ phiên đăng nhập (trong `localStorage`). Bạn có thể bấm nút **🔒 Khóa** trên thanh điều hướng để khóa lại.
+- `username`: Tên đăng nhập (không phân biệt chữ hoa, chữ thường).
+- `password`: Mật khẩu đăng nhập dạng văn bản thuần (plain-text).
+- `role`: Vai trò người dùng, gồm 3 giá trị: `host` (Dẫn chương trình), `judge` (Ban Giám khảo), `team` (Đội thi).
+- `ref_id`: Mã giám khảo (tương ứng cột `id` trong tab `judges`) hoặc mã đội (tương ứng cột `id` trong tab `teams`); để trống đối với vai trò `host`.
+- `display_name`: Tên hiển thị người dùng (tùy chọn, tự động lấy theo tên giám khảo/đội thi nếu để trống).
 
-### Đặt mật khẩu riêng cho từng cổng trong tab `config`
-Bạn có thể cấu hình mật khẩu riêng biệt cho từng vai trò bằng mã băm SHA-256 (64 ký tự hex) trong tab `config`:
-- `password_host_sha256`: Mật khẩu màn hình Dẫn chương trình / Máy chiếu.
-- `password_judge_sha256`: Mật khẩu cổng Ban Giám khảo.
-- `password_team_sha256`: Mật khẩu cổng Đội thi.
+> ⚠️ **Cảnh báo bảo mật:**
+> Mật khẩu được lưu trữ dưới dạng văn bản thuần nhằm tạo sự tiện lợi tối đa cho Ban tổ chức không chuyên về kỹ thuật. Đây là cơ chế ngăn khán giả hoặc người lạ bấm nhầm vào trang điều khiển/chấm điểm. Bất kỳ ai có đường link Google Sheet đều có thể đọc được mật khẩu trong tab này.
 
-> **Cách tạo mã SHA-256 nhanh:**
-> Mở trang web bất kỳ, nhấn `F12` vào mục **Console** và dán đoạn lệnh sau (thay `MAT_KHAU_CUA_BAN` bằng mật khẩu muốn đặt):
-> ```js
-> crypto.subtle.digest("SHA-256", new TextEncoder().encode("MAT_KHAU_CUA_BAN")).then(b => console.log([...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("")))
-> ```
-> Sao chép chuỗi 64 ký tự in ra và dán vào cột `value` tương ứng trong tab `config` của Google Sheet.
+### Tài khoản mặc định (khi tab `accounts` bị thiếu hoặc trống)
+Nếu chưa cấu hình tài khoản trong sheet, hệ thống tự động khởi tạo các tài khoản mặc định sau với mật khẩu chung là `122345678910`:
+- **Dẫn chương trình:** `mc`
+- **Ban Giám khảo:** `gk1`, `gk2`, `gk3`... (tự động liên kết tương ứng từng giám khảo trong tab `judges`)
+- **Đội thi đấu:** `doi01`, `doi02`, `doi03`... (tự động liên kết tương ứng từng đội trong tab `teams`)
+
+### Cơ chế ghi nhớ phiên và đồng bộ
+- Người dùng chỉ cần đăng nhập một lần trên thiết bị; thông tin đăng nhập được lưu an toàn trên máy cho đến khi bấm **"Đăng xuất"** (nút đăng xuất hiển thị rõ tên tài khoản hiện tại).
+- Giám khảo và đội thi khi đăng nhập sẽ vào thẳng danh tính của mình, loại bỏ hoàn toàn bước chọn danh tính thủ công.
+- Bất kỳ ai truy cập trực tiếp vào trang của cổng thi mà chưa đăng nhập đúng vai trò sẽ tự động được chuyển hướng về trang chủ `index.html`.
+- Khi Ban tổ chức chỉnh sửa tài khoản hoặc đổi mật khẩu trên Google Sheet, thay đổi sẽ có hiệu lực ngay sau khi bấm **"↻ Tải lại dữ liệu"** (hoặc tải lại trang); tài khoản bị xóa khỏi bảng tính hoặc bị đổi mật khẩu sẽ tự động bị đăng xuất.
 
 ---
 

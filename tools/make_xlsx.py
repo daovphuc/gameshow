@@ -49,7 +49,14 @@ COLS = {
     },
     "config": {
         "key": "Tên cài đặt (key). Không đổi tên cột key.",
-        "value": "Giá trị cài đặt (tên hội thi, thời gian, điểm tối đa, mật khẩu sha256...).",
+        "value": "Giá trị cài đặt (tên hội thi, thời gian, điểm tối đa, màu giao diện...).",
+    },
+    "accounts": {
+        "username": "Tên đăng nhập (không phân biệt hoa thường). Bắt buộc, duy nhất.",
+        "password": "Mật khẩu đăng nhập (văn bản thuần). Bắt buộc.",
+        "role": "Vai trò: host (dẫn chương trình), judge (giám khảo), hoặc team (đội thi). Bắt buộc.",
+        "ref_id": "Mã giám khảo (từ tab judges) hoặc mã đội (từ tab teams). Để trống với host.",
+        "display_name": "Tên hiển thị người dùng (tùy chọn).",
     },
 }
 
@@ -64,7 +71,7 @@ lines = [
     "HƯỚNG DẪN SỬ DỤNG FILE MẪU HỘI THI PCCC VÀ CNCH",
     "",
     "1. Vào Google Drive > Mới > Tải tệp lên > chọn file này. Mở file > Tệp > Lưu dưới dạng Google Trang tính.",
-    "2. Giữ nguyên TÊN CÁC TAB (teams, round1, round2, round3, judges, config) và TÊN CỘT ở dòng 1 (ô màu cam).",
+    "2. Giữ nguyên TÊN CÁC TAB (teams, round1, round2, round3, judges, accounts, config) và TÊN CỘT ở dòng 1 (ô màu cam).",
     "3. Sửa dữ liệu từ dòng 2 trở đi. Rê chuột vào tiêu đề cột để xem ghi chú hướng dẫn từng cột.",
     "4. Chia sẻ sheet: Bất kỳ ai có đường liên kết > Người xem. Copy link, dán vào mục Cài đặt trên màn hình Dẫn chương trình.",
     "5. Điểm số và trạng thái trận đấu được đồng bộ thời gian thực qua Firebase Realtime Database.",
@@ -77,7 +84,7 @@ for i, text in enumerate(lines, 1):
     c.font = Font(name="Arial", bold=(i == 1), size=14 if i == 1 else 11)
 guide.column_dimensions["A"].width = 110
 
-for tab in ["teams", "round1", "round2", "round3", "judges", "config"]:
+for tab in ["teams", "round1", "round2", "round3", "judges", "accounts", "config"]:
     path = src / f"{tab}.csv"
     with open(path, encoding="utf-8-sig", newline="") as f:
         rows = [r for r in csv.reader(f) if any(cell.strip() for cell in r)]

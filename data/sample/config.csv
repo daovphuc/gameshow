@@ -21,9 +21,6 @@ round3_default_points,30
 round3_max_content,25
 round3_max_manner,5
 warning_seconds,5
-password_host_sha256,
-password_judge_sha256,
-password_team_sha256,
 theme_mode,light
 bg_color,#F5F4ED
 surface_color,#FAF9F5
