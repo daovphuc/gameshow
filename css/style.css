@@ -409,7 +409,36 @@ body.sidebar-collapsed .sidebar-link {
   width: 100%;
   border: 1px solid var(--border);
   background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
   text-decoration: none;
+}
+
+.sidebar-bottom .sidebar-link-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-footer-note {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.sidebar-footer-note kbd {
+  display: inline-block;
+  min-width: 1.6rem;
+  margin-right: 0.35rem;
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-elevated);
+  color: var(--text);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.78rem;
+  text-align: center;
 }
 
 body.sidebar-collapsed .sidebar-bottom .sidebar-link {
@@ -2399,4 +2428,75 @@ body.sidebar-collapsed .sidebar-bottom .sidebar-link {
 .judge-score-input:focus {
   border-color: var(--accent);
   outline: none;
+}
+
+/* Judge portal: team list in a left column, scoring sheet on the right */
+.tablet-container.judge-container {
+  max-width: 1240px;
+}
+
+.judge-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.judge-layout-sidebar {
+  grid-column: 1;
+  grid-row: 1;
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.judge-layout-main {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.judge-layout-sidebar .judge-teams-overview-grid {
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
+.judge-layout-sidebar .judge-team-row-btn {
+  padding: 0.6rem 0.7rem;
+}
+
+@media (max-width: 640px) {
+  .judge-layout {
+    grid-template-columns: 1fr;
+  }
+  .judge-layout-sidebar,
+  .judge-layout-main {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .judge-layout-sidebar {
+    position: static;
+    max-height: none;
+  }
+}
+
+.judge-layout-sidebar .judge-team-row-btn {
+  gap: 0.5rem;
+}
+
+.judge-layout-sidebar .judge-team-row-btn > div:first-child {
+  min-width: 0;
+  flex: 1;
+}
+
+.judge-layout-sidebar .judge-team-row-btn > div:first-child > div {
+  min-width: 0;
+}
+
+.judge-layout-sidebar .judge-team-row-btn > div:first-child > div > div {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

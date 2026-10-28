@@ -230,7 +230,7 @@
               ${renderAvatarHtml(team, "team-avatar-lg")}
               <div class="team-card-name">${escapeHtml(team.name)}</div>
               <div class="team-card-status">
-                ${locked ? `✓ Đã hoàn thành${pickedLabel ? ` (${escapeHtml(pickedLabel)})` : ""}` : "Bấm để chọn gói chủ đề"}
+                ${locked ? `✓ Đã hoàn thành${pickedLabel ? ` (${escapeHtml(pickedLabel)})` : ""}` : ""}
               </div>
             </button>
           `;
@@ -241,9 +241,6 @@
         <div class="section-header">
           <div>
             <h1 class="section-title">${escapeHtml(quizData.config.round1_name)}</h1>
-            <p class="section-subtitle">
-              Chọn đội thi bước lên sân khấu để hiển thị các gói chủ đề giới thiệu.
-            </p>
           </div>
         </div>
         <div class="teams-grid">
@@ -283,12 +280,8 @@
               </span>
               <h2 class="package-card-title">${escapeHtml(pkg.package)}</h2>
               <p class="package-card-meta">
-                Thời gian: <strong>${timeSec} giây</strong>
+                Thời gian: <strong>${timeSec % 60 === 0 ? `${timeSec / 60} phút` : `${timeSec} giây`}</strong>
               </p>
-            </div>
-            <div class="nav-card-footer">
-              <span>Mở chủ đề của gói</span>
-              <span>Chọn gói này →</span>
             </div>
           </button>
         `;
@@ -310,9 +303,6 @@
         <div class="section-header">
           <div>
             <h1 class="section-title">Chọn 1 trong ${offered.length} gói chủ đề</h1>
-            <p class="section-subtitle">
-              Mỗi gói là một chủ đề tự giới thiệu dành riêng cho ${escapeHtml(team.name)}.
-            </p>
           </div>
         </div>
 

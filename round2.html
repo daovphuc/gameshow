@@ -449,7 +449,7 @@
         resultsHtml = `
           <div class="panel-card" style="margin-top: 2rem;">
             <h2 class="panel-title">Kết quả trả lời của các đội câu #${q.number}:</h2>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem; margin-top: 1rem;">
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem;">
               ${teamResultsList
                 .map(
                   (item) => `
@@ -462,7 +462,7 @@
                     <span style="font-weight: 800; font-size: 1.1rem; color: ${item.isCorrect ? "#2E7D4F" : "#C94A38"};">
                       ${item.choice}
                     </span>
-                    <span style="font-size: 0.82rem; color: var(--text-muted);">${item.timeSec}s</span>
+                    <span style="font-size: 0.82rem; color: var(--text-muted); min-width: 56px; text-align: right;">${item.answered ? `${item.timeSec}s` : "—"}</span>
                     <span style="font-weight: 800; color: var(--accent); min-width: 45px; text-align: right;">+${item.points}đ</span>
                   </div>
                 </div>

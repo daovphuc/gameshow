@@ -508,8 +508,8 @@ export function wireStageLayout({
           class="sidebar-link"
           title="Về màn hình chọn cổng"
         >
-          <span class="sidebar-link-icon">🚪</span>
-          <span class="sidebar-link-label">Đổi cổng truy cập</span>
+          <span class="sidebar-link-icon">⌂</span>
+          <span class="sidebar-link-label">Đổi cổng</span>
         </a>
 
         <button
@@ -518,12 +518,14 @@ export function wireStageLayout({
           class="sidebar-link"
           title="Đăng xuất (${escapeHtml(displayName)})"
         >
-          <span class="sidebar-link-icon">⎋</span>
-          <span class="sidebar-link-label">Đăng xuất (${escapeHtml(displayName)})</span>
+          <span class="sidebar-link-icon">⏻</span>
+          <span class="sidebar-link-label">Đăng xuất</span>
         </button>
 
-        <div class="sidebar-footer-note" style="font-size: 0.76rem; color: var(--text-muted);">
-          Phím tắt: <strong>Space</strong> (Bắt đầu giờ), <strong>←</strong> (Quay lại), <strong>→</strong> (Tiếp tục)
+        <div class="sidebar-footer-note">
+          <span><kbd>Space</kbd> Bắt đầu giờ</span>
+          <span><kbd>←</kbd> Quay lại</span>
+          <span><kbd>→</kbd> Tiếp tục</span>
         </div>
       </div>
     `;
