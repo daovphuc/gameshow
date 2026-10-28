@@ -8,46 +8,100 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Noto+Serif:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./css/style.css" />
+  <style>
+    .scores-control-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .score-breakdown-box {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      min-width: 170px;
+    }
+    .judge-mini-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      background: var(--surface-alt, rgba(0,0,0,0.03));
+      padding: 0.35rem 0.5rem;
+      border-radius: 6px;
+    }
+    .penalty-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+    }
+    .penalty-input {
+      width: 58px;
+      padding: 0.2rem 0.35rem;
+      font-size: 0.82rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      text-align: center;
+      background: var(--surface);
+      color: var(--text);
+    }
+    .score-final-badge {
+      font-family: var(--font-mono);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .r2-score-box {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      min-width: 160px;
+    }
+  </style>
 </head>
 <body>
   <div class="app-shell">
     <aside id="app-sidebar" class="app-sidebar" aria-label="Thanh điều hướng bên trái"></aside>
 
     <main class="stage-main">
-      <div class="section-header">
+      <div class="scores-control-header">
         <div>
           <h1 class="section-title">Quản Lý Điểm Số &amp; Điều Khiển Trận Đấu</h1>
           <p class="section-subtitle">
-            Nhập điểm Vòng 1, Vòng 2, Vòng 3 cho từng đội và quản lý trạng thái câu hỏi.
+            Tổng hợp điểm Vòng 1, Vòng 2, Vòng 3; xem chi tiết chấm điểm Ban Giám khảo; trừ điểm lỗi và ghi đè sự cố.
           </p>
         </div>
 
-        <div>
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+          <button type="button" id="btn-download-report" class="btn btn-primary">
+            ⬇ Tải báo cáo (Excel CSV)
+          </button>
           <button type="button" id="btn-reset-all" class="btn btn-danger">
             ✕ Đặt lại trận đấu
           </button>
         </div>
       </div>
 
-      <!-- Sync Status Banner -->
-      <div id="page-sync-banner" class="sync-status-banner"></div>
-
       <!-- Score Adjustment Table -->
       <section class="panel-card">
-        <h2 class="panel-title">Bảng Điểm Các Đội Thi</h2>
+        <h2 class="panel-title">Bảng Điểm Chi Tiết Các Đội Thi</h2>
         <p class="panel-desc">
-          Nhập số trực tiếp hoặc dùng nút <code>-10</code> / <code>+10</code> để cập nhật điểm từng vòng.
+          Điểm Vòng 1 &amp; 3 tự động tính từ trung bình điểm Ban Giám khảo trừ điểm phạt. Vòng 2 tự động quy đổi từ điểm phần mềm kèm ô ghi đè khi có sự cố.
         </p>
         <div class="scores-table-wrap">
           <table class="scores-table">
             <thead>
               <tr>
-                <th>Đội thi</th>
-                <th>Vòng 1</th>
-                <th>Vòng 2</th>
-                <th>Vòng 3</th>
+                <th style="min-width: 140px;">Đội thi</th>
+                <th>Vòng 1 (Điểm GK - Phạt)</th>
+                <th>Vòng 2 (Phần mềm / Ghi đè)</th>
+                <th>Vòng 3 (Điểm GK - Phạt)</th>
                 <th>Tổng điểm</th>
-                <th>Trạng thái Vòng 1</th>
+                <th>Trạng thái V1</th>
               </tr>
             </thead>
             <tbody id="scores-tbody"></tbody>
@@ -56,10 +110,10 @@
       </section>
 
       <!-- Unlock Controls -->
-      <section class="panel-card">
+      <section class="panel-card" style="margin-top: 1.5rem;">
         <h2 class="panel-title">Mở Khóa Gói Câu Hỏi Vòng 1 &amp; Ô Số Vòng 3</h2>
         <p class="panel-desc">
-          Bấm vào gói câu hỏi hoặc ô số bên dưới để mở khóa lại nếu chọn nhầm.
+          Bấm vào gói câu hỏi hoặc ô số bên dưới để mở khóa lại nếu người dẫn chương trình chọn nhầm.
         </p>
 
         <div style="margin-bottom: 1.5rem;">
@@ -83,9 +137,6 @@
       fetchQuizData,
       loadAppState,
       saveAppState,
-      syncScoresToSheet,
-      onSyncStatusChange,
-      getWebAppUrl,
       renderAvatarHtml,
       escapeHtml,
       showToast,
@@ -93,113 +144,185 @@
     } from "./js/app.js";
     import {
       isTeamLocked,
-      setRoundScore,
-      adjustRoundScore,
       unlockRound1Team,
       unlockRound1Package,
       unlockRound3Tile,
-      resetState
+      setRoundScore,
+      setRound2Score,
+      setTeamPenalty,
+      adjustRoundScore,
+      computeTeamScores
     } from "./js/state.js";
+    import { calculateTeamRoundScore } from "./js/judges.js";
+    import { calculateRound2Score } from "./js/round2.js";
+    import { buildReportCsv } from "./js/report.js";
+    import { get, listen, update, resetLiveState } from "./js/backend.js";
 
     let quizData = null;
     let gameState = null;
 
-    function renderSyncBanner(status) {
-      const banner = document.getElementById("page-sync-banner");
-      if (!banner) return;
-
-      banner.classList.remove("saving", "saved", "failed");
-
-      if (status.state === "saving") {
-        banner.classList.add("saving");
-        banner.innerHTML = `<span>⏳ Đang lưu…</span>`;
-      } else if (status.state === "failed") {
-        banner.classList.add("failed");
-        banner.innerHTML = `
-          <span>⚠ Chưa lưu được, bấm để thử lại</span>
-          <button type="button" id="btn-banner-retry" class="btn btn-sm">Chưa lưu được, bấm để thử lại</button>
-        `;
-        document.getElementById("btn-banner-retry")?.addEventListener("click", () => {
-          if (typeof status.retryFn === "function") {
-            status.retryFn();
-          } else if (gameState && quizData) {
-            syncScoresToSheet(gameState, quizData.teams);
-          }
-        });
-      } else {
-        banner.classList.add("saved");
-        const hasRemoteLink = Boolean(getWebAppUrl());
-        banner.innerHTML = `
-          <span>✓ Đã lưu</span>
-          ${
-            hasRemoteLink
-              ? `<button type="button" id="btn-push-now" class="btn btn-sm">Lưu lại ngay</button>`
-              : ""
-          }
-        `;
-        document.getElementById("btn-push-now")?.addEventListener("click", () => {
-          if (gameState && quizData) {
-            syncScoresToSheet(gameState, quizData.teams);
-          }
-        });
-      }
-    }
-
-    onSyncStatusChange(renderSyncBanner);
-
-    async function persistAndSyncScores() {
+    async function syncScoresToBackend() {
       saveAppState(gameState);
+      try {
+        await update("live", {
+          penalties: gameState.penalties,
+          manualOverrides: gameState.manualOverrides,
+          round1: {
+            lockedTeams: gameState.round1.lockedTeams || [],
+            pickedPackages: gameState.round1.pickedPackages || [],
+            teamPackages: gameState.round1.teamPackages || {}
+          },
+          round3: {
+            openedTiles: gameState.round3.openedTiles || [],
+            activeTile: gameState.round3.activeTile || null
+          }
+        });
+      } catch {
+        // Backend update error
+      }
       renderAdminPage();
-      await syncScoresToSheet(gameState, quizData.teams);
     }
 
     function renderAdminPage() {
+      if (!quizData || !gameState) return;
+
+      const derivedScores = computeTeamScores({
+        teams: quizData.teams,
+        live: gameState,
+        config: quizData.config
+      });
+
       const tbody = document.getElementById("scores-tbody");
+      const cfg = quizData.config;
+
       tbody.innerHTML = quizData.teams
         .map((team) => {
-          const s = gameState.scores[team.id] || { round1: 0, round2: 0, round3: 0 };
-          const total = (Number(s.round1) || 0) + (Number(s.round2) || 0) + (Number(s.round3) || 0);
+          const s = derivedScores[team.id] || { round1: 0, round2: 0, round3: 0, total: 0 };
+          const total = s.total;
           const locked = isTeamLocked(gameState, team.id);
 
-          const renderRoundCell = (roundNum, val) => `
-            <div class="score-cell-controls">
-              <button type="button" class="btn btn-sm" data-adj-team="${escapeHtml(team.id)}" data-adj-round="${roundNum}" data-adj-delta="-10">-10</button>
-              <input
-                type="number"
-                class="score-input"
-                value="${val}"
-                step="5"
-                data-input-team="${escapeHtml(team.id)}"
-                data-input-round="${roundNum}"
-                aria-label="Điểm vòng ${roundNum} của ${escapeHtml(team.name)}"
-              />
-              <button type="button" class="btn btn-sm" data-adj-team="${escapeHtml(team.id)}" data-adj-round="${roundNum}" data-adj-delta="10">+10</button>
-            </div>
-          `;
+          // R1 details
+          const r1Judges = gameState.judgeScores?.round1?.[team.id] || {};
+          const r1Penalty = gameState.penalties?.round1?.[team.id] || 0;
+          const r1JudgesList = (quizData.judges || [])
+            .map((j) => {
+              const entry = r1Judges[j.id];
+              if (!entry || (entry.content === undefined && entry.manner === undefined)) {
+                return `<span>${escapeHtml(j.name)}: <em>chưa chấm</em></span>`;
+              }
+              return `<span>${escapeHtml(j.name)}: <strong>${entry.content ?? 0}</strong> + <strong>${entry.manner ?? 0}</strong></span>`;
+            })
+            .join("");
+
+          // R2 details
+          const r2Override = gameState.manualOverrides?.round2?.[team.id];
+          const hasOverride = r2Override !== undefined && r2Override !== null && r2Override !== "";
+
+          // R3 details
+          const r3Judges = gameState.judgeScores?.round3?.[team.id] || {};
+          const r3Penalty = gameState.penalties?.round3?.[team.id] || 0;
+          const r3JudgesList = (quizData.judges || [])
+            .map((j) => {
+              const entry = r3Judges[j.id];
+              if (!entry || (entry.content === undefined && entry.manner === undefined)) {
+                return `<span>${escapeHtml(j.name)}: <em>chưa chấm</em></span>`;
+              }
+              return `<span>${escapeHtml(j.name)}: <strong>${entry.content ?? 0}</strong> + <strong>${entry.manner ?? 0}</strong></span>`;
+            })
+            .join("");
 
           return `
             <tr>
               <td>
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 0.65rem;">
                   ${renderAvatarHtml(team, "team-avatar-sm")}
                   <strong>${escapeHtml(team.name)}</strong>
                 </div>
               </td>
-              <td>${renderRoundCell(1, s.round1)}</td>
-              <td>${renderRoundCell(2, s.round2)}</td>
-              <td>${renderRoundCell(3, s.round3)}</td>
+
+              <!-- Vong 1 -->
               <td>
-                <strong style="font-family: var(--font-mono); font-size: 1.25rem; color: var(--accent);">
+                <div class="score-breakdown-box">
+                  <div class="score-final-badge">${s.round1}đ</div>
+                  <div class="judge-mini-list">${r1JudgesList || "<em>Chưa có dữ liệu GK</em>"}</div>
+                  <div class="penalty-row">
+                    <span>Phạt:</span>
+                    <input
+                      type="number"
+                      class="penalty-input"
+                      value="${r1Penalty}"
+                      step="1"
+                      min="0"
+                      data-penalty-team="${escapeHtml(team.id)}"
+                      data-penalty-round="round1"
+                      title="Điểm trừ quá giờ hoặc lỗi quy chế"
+                    />
+                    <span>đ</span>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Vong 2 -->
+              <td>
+                <div class="r2-score-box">
+                  <div class="score-final-badge">
+                    ${s.round2}đ ${hasOverride ? '<span style="font-size: 0.72rem; color: var(--accent);">(Ghi đè)</span>' : ""}
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.2rem;">
+                    <button type="button" class="btn btn-sm" data-r2-adj="${escapeHtml(team.id)}" data-r2-delta="-1">-1</button>
+                    <input
+                      type="number"
+                      class="score-input"
+                      style="width: 72px; padding: 0.25rem 0.35rem;"
+                      value="${s.round2}"
+                      step="0.25"
+                      min="0"
+                      max="20"
+                      data-r2-team="${escapeHtml(team.id)}"
+                      title="Ghi đè điểm Vòng 2 trực tiếp"
+                    />
+                    <button type="button" class="btn btn-sm" data-r2-adj="${escapeHtml(team.id)}" data-r2-delta="1">+1</button>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Vong 3 -->
+              <td>
+                <div class="score-breakdown-box">
+                  <div class="score-final-badge">${s.round3}đ</div>
+                  <div class="judge-mini-list">${r3JudgesList || "<em>Chưa có dữ liệu GK</em>"}</div>
+                  <div class="penalty-row">
+                    <span>Phạt:</span>
+                    <input
+                      type="number"
+                      class="penalty-input"
+                      value="${r3Penalty}"
+                      step="1"
+                      min="0"
+                      data-penalty-team="${escapeHtml(team.id)}"
+                      data-penalty-round="round3"
+                      title="Điểm trừ quá giờ hoặc lỗi quy chế"
+                    />
+                    <span>đ</span>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Tong diem -->
+              <td>
+                <strong style="font-family: var(--font-mono); font-size: 1.35rem; color: var(--accent);">
                   ${total}
                 </strong>
               </td>
+
+              <!-- Trang thai V1 -->
               <td>
                 ${
                   locked
                     ? `<button type="button" class="btn btn-sm" data-unlock-team="${escapeHtml(team.id)}">
-                        🔓 Mở khóa đội
+                        🔓 Mở khóa
                       </button>`
-                    : `<span style="color: var(--text-muted); font-size: 0.9rem;">Đang mở</span>`
+                    : `<span style="color: var(--text-muted); font-size: 0.85rem;">Đang mở</span>`
                 }
               </td>
             </tr>
@@ -207,33 +330,47 @@
         })
         .join("");
 
-      tbody.querySelectorAll("[data-adj-team]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const teamId = btn.dataset.adjTeam;
-          const round = Number(btn.dataset.adjRound);
-          const delta = Number(btn.dataset.adjDelta);
-          gameState = adjustRoundScore(gameState, teamId, round, delta);
-          persistAndSyncScores();
-        });
-      });
-
-      tbody.querySelectorAll("[data-input-team]").forEach((input) => {
+      // Penalty inputs
+      tbody.querySelectorAll("[data-penalty-team]").forEach((input) => {
         input.addEventListener("change", () => {
-          const teamId = input.dataset.inputTeam;
-          const round = Number(input.dataset.inputRound);
-          const val = Number(input.value) || 0;
-          gameState = setRoundScore(gameState, teamId, round, val);
-          persistAndSyncScores();
+          const teamId = input.dataset.penaltyTeam;
+          const round = input.dataset.penaltyRound;
+          const val = Math.max(0, Number(input.value) || 0);
+          gameState = setTeamPenalty(gameState, { round, teamId, penalty: val });
+          syncScoresToBackend();
+          showToast(`Đã cập nhật điểm phạt ${teamId}.`);
         });
       });
 
+      // Round 2 overrides
+      tbody.querySelectorAll("[data-r2-team]").forEach((input) => {
+        input.addEventListener("change", () => {
+          const teamId = input.dataset.r2Team;
+          const val = Math.max(0, Number(input.value) || 0);
+          gameState = setRound2Score(gameState, teamId, val);
+          syncScoresToBackend();
+          showToast(`Đã ghi đè điểm Vòng 2 cho ${teamId}: ${val}đ.`);
+        });
+      });
+
+      tbody.querySelectorAll("[data-r2-adj]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const teamId = btn.dataset.r2Adj;
+          const delta = Number(btn.dataset.r2Delta) || 0;
+          const current = Number(gameState.scores[teamId]?.round2) || 0;
+          const next = Math.max(0, Math.round((current + delta) * 100) / 100);
+          gameState = setRound2Score(gameState, teamId, next);
+          syncScoresToBackend();
+        });
+      });
+
+      // Unlock team V1
       tbody.querySelectorAll("[data-unlock-team]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const teamId = btn.dataset.unlockTeam;
           gameState = unlockRound1Team(gameState, teamId, { unlockPackage: false });
-          saveAppState(gameState);
-          renderAdminPage();
-          showToast("Đã mở khóa đội Vòng 1.");
+          syncScoresToBackend();
+          showToast(`Đã mở khóa đội ${teamId} ở Vòng 1.`);
         });
       });
 
@@ -252,7 +389,7 @@
               : pkgId;
             return `
               <button type="button" class="btn btn-sm" data-unlock-pkg="${escapeHtml(pkgId)}" data-unlock-label="${escapeHtml(label)}">
-                🔓 ${escapeHtml(label)} (Bấm để mở khóa)
+                🔓 ${escapeHtml(label)} (Bấm để mở lại)
               </button>
             `;
           })
@@ -261,8 +398,7 @@
         pkgListEl.querySelectorAll("[data-unlock-pkg]").forEach((btn) => {
           btn.addEventListener("click", () => {
             gameState = unlockRound1Package(gameState, btn.dataset.unlockPkg);
-            saveAppState(gameState);
-            renderAdminPage();
+            syncScoresToBackend();
             showToast(`Đã mở khóa gói "${btn.dataset.unlockLabel || btn.dataset.unlockPkg}".`);
           });
         });
@@ -278,7 +414,7 @@
           .map(
             (num) => `
             <button type="button" class="btn btn-sm" data-unlock-tile="${num}">
-              🔓 Ô #${num}
+              🔓 Ô #${num} (Mở lại)
             </button>
           `
           )
@@ -288,8 +424,7 @@
           btn.addEventListener("click", () => {
             const num = Number(btn.dataset.unlockTile);
             gameState = unlockRound3Tile(gameState, num);
-            saveAppState(gameState);
-            renderAdminPage();
+            syncScoresToBackend();
             showToast(`Đã mở khóa lại Ô số #${num}.`);
           });
         });
@@ -300,37 +435,81 @@
       if (!gameState.round3.openedTiles.length) return;
       gameState.round3.openedTiles = [];
       gameState.round3.activeTile = null;
-      saveAppState(gameState);
-      renderAdminPage();
-      showToast("Đã mở khóa toàn bộ 50 ô Vòng 3.");
+      syncScoresToBackend();
+      showToast("Đã mở khóa toàn bộ ô Vòng 3.");
     });
 
+    // Reset Contest button
     document.getElementById("btn-reset-all")?.addEventListener("click", async () => {
       const confirmed = window.confirm(
-        "Bạn có chắc chắn muốn ĐẶT LẠI TRẬN ĐẤU (xóa toàn bộ điểm số, mở khóa các đội Vòng 1 và các ô Vòng 3) về 0 không?"
+        "CẢNH BÁO: Bạn có chắc chắn muốn ĐẶT LẠI TRẬN ĐẤU?\n\nToàn bộ điểm số, phiên thi, và câu trả lời của tất cả các đội trên mọi thiết bị sẽ được xóa về trạng thái ban đầu!"
       );
       if (!confirmed) return;
-      gameState = resetState(quizData.teams);
-      sessionStorage.removeItem("gameshow_r1_pending_team");
-      await persistAndSyncScores();
-      showToast("Đã đặt lại toàn bộ trận đấu về trạng thái ban đầu.");
+      try {
+        const fresh = await resetLiveState(quizData.teams);
+        gameState = fresh;
+        saveAppState(gameState);
+        sessionStorage.removeItem("gameshow_r1_pending_team");
+        renderAdminPage();
+        showToast("Đã đặt lại toàn bộ trận đấu về trạng thái ban đầu cho tất cả thiết bị!");
+      } catch (err) {
+        showToast("Lỗi khi đặt lại trận đấu: " + err.message);
+      }
+    });
+
+    // Download CSV Report
+    document.getElementById("btn-download-report")?.addEventListener("click", async () => {
+      try {
+        const allAnswers = (await get("answers")) || {};
+        const csvContent = buildReportCsv({
+          teams: quizData.teams,
+          judges: quizData.judges,
+          gameState,
+          round2Questions: quizData.round2Questions,
+          allAnswers,
+          config: quizData.config
+        });
+
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const dateStr = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `Ket_qua_Hoi_thi_PCCC_CNCH_${dateStr}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast("Đã tạo và tải file báo cáo CSV thành công!");
+      } catch (err) {
+        showToast("Lỗi khi xuất báo cáo: " + err.message);
+      }
     });
 
     async function initScoresPage(forceRefresh = false) {
-      quizData = await fetchQuizData({ forceRefresh });
-      gameState = loadAppState(quizData.teams, quizData.scores);
+      quizData = await fetchQuizData({ forceRefresh, portal: "host" });
+      gameState = loadAppState(quizData.teams);
       document.title = `Điểm số - ${quizData.config.show_title}`;
+
+      // Subscribe to remote live updates
+      listen("live", (remoteLive) => {
+        if (!remoteLive) return;
+        gameState = { ...gameState, ...remoteLive };
+        saveAppState(gameState);
+        renderAdminPage();
+      });
+
       renderAdminPage();
-      renderSyncBanner({ state: "idle" });
 
       wireStageLayout({
         activePage: "scores",
         config: quizData.config,
+        teams: quizData.teams,
         onBack: () => {
           window.location.href = "./leaderboard.html";
         },
         onContinue: () => {
-          window.location.href = "./index.html";
+          window.location.href = "./host.html";
         },
         onReload: () => initScoresPage(true)
       });

@@ -1,51 +1,16 @@
 number,question,image_url,time_seconds,points
-1,Nhà nước đầu tiên trong lịch sử dân tộc Việt Nam có tên gọi là gì?,,20,20
-2,Sông nào dài nhất trên thế giới chảy qua khu vực Đông Bắc châu Phi?,,20,20
-3,Nguyên tố hóa học nào có số hiệu nguyên tử bằng 1 trong bảng tuần hoàn?,,20,20
-4,"Tác phẩm ""Nhật ký trong tù"" của Chủ tịch Hồ Chí Minh được viết bằng chữ gì?",,20,20
-5,Thành phố nào là thủ đô của nước Cộng hòa Nhân dân Trung Hoa?,,20,20
-6,"Trong hình học phẳng, đường thẳng đi qua tâm và nối hai điểm trên đường tròn gọi là gì?",,20,20
-7,Vịnh biển nào của Việt Nam từng hai lần được UNESCO công nhận là Di sản Thiên nhiên Thế giới về giá trị thẩm mỹ và địa chất?,,20,20
-8,Ai là người chỉ huy quân dân nhà Trần lập chiến công trên sông Bạch Đằng năm 1288?,,20,20
-9,Hành tinh nào trong Hệ Mặt Trời nổi tiếng với hệ thống vành đai băng và bụi rộng lớn dễ quan sát nhất?,,20,20
-10,Cơ quan hô hấp chính của loài cá sống dưới nước là bộ phận nào?,,20,20
-11,Tỉnh nào của Việt Nam có diện tích tự nhiên lớn nhất cả nước?,,20,20
-12,"Bản giao hưởng ""Định mệnh"" (Số 5) là kiệt tác của nhà soạn nhạc người Đức nào?",,20,20
-13,Đơn vị đo tần số dao động trong hệ đo lường quốc tế SI là gì?,,20,20
-14,Chiến dịch Điện Biên Phủ năm 1954 kéo dài trong bao nhiêu ngày đêm?,,20,20
-15,Quốc gia nào có diện tích lãnh thổ lớn nhất thế giới?,,20,20
-16,"Tác giả của truyện ngắn ""Vợ nhặt"" trong văn học Việt Nam hiện đại là ai?",,20,20
-17,Kim loại nào nhẹ nhất (có khối lượng riêng nhỏ nhất) trong tất cả các kim loại ở điều kiện chuẩn?,,25,30
-18,Đường xích đạo chia quả địa cầu thành hai phần bằng nhau gọi là gì?,,20,20
-19,Kinh thành Huế được xây dựng bắt đầu từ triều vua nào của nhà Nguyễn?,,20,20
-20,"Trong công nghệ thông tin, thuật ngữ ""RAM"" là viết tắt của cụm từ tiếng Anh nào?",,20,20
-21,"Loài cây nào thường được xem là biểu tượng cho phẩm chất thanh cao, được đề cử là Quốc hoa Việt Nam?",,20,20
-22,Ai là nhà bác học vĩ đại đã phát hiện ra định luật vạn vật hấp dẫn?,,20,20
-23,Thành cổ Quảng Trị gắn liền với cuộc chiến đấu 81 ngày đêm mùa hè đỏ lửa vào năm nào?,,25,30
-24,Hồ nước ngọt sâu nhất trên thế giới nằm ở vùng Siberia (Nga) có tên là gì?,,25,30
-25,Vitamin nào đóng vai trò quan trọng giúp tăng cường thị lực và phòng ngừa bệnh quáng gà?,,20,20
-26,"Tác phẩm ""Số đỏ"" với nhân vật Xuân Tóc Đỏ là tiểu thuyết trào phúng của nhà văn nào?",,20,20
-27,Dãy núi Himalaya nằm ở châu lục nào?,,20,20
-28,"Trong vật lý, đại lượng đặc trưng cho sự nhanh hay chậm của chuyển động gọi là gì?",,20,20
-29,Ai là nữ tướng đầu tiên của Quân đội Nhân dân Việt Nam?,,25,30
-30,Quần đảo Hoàng Sa trực thuộc đơn vị hành chính cấp tỉnh/thành phố nào của Việt Nam?,,20,20
-31,Chất khí nào gây ra hiệu ứng nhà kính mạnh mẽ nhất do hoạt động đốt nhiên liệu hóa thạch của con người?,,20,20
-32,"Bài thơ ""Đất Nước"" (trích trường ca Mặt đường khát vọng) là sáng tác của nhà thơ nào?",,25,30
-33,Eo biển nào ngăn cách đảo Anh với lục địa châu Âu?,,25,30
-34,Một byte trong tin học tương đương với bao nhiêu bit?,,20,20
-35,Phong trào Cần Vương cuối thế kỷ XIX được phát động bởi chiếu Cần Vương nhân danh vị vua nào?,,25,30
-36,"Nhóm máu nào được gọi là nhóm máu ""chuyên cho"" (hồng cầu lắng) trong truyền máu cổ điển?",,25,30
-37,Sông Hồng chảy vào địa phận Việt Nam đầu tiên tại tỉnh nào?,,20,20
-38,Tác giả của thuyết tương đối rộng và thuyết tương đối hẹp trong vật lý hiện đại là ai?,,20,20
-39,Di sản Văn hóa Thế giới Phố cổ Hội An nằm bên bờ con sông nào?,,20,20
-40,Hợp kim đồng thau là sự kết hợp chủ yếu giữa kim loại đồng (Cu) và kim loại nào?,,30,40
-41,"Hiệp định Genève về chấm dứt chiến tranh, lập lại hòa bình ở Đông Dương được ký kết vào năm nào?",,20,20
-42,Châu lục nào nằm hoàn toàn ở bán cầu Nam và được bao phủ bởi băng tuyết quanh năm?,,20,20
-43,Nhà bác học Marie Curie đã tìm ra hai nguyên tố phóng xạ nào?,,30,40
-44,"Trong văn học dân gian Việt Nam, vị thần nào trong ""Tứ bất tử"" gắn với truyền thuyết chống lũ lụt sông Hồng?",,25,30
-45,Ký hiệu hóa học của nguyên tố Sắt trong bảng tuần hoàn là gì?,,20,20
-46,Hiệp hội các quốc gia Đông Nam Á (ASEAN) được thành lập vào năm nào?,,25,30
-47,Đỉnh núi cao nhất trên Trái Đất thuộc dãy Himalaya có tên là gì?,,20,20
-48,Ai là người Việt Nam đầu tiên bay vào vũ trụ trên tàu Liên hợp 37 năm 1980?,,20,20
-49,"Trong toán học, hằng số Pi (tỷ số giữa chu vi và đường kính đường tròn) có giá trị xấp xỉ hai chữ số thập phân là bao nhiêu?",,20,20
-50,Bến Nhà Rồng - nơi người thanh niên Nguyễn Tất Thành ra đi tìm đường cứu nước năm 1911 - nằm tại thành phố nào hiện nay?,,20,30
+1,Tình huống phát hiện rò rỉ khí gas tại bếp ăn tập thể. Đội thi hãy thực hiện bài tuyên truyền hướng dẫn các bước xử lý tại chỗ và cách thức thông báo cho mọi người thoát nạn an toàn?,,420,30
+2,Tình huống cháy tại tầng 3 nhà ở kết hợp kinh doanh quần áo (nhà ống 1 lối thoát nạn) có người mắc kẹt trên tầng tum. Hãy thuyết trình phương án truyền thông kỹ năng cứu nạn và thoát hiểm cho người dân?,,420,30
+3,Tình huống xảy ra chập cháy bình ắc quy xe máy điện khi đang sạc tại tầng hầm chung cư mini lúc nửa đêm. Đội thi hãy trình bày bài truyền thông hướng dẫn cư dân xử lý ban đầu và ngăn cháy lan?,,420,30
+4,Tình huống một nhân viên bị bắt lửa vào quần áo và đang hoảng loạn tháo chạy. Đội thi hãy hướng dẫn và tuyên truyền cách xử lý dập lửa trên người nạn nhân cùng biện pháp sơ cấp cứu ban đầu?,,420,30
+5,Tình huống kiểm tra an toàn PCCC phát hiện lối thoát nạn khẩn cấp bị khóa xích và chuông báo cháy bị tắt. Cán bộ kiểm tra thực hiện công tác tuyên truyền vận động và xử lý nghiệp vụ đối với cơ sở ra sao?,,420,30
+6,Tình huống chuông báo cháy chung cư cao tầng kêu lúc rạng sáng cư dân hoảng loạn chen lấn vào thang máy. Hãy thực hiện bài phát thanh tuyên truyền hướng dẫn thoát nạn an toàn và trấn an người dân?,,420,30
+7,Tình huống xảy ra sự cố cháy xe ô tô chở khách trên đường cao tốc. Đội thi hãy tuyên truyền phổ biến phương án tổ chức sơ tán hành khách và dập lửa ban đầu cho các tài xế?,,420,30
+8,Tình huống một nạn nhân bị mắc kẹt chân trong thang cuốn tại trung tâm thương mại đang có khói bốc lên. Đội thi tuyên truyền kỹ năng xử lý tình huống khẩn cấp cho lực lượng cơ sở như thế nào?,,420,30
+9,Tình huống tuyên truyền an toàn PCCC cho các tiểu thương tại chợ truyền thống về việc thắp hương thờ cúng và câu móc điện tùy tiện. Đội thi xây dựng bài thuyết trình thuyết phục hiệu quả ra sao?,,420,30
+10,Tình huống cháy chảo dầu mỡ đang đun nấu trên bếp công nghiệp đầu bếp chuẩn bị dội nước vào dập lửa. Đội thi can thiệp và tuyên truyền hướng dẫn kỹ năng dập tắt an toàn tình huống trên ra sao?,,420,30
+11,Tình huống căn hộ khóa trái cửa có khói đen đặc bốc ra từ khe cửa và có tiếng trẻ em kêu cứu. Đội thi tuyên truyền kỹ năng cứu người phá dỡ và chữa cháy ban đầu cho người dân xung quanh như thế nào?,,420,30
+12,Tình huống mưa ngập sâu tầng hầm tòa nhà có nguy cơ rò rỉ điện từ trạm biến áp và máy phát điện. Cán bộ PCCC tuyên truyền phổ biến các biện pháp đảm bảo an toàn cho ban quản lý tòa nhà ra sao?,,420,30
+13,Tình huống tổ chức chữa cháy tại khu dân cư trong ngõ hẻm sâu hơn 200m xe chữa cháy không vào được. Đội thi tuyên truyền giải pháp phát huy mô hình Tổ liên gia an toàn PCCC và Điểm chữa cháy công cộng?,,420,30
+14,Tình huống đám cháy bao vây nạn nhân tại tầng 2 nhà ống có ban công bị rào chắn chuồng cọp lồng sắt kiên cố. Đội thi tuyên truyền kỹ năng sinh tồn và hướng dẫn người dân cắt lồng sắt mở lối thoát hiểm?,,420,30
+15,Tình huống xảy ra sự cố cháy tại phòng máy chủ (Server) chứa nhiều thiết bị điện tử quan trọng. Đội thi tuyên truyền hướng dẫn lựa chọn chất chữa cháy và biện pháp dập lửa an toàn phù hợp ra sao?,,420,30

@@ -1,42 +1,74 @@
-// Shared browser runtime wiring: data fetching, score sync, state persistence,
-// theme application from config, and collapsible left sidebar.
+// Shared browser runtime wiring: data fetching, state persistence,
+// theme application, connection status, collapsible left sidebar,
+// and right-side live leaderboard drawer with FLIP animation.
 
 import {
   DEFAULT_SHEET_ID,
-  DEFAULT_WEB_APP_URL,
   SHEET_TABS,
   extractSheetId,
   buildTabUrl
 } from "./config.js";
-import { resolvePasswordHash, verifyPassword } from "./auth.js";
+import { resolvePortalPasswordHash, resolvePasswordHash, verifyPortalPassword, verifyPassword } from "./auth.js";
 import { normaliseAllData, resolveImageUrl } from "./data.js";
-import { normaliseScores, buildScoresPayload, mergeScores } from "./scores.js";
-import { createInitialState, syncStateWithTeams, exportState, importState } from "./state.js";
-import { getTeamInitials } from "./leaderboard.js";
+import { createInitialState, syncStateWithTeams, exportState, importState, computeTeamScores } from "./state.js";
+import { getTeamInitials, computeLeaderboard, diffLeaderboard } from "./leaderboard.js";
 import { LIGHT_THEME, mergeTheme, themeToCssVars } from "./theme.js";
+import { initBackend, listen, get, set, getServerTime, getConnectionStatus, onStatusChange } from "./backend.js";
 
 export const STORAGE_KEYS = {
   SHEET_ID: "gameshow_sheet_id",
-  WEB_APP_URL: "gameshow_web_app_url",
   SIDEBAR_COLLAPSED: "gameshow_sidebar_collapsed",
   STATE: "gameshow_state",
   DATA_CACHE: "gameshow_data_cache",
-  AUTH_HASH: "gameshow_auth_hash"
+  AUTH_HASH_HOST: "gameshow_auth_host",
+  AUTH_HASH_JUDGE: "gameshow_auth_judge",
+  AUTH_HASH_TEAM: "gameshow_auth_team",
+  AUTH_HASH: "gameshow_auth_host",
+  LEADERBOARD_DRAWER_OPEN: "gameshow_lb_panel_open"
 };
 
-export function isPasswordUnlocked(config = {}) {
+/**
+ * Checks whether a specific portal session is unlocked.
+ * @param {"host"|"judge"|"team"|Record<string, any>} [portal]
+ * @param {Record<string, any>} [config]
+ * @returns {boolean}
+ */
+export function isPasswordUnlocked(portal = "host", config = {}) {
+  let targetPortal = portal;
+  let targetConfig = config;
+  if (typeof portal === "object" && portal !== null) {
+    targetConfig = portal;
+    targetPortal = "host";
+  }
+  const cleanPortal = String(targetPortal || "host").toLowerCase();
+  const storageKey = `gameshow_auth_${cleanPortal}`;
   try {
-    const storedHash = localStorage.getItem(STORAGE_KEYS.AUTH_HASH);
-    return Boolean(storedHash) && storedHash === resolvePasswordHash(config);
+    const storedHash = localStorage.getItem(storageKey);
+    const targetHash = resolvePortalPasswordHash(cleanPortal, targetConfig);
+    return Boolean(storedHash) && storedHash.toLowerCase() === targetHash.toLowerCase();
   } catch {
     return false;
   }
 }
 
-export function ensurePasswordUnlocked(config = {}) {
-  const targetHash = resolvePasswordHash(config);
+/**
+ * Ensures a portal is unlocked before displaying page content.
+ * @param {"host"|"judge"|"team"|Record<string, any>} [portal]
+ * @param {Record<string, any>} [config]
+ * @returns {Promise<boolean>}
+ */
+export function ensurePasswordUnlocked(portal = "host", config = {}) {
+  let targetPortal = portal;
+  let targetConfig = config;
+  if (typeof portal === "object" && portal !== null) {
+    targetConfig = portal;
+    targetPortal = "host";
+  }
+  const cleanPortal = String(targetPortal || "host").toLowerCase();
+  const targetHash = resolvePortalPasswordHash(cleanPortal, targetConfig);
+  const storageKey = `gameshow_auth_${cleanPortal}`;
 
-  if (isPasswordUnlocked(config)) {
+  if (isPasswordUnlocked(cleanPortal, targetConfig)) {
     document.body.classList.add("auth-unlocked");
     document.getElementById("auth-gate-overlay")?.remove();
     return Promise.resolve(true);
@@ -53,14 +85,23 @@ export function ensurePasswordUnlocked(config = {}) {
       document.body.appendChild(overlay);
     }
 
-    const showTitle = escapeHtml(config.show_title || "Đấu Trường Tri Thức");
+    const showTitle = escapeHtml(targetConfig.show_title || "Hội thi PCCC và CNCH");
+    const portalLabels = {
+      host: "Màn hình Dẫn chương trình",
+      judge: "Cổng Ban Giám khảo",
+      team: "Cổng Đội thi"
+    };
+    const portalLabel = portalLabels[cleanPortal] || "Cổng truy cập";
 
     overlay.innerHTML = `
       <div class="auth-gate-card" role="dialog" aria-modal="true" aria-labelledby="auth-gate-title">
         <div class="auth-gate-icon" aria-hidden="true">🔒</div>
         <h1 id="auth-gate-title" class="auth-gate-title">${showTitle}</h1>
+        <p class="auth-gate-subtitle" style="font-weight: 600; color: var(--accent); margin-bottom: 0.35rem;">
+          ${escapeHtml(portalLabel)}
+        </p>
         <p class="auth-gate-subtitle">
-          Vui lòng nhập mật khẩu để mở khóa hệ thống trình chiếu.
+          Vui lòng nhập mật khẩu để mở khóa thiết bị.
         </p>
         <form id="auth-gate-form" class="auth-gate-form" novalidate>
           <input
@@ -87,7 +128,7 @@ export function ensurePasswordUnlocked(config = {}) {
 
     setTimeout(() => {
       input?.focus();
-    }, 20);
+    }, 25);
 
     form?.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -95,10 +136,10 @@ export function ensurePasswordUnlocked(config = {}) {
       const candidate = input.value;
       if (submitBtn) submitBtn.disabled = true;
       try {
-        const ok = await verifyPassword(candidate, config);
+        const ok = await verifyPortalPassword(candidate, cleanPortal, targetConfig);
         if (ok) {
           try {
-            localStorage.setItem(STORAGE_KEYS.AUTH_HASH, targetHash);
+            localStorage.setItem(storageKey, targetHash);
           } catch {
             // Ignore storage errors
           }
@@ -119,43 +160,24 @@ export function ensurePasswordUnlocked(config = {}) {
   });
 }
 
-export function lockAppSession(config = {}) {
+/**
+ * Locks the current portal session, requiring password re-entry.
+ */
+export function lockAppSession(portal = "host", config = {}) {
+  let targetPortal = portal;
+  let targetConfig = config;
+  if (typeof portal === "object" && portal !== null) {
+    targetConfig = portal;
+    targetPortal = "host";
+  }
+  const cleanPortal = String(targetPortal || "host").toLowerCase();
   try {
-    localStorage.removeItem(STORAGE_KEYS.AUTH_HASH);
+    localStorage.removeItem(`gameshow_auth_${cleanPortal}`);
   } catch {
     // Ignore storage errors
   }
   document.body.classList.remove("auth-unlocked");
-  return ensurePasswordUnlocked(config);
-}
-
-let currentSyncStatus = {
-  state: "idle", // "idle" | "saving" | "saved" | "failed"
-  message: "",
-  retryFn: null
-};
-const syncListeners = new Set();
-
-export function onSyncStatusChange(listener) {
-  syncListeners.add(listener);
-  listener(currentSyncStatus);
-  return () => syncListeners.delete(listener);
-}
-
-function notifySyncStatus(next) {
-  currentSyncStatus = { ...currentSyncStatus, ...next };
-  for (const fn of syncListeners) {
-    try {
-      fn(currentSyncStatus);
-    } catch {
-      // Ignore listener error
-    }
-  }
-  updateSidebarSyncBadge();
-}
-
-export function getSyncStatus() {
-  return currentSyncStatus;
+  return ensurePasswordUnlocked(cleanPortal, targetConfig);
 }
 
 export function escapeHtml(value) {
@@ -197,34 +219,6 @@ export function setSheetId(rawInput) {
   return clean;
 }
 
-export function getWebAppUrl() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    if (params.has("webapp")) {
-      const fromUrl = (params.get("webapp") || "").trim();
-      localStorage.setItem(STORAGE_KEYS.WEB_APP_URL, fromUrl);
-      return fromUrl;
-    }
-    const stored = localStorage.getItem(STORAGE_KEYS.WEB_APP_URL);
-    if (stored !== null) {
-      return stored.trim();
-    }
-  } catch {
-    // Ignore storage errors
-  }
-  return DEFAULT_WEB_APP_URL;
-}
-
-export function setWebAppUrl(rawInput) {
-  const clean = String(rawInput || "").trim();
-  try {
-    localStorage.setItem(STORAGE_KEYS.WEB_APP_URL, clean);
-  } catch {
-    // Ignore storage errors
-  }
-  return clean;
-}
-
 export function isSidebarCollapsed() {
   try {
     return localStorage.getItem(STORAGE_KEYS.SIDEBAR_COLLAPSED) === "1";
@@ -257,7 +251,28 @@ export function applyResolvedTheme(sheetConfig = {}) {
   return resolved;
 }
 
-export async function fetchQuizData({ forceRefresh = false } = {}) {
+/**
+ * Fetches all contest data from Google Sheet or fallback sample CSVs.
+ * Synchronises sheet ID from the database if configured.
+ * @param {{forceRefresh?: boolean, portal?: string}} options
+ */
+export async function fetchQuizData({ forceRefresh = false, portal = "host" } = {}) {
+  await initBackend();
+
+  // Check if database has a shared sheet ID from the host
+  try {
+    const sharedSheetId = await get("sheetId");
+    if (sharedSheetId && typeof sharedSheetId === "string" && sharedSheetId.trim()) {
+      const cleanShared = extractSheetId(sharedSheetId);
+      const current = getSheetId();
+      if (cleanShared && cleanShared !== current) {
+        setSheetId(cleanShared);
+      }
+    }
+  } catch {
+    // Ignore database read error
+  }
+
   const sheetId = getSheetId();
 
   if (!forceRefresh) {
@@ -267,7 +282,7 @@ export async function fetchQuizData({ forceRefresh = false } = {}) {
         const cached = JSON.parse(cachedRaw);
         if (cached && cached.sheetId === sheetId && cached.data) {
           applyResolvedTheme(cached.data.config);
-          await ensurePasswordUnlocked(cached.data.config);
+          await ensurePasswordUnlocked(portal, cached.data.config);
           return { ...cached.data, sheetId, isSample: !sheetId };
         }
       }
@@ -284,24 +299,16 @@ export async function fetchQuizData({ forceRefresh = false } = {}) {
         try {
           const res = await fetch(url, { cache: forceRefresh ? "no-store" : "default" });
           if (!res.ok) {
-            if (tab === "scores") {
-              fetched.scoresCsv = "";
-              return;
-            }
-            throw new Error("Không thể tải dữ liệu câu hỏi.");
+            throw new Error(`Không thể tải dữ liệu tab "${tab}".`);
           }
           fetched[`${tab}Csv`] = await res.text();
         } catch (err) {
-          if (tab === "scores") {
-            fetched.scoresCsv = "";
-            return;
-          }
           throw err;
         }
       })
     );
   } catch (err) {
-    await ensurePasswordUnlocked({});
+    await ensurePasswordUnlocked(portal, {});
     throw err;
   }
 
@@ -316,41 +323,11 @@ export async function fetchQuizData({ forceRefresh = false } = {}) {
   }
 
   applyResolvedTheme(data.config);
-  await ensurePasswordUnlocked(data.config);
+  await ensurePasswordUnlocked(portal, data.config);
   return { ...data, sheetId, isSample: !sheetId };
 }
 
-/**
- * Fetches only the `scores` tab CSV to refresh scores quickly (e.g. every 10s on Leaderboard).
- */
-export async function fetchSheetScoresOnly(teams = []) {
-  const sheetId = getSheetId();
-  const url = buildTabUrl("scores", sheetId);
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`);
-  }
-  const csvText = await res.text();
-  const scores = normaliseScores(csvText, teams);
-
-  // Update cached data.scores if cache exists
-  try {
-    const cachedRaw = sessionStorage.getItem(STORAGE_KEYS.DATA_CACHE);
-    if (cachedRaw) {
-      const cached = JSON.parse(cachedRaw);
-      if (cached && cached.data) {
-        cached.data.scores = scores;
-        sessionStorage.setItem(STORAGE_KEYS.DATA_CACHE, JSON.stringify(cached));
-      }
-    }
-  } catch {
-    // Ignore cache update error
-  }
-
-  return scores;
-}
-
-export function loadAppState(teams = [], sheetScores = null) {
+export function loadAppState(teams = []) {
   let state;
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.STATE);
@@ -364,19 +341,6 @@ export function loadAppState(teams = [], sheetScores = null) {
   if (!state) {
     state = createInitialState(teams);
   }
-
-  // Merge sheetScores and localScores according to whether a web-app URL is configured
-  const webAppUrl = getWebAppUrl();
-  if (sheetScores && typeof sheetScores === "object") {
-    state.scores = mergeScores({
-      teams,
-      sheetScores,
-      localScores: state.scores,
-      webAppUrl
-    });
-  }
-
-  saveAppState(state);
   return state;
 }
 
@@ -387,87 +351,6 @@ export function saveAppState(state) {
     // Ignore storage errors
   }
   return state;
-}
-
-/**
- * Posts score updates to the configured score endpoint using text/plain.
- * Keeps local scores on failure and allows retry.
- */
-export async function syncScoresToSheet(scoresOrState, teams = []) {
-  const webAppUrl = getWebAppUrl();
-  if (!webAppUrl) {
-    notifySyncStatus({
-      state: "saved",
-      message: "Đã lưu",
-      retryFn: null
-    });
-    return { ok: true, localOnly: true };
-  }
-
-  const payload = buildScoresPayload(scoresOrState, teams);
-  const doSend = () => syncScoresToSheet(scoresOrState, teams);
-
-  notifySyncStatus({
-    state: "saving",
-    message: "Đang lưu…",
-    retryFn: null
-  });
-
-  try {
-    const res = await fetch(webAppUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8"
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-
-    let result = { ok: true };
-    try {
-      const text = await res.text();
-      if (text) {
-        result = JSON.parse(text);
-      }
-    } catch {
-      // Non-JSON or opaque response is still treated as sent if HTTP 200
-    }
-
-    if (result && result.ok === false) {
-      throw new Error(result.error || "Không thể lưu điểm");
-    }
-
-    // Update cached sheet scores so subsequent reads match immediately
-    try {
-      const cachedRaw = sessionStorage.getItem(STORAGE_KEYS.DATA_CACHE);
-      if (cachedRaw) {
-        const cached = JSON.parse(cachedRaw);
-        if (cached?.data) {
-          cached.data.scores = normaliseScores(payload.rows, teams);
-          sessionStorage.setItem(STORAGE_KEYS.DATA_CACHE, JSON.stringify(cached));
-        }
-      }
-    } catch {
-      // Ignore cache update error
-    }
-
-    notifySyncStatus({
-      state: "saved",
-      message: "Đã lưu",
-      retryFn: null
-    });
-    return { ok: true };
-  } catch (err) {
-    notifySyncStatus({
-      state: "failed",
-      message: "Chưa lưu được, bấm để thử lại",
-      retryFn: doSend
-    });
-    return { ok: false, error: err };
-  }
 }
 
 export function renderAvatarHtml(team, sizeClass = "") {
@@ -501,37 +384,148 @@ export function showToast(message, durationMs = 2800) {
   }, durationMs);
 }
 
-function updateSidebarSyncBadge() {
-  const badge = document.getElementById("sidebar-sync-status");
-  if (!badge) return;
+// -----------------------------------------------------------------------------
+// Live Leaderboard Side Panel (Host screens) with FLIP animation
+// -----------------------------------------------------------------------------
 
-  badge.classList.remove("saving", "saved", "failed");
-  if (currentSyncStatus.state === "saving") {
-    badge.classList.add("saving");
-    badge.textContent = currentSyncStatus.message || "Đang lưu…";
-  } else if (currentSyncStatus.state === "saved") {
-    badge.classList.add("saved");
-    badge.textContent = currentSyncStatus.message || "Đã lưu";
-  } else if (currentSyncStatus.state === "failed") {
-    badge.classList.add("failed");
-    badge.innerHTML = `<button type="button" id="btn-sidebar-retry-sync" class="btn btn-sm" style="width:100%;">Chưa lưu được, bấm để thử lại</button>`;
-    document.getElementById("btn-sidebar-retry-sync")?.addEventListener("click", () => {
-      if (typeof currentSyncStatus.retryFn === "function") {
-        currentSyncStatus.retryFn();
+let lastLeaderboardEntries = [];
+
+/**
+ * Wires the collapsible right-side live leaderboard drawer on host screens.
+ */
+export function wireLiveLeaderboardPanel({ teams = [], getLiveScores } = {}) {
+  if (typeof document === "undefined") return;
+
+  let toggleBtn = document.getElementById("btn-toggle-live-leaderboard");
+  if (!toggleBtn) {
+    toggleBtn = document.createElement("button");
+    toggleBtn.id = "btn-toggle-live-leaderboard";
+    toggleBtn.type = "button";
+    toggleBtn.className = "btn-toggle-live-leaderboard";
+    toggleBtn.setAttribute("aria-label", "Mở hoặc đóng bảng điểm trực tiếp bên phải");
+    toggleBtn.innerHTML = `<span>★ Bảng điểm</span>`;
+    document.body.appendChild(toggleBtn);
+  }
+
+  let drawer = document.getElementById("live-leaderboard-drawer");
+  if (!drawer) {
+    drawer = document.createElement("aside");
+    drawer.id = "live-leaderboard-drawer";
+    drawer.className = "live-leaderboard-drawer";
+    drawer.setAttribute("aria-label", "Bảng điểm trực tiếp");
+    drawer.innerHTML = `
+      <div class="drawer-header">
+        <h2 class="drawer-title">★ Bảng Điểm Trực Tiếp</h2>
+        <button type="button" id="btn-drawer-close" class="drawer-close-btn" aria-label="Đóng">✕</button>
+      </div>
+      <div class="drawer-body">
+        <div id="drawer-ranking-list" class="drawer-ranking-list"></div>
+      </div>
+    `;
+    document.body.appendChild(drawer);
+
+    document.getElementById("btn-drawer-close")?.addEventListener("click", () => {
+      setDrawerOpen(false);
+    });
+  }
+
+  function isDrawerOpen() {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.LEADERBOARD_DRAWER_OPEN) === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  function setDrawerOpen(open) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.LEADERBOARD_DRAWER_OPEN, open ? "1" : "0");
+    } catch {
+      // Ignore storage errors
+    }
+    drawer.classList.toggle("open", Boolean(open));
+  }
+
+  setDrawerOpen(isDrawerOpen());
+
+  toggleBtn.onclick = () => {
+    setDrawerOpen(!drawer.classList.contains("open"));
+  };
+
+  function updateLeaderboardRows(currentScores) {
+    const container = document.getElementById("drawer-ranking-list");
+    if (!container || !teams || teams.length === 0) return;
+
+    const ranked = computeLeaderboard(teams, currentScores, "total", { tieBreak: true });
+    const diff = diffLeaderboard(lastLeaderboardEntries, ranked);
+
+    // FLIP FIRST: record initial DOM bounding rects
+    const prevRects = new Map();
+    container.querySelectorAll(".drawer-ranking-row").forEach((el) => {
+      const id = el.dataset.teamId;
+      if (id) {
+        prevRects.set(id, el.getBoundingClientRect());
       }
     });
-  } else {
-    badge.classList.add("saved");
-    badge.textContent = "Đã lưu";
+
+    const changedScoreIds = new Set(diff.changedScores.map((c) => c.id));
+
+    // Render new DOM order
+    container.innerHTML = ranked
+      .map(
+        (entry) => `
+        <div
+          class="drawer-ranking-row ${changedScoreIds.has(entry.id) ? "score-tick" : ""}"
+          data-team-id="${escapeHtml(entry.id)}"
+        >
+          <span class="drawer-rank ${entry.rank === 1 ? "top-1" : ""}">#${entry.rank}</span>
+          ${renderAvatarHtml(entry, "team-avatar-sm")}
+          <span class="drawer-team-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
+          <span class="drawer-team-score">${entry.score}đ</span>
+        </div>
+      `
+      )
+      .join("");
+
+    // FLIP LAST & INVERT & PLAY: animate movements smoothly
+    if (diff.hasChanged && prevRects.size > 0) {
+      container.querySelectorAll(".drawer-ranking-row").forEach((el) => {
+        const id = el.dataset.teamId;
+        const prevRect = prevRects.get(id);
+        if (prevRect) {
+          const currentRect = el.getBoundingClientRect();
+          const deltaY = prevRect.top - currentRect.top;
+          if (deltaY !== 0) {
+            el.style.transform = `translateY(${deltaY}px)`;
+            el.style.transition = "none";
+            requestAnimationFrame(() => {
+              el.style.transition = "transform 0.45s cubic-bezier(0.2, 0, 0, 1)";
+              el.style.transform = "";
+            });
+          }
+        }
+      });
+    }
+
+    lastLeaderboardEntries = ranked;
   }
+
+  // Subscribe to live state updates
+  listen("live", (liveState) => {
+    if (!liveState) return;
+    const scores = computeTeamScores({ teams, live: liveState });
+    updateLeaderboardRows(scores);
+  });
 }
 
 /**
- * Renders and wires the collapsible left sidebar and keyboard shortcuts.
+ * Renders and wires the collapsible left sidebar, connection status badge,
+ * and keyboard shortcuts on host pages.
  */
 export function wireStageLayout({
   activePage = "home",
   config = {},
+  teams = [],
   onBack,
   onContinue,
   onReload,
@@ -543,16 +537,16 @@ export function wireStageLayout({
   const sidebar = document.getElementById("app-sidebar");
   if (sidebar) {
     const navItems = [
-      { id: "home", href: "./index.html", icon: "⌂", label: "Trang chủ" },
+      { id: "home", href: "./host.html", icon: "⌂", label: "Tổng quan" },
       { id: "round1", href: "./round1.html", icon: "①", label: "Vòng 1" },
+      { id: "round2", href: "./round2.html", icon: "②", label: "Vòng 2" },
       { id: "round3", href: "./round3.html", icon: "③", label: "Vòng 3" },
       { id: "leaderboard", href: "./leaderboard.html", icon: "★", label: "Bảng xếp hạng" },
       { id: "scores", href: "./scores.html", icon: "✎", label: "Điểm số" }
     ];
 
     const sheetIdVal = escapeHtml(getSheetId());
-    const webAppVal = escapeHtml(getWebAppUrl());
-    const showTitle = escapeHtml(config.show_title || "Đấu Trường Tri Thức");
+    const showTitle = escapeHtml(config.show_title || "Hội thi PCCC và CNCH");
 
     sidebar.innerHTML = `
       <div class="sidebar-top">
@@ -569,6 +563,14 @@ export function wireStageLayout({
           >
             ${collapsed ? "»" : "«"}
           </button>
+        </div>
+
+        <!-- Connection Status -->
+        <div style="padding: 0 0.2rem 0.65rem;">
+          <div id="sidebar-conn-badge" class="conn-status-badge local">
+            <span class="conn-status-dot"></span>
+            <span id="sidebar-conn-label">Đang kết nối...</span>
+          </div>
         </div>
 
         <nav class="sidebar-nav" aria-label="Điều hướng chính">
@@ -606,17 +608,6 @@ export function wireStageLayout({
                 />
               </div>
 
-              <div>
-                <label class="sidebar-field-label" for="sidebar-webapp-url">Link ghi điểm</label>
-                <input
-                  type="url"
-                  id="sidebar-webapp-url"
-                  class="sidebar-input"
-                  value="${webAppVal}"
-                  placeholder="Dán link ghi điểm..."
-                />
-              </div>
-
               <button type="button" id="btn-sidebar-save" class="btn btn-primary btn-sm" style="width: 100%;">
                 Lưu cài đặt
               </button>
@@ -624,14 +615,22 @@ export function wireStageLayout({
               <button type="button" id="btn-reload-data" class="btn btn-sm" style="width: 100%;">
                 ↻ Tải lại dữ liệu
               </button>
-
-              <div id="sidebar-sync-status" class="sidebar-sync-badge"></div>
             </div>
           </details>
         </div>
       </div>
 
       <div class="sidebar-bottom" style="display: flex; flex-direction: column; gap: 0.65rem; padding-top: 1rem;">
+        <a
+          href="./index.html"
+          class="sidebar-link"
+          style="width: 100%; border: 1px solid var(--border); background: var(--surface); text-decoration: none;"
+          title="Về màn hình chọn cổng"
+        >
+          <span class="sidebar-link-icon">🚪</span>
+          <span class="sidebar-link-label">Đổi cổng truy cập</span>
+        </a>
+
         <button
           type="button"
           id="btn-sidebar-lock"
@@ -649,10 +648,17 @@ export function wireStageLayout({
       </div>
     `;
 
-    updateSidebarSyncBadge();
+    // Wire connection status display
+    const connBadge = document.getElementById("sidebar-conn-badge");
+    const connLabel = document.getElementById("sidebar-conn-label");
+    onStatusChange((status) => {
+      if (!connBadge || !connLabel) return;
+      connBadge.className = `conn-status-badge ${status.code || "local"}`;
+      connLabel.textContent = status.label || "Chế độ thử trên 1 máy";
+    });
 
     document.getElementById("btn-sidebar-lock")?.addEventListener("click", () => {
-      lockAppSession(config);
+      lockAppSession("host", config);
     });
 
     document.getElementById("btn-sidebar-toggle")?.addEventListener("click", () => {
@@ -666,18 +672,21 @@ export function wireStageLayout({
 
     document.getElementById("btn-sidebar-save")?.addEventListener("click", async () => {
       const rawSheet = document.getElementById("sidebar-sheet-id")?.value || "";
-      const rawWebApp = document.getElementById("sidebar-webapp-url")?.value || "";
       const cleanSheet = setSheetId(rawSheet);
-      const cleanWebApp = setWebAppUrl(rawWebApp);
       const sheetInput = document.getElementById("sidebar-sheet-id");
-      const webAppInput = document.getElementById("sidebar-webapp-url");
       if (sheetInput) sheetInput.value = cleanSheet;
-      if (webAppInput) webAppInput.value = cleanWebApp;
-      updateSidebarSyncBadge();
+
+      // Share sheet ID to all devices via database
+      try {
+        await set("sheetId", cleanSheet);
+      } catch {
+        // Ignore DB write error
+      }
+
       if (typeof onReload === "function") {
         try {
           await onReload();
-          showToast("Đã lưu cài đặt và tải lại dữ liệu!");
+          showToast("Đã lưu cài đặt và đồng bộ tới toàn bộ thiết bị!");
         } catch (err) {
           showToast(err.message || "Không thể tải dữ liệu, vui lòng kiểm tra lại đường dẫn.");
         }
@@ -700,6 +709,11 @@ export function wireStageLayout({
         }
       });
     }
+  }
+
+  // Wire right-side live leaderboard drawer
+  if (teams && teams.length > 0) {
+    wireLiveLeaderboardPanel({ teams });
   }
 
   window.onkeydown = (e) => {

@@ -18,7 +18,7 @@
         <div>
           <h1 class="section-title">Bảng Xếp Hạng Đội Thi</h1>
           <p class="section-subtitle">
-            Top 5 đội dẫn đầu vinh danh trên bục cúp chiến thắng; điểm số tự động cập nhật mỗi 10 giây.
+            Top 5 đội dẫn đầu vinh danh trên bục cúp chiến thắng; điểm số tự động cập nhật trực tiếp theo thời gian thực.
           </p>
         </div>
 
@@ -38,13 +38,14 @@
   <script type="module">
     import {
       fetchQuizData,
-      fetchSheetScoresOnly,
       loadAppState,
       renderAvatarHtml,
       escapeHtml,
       wireStageLayout
     } from "./js/app.js";
     import { computeLeaderboard, buildPodiumSlots } from "./js/leaderboard.js";
+    import { computeTeamScores } from "./js/state.js";
+    import { listen } from "./js/backend.js";
 
     const params = new URLSearchParams(window.location.search);
     let currentMode = params.get("tab") || "total";
@@ -185,11 +186,19 @@
     }
 
     function renderBoard() {
+      if (!quizData || !gameState) return;
+
       document.querySelectorAll(".tab-btn").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.tab === currentMode);
       });
 
-      const ranked = computeLeaderboard(quizData.teams, gameState, currentMode);
+      const derivedScores = computeTeamScores({
+        teams: quizData.teams,
+        live: gameState,
+        config: quizData.config
+      });
+
+      const ranked = computeLeaderboard(quizData.teams, derivedScores, currentMode, { tieBreak: true });
       const podiumEl = document.getElementById("podium-section");
       const listEl = document.getElementById("leaderboard-list");
 
@@ -203,7 +212,6 @@
       if (nextSignature !== lastPodiumSignature) {
         lastPodiumSignature = nextSignature;
         podiumEl.classList.remove("animate-rise");
-        // Trigger reflow so the gentle rise animation replays on tab or score change
         void podiumEl.offsetWidth;
         podiumEl.classList.add("animate-rise");
 
@@ -241,30 +249,24 @@
         .join("");
     }
 
-    async function refreshScoresSilently() {
-      if (!quizData) return;
-      try {
-        const latestSheetScores = await fetchSheetScoresOnly(quizData.teams);
-        quizData.scores = latestSheetScores;
-        gameState = loadAppState(quizData.teams, latestSheetScores);
-        renderBoard();
-      } catch {
-        // Fallback to localStorage state if offline or sheet temporarily unreachable
-        gameState = loadAppState(quizData.teams, quizData.scores);
-        renderBoard();
-      }
-    }
-
     async function initLeaderboard(forceRefresh = false) {
-      quizData = await fetchQuizData({ forceRefresh });
-      gameState = loadAppState(quizData.teams, quizData.scores);
+      quizData = await fetchQuizData({ forceRefresh, portal: "host" });
+      gameState = loadAppState(quizData.teams);
       document.title = `Bảng xếp hạng - ${quizData.config.show_title}`;
 
       renderBoard();
 
+      // Listen to real-time updates from Firebase / Local Mode
+      listen("live", (remoteLive) => {
+        if (!remoteLive) return;
+        gameState = { ...gameState, ...remoteLive };
+        renderBoard();
+      });
+
       wireStageLayout({
         activePage: "leaderboard",
         config: quizData.config,
+        teams: quizData.teams,
         onBack: () => {
           window.location.href = "./round3.html";
         },
@@ -284,13 +286,10 @@
 
     window.addEventListener("storage", () => {
       if (quizData) {
-        gameState = loadAppState(quizData.teams, quizData.scores);
+        gameState = loadAppState(quizData.teams);
         renderBoard();
       }
     });
-
-    // Auto-refresh scores every 10 seconds for secondary/stage screens
-    setInterval(refreshScoresSilently, 10000);
 
     initLeaderboard(false);
   </script>

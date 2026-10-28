@@ -1,25 +1,25 @@
 package,team_id,question,image_url,time_seconds,points
-Gói A,doi-01,Kinh đô của nhà nước Văn Lang được đặt tại vùng đất thuộc tỉnh nào của Việt Nam hiện nay?,,15,10
-Gói B,doi-01,Nguyên tố hóa học nào chiếm tỷ lệ thể tích lớn nhất trong khí quyển Trái Đất?,,15,10
-Gói A,doi-02,"Tác phẩm ""Truyện Kiều"" của đại thi hào Nguyễn Du được viết theo thể thơ nào?",,15,10
-Gói B,doi-02,Ánh sáng từ Mặt Trời mất khoảng bao nhiêu phút để truyền tới Trái Đất?,,15,10
-Gói A,doi-03,Sông Mê Kông chảy vào lãnh thổ Việt Nam qua hai nhánh chính là sông Tiền và sông gì?,,15,10
-Gói B,doi-03,"Từ viết tắt ""CPU"" trong máy tính có nghĩa tiếng Việt là gì?",,15,10
-Gói A,doi-04,Quần thể di tích Cố đô Huế được UNESCO công nhận là Di sản Văn hóa Thế giới vào năm nào?,,15,10
-Gói B,doi-04,Quá trình cây xanh tổng hợp chất hữu cơ nhờ năng lượng ánh sáng gọi là gì?,,15,10
-Gói A,doi-05,"Vị vua nào đã ban ""Chiếu dời đô"" đưa kinh đô từ Hoa Lư về Đại La (Thăng Long) năm 1010?",,15,10
-Gói B,doi-05,Đại dương nào có diện tích và độ sâu lớn nhất thế giới?,,15,10
-Gói A,doi-06,Lễ hội Đền Hùng tưởng nhớ các Vua Hùng diễn ra vào ngày nào âm lịch hằng năm?,,15,10
-Gói B,doi-06,"Trong bảng tuần hoàn hóa học, nguyên tố Vàng có ký hiệu là gì?",,15,10
-Gói A,doi-07,"Tác giả của bản ""Tuyên ngôn Độc lập"" khai sinh nước Việt Nam Dân chủ Cộng hòa ngày 2/9/1945 là ai?",,15,10
-Gói B,doi-07,Chiến dịch Hồ Chí Minh lịch sử toàn thắng vào ngày tháng năm nào?,,15,10
-Gói A,doi-08,Trường đại học đầu tiên của Việt Nam tại kinh thành Thăng Long có tên là gì?,,15,10
-Gói B,doi-08,"Trên sông Bạch Đằng năm 938, vị anh hùng nào đã đánh tan quân Nam Hán?",,15,10
-Gói A,doi-09,Ai là vị trạng nguyên trẻ tuổi nhất trong lịch sử khoa bảng phong kiến Việt Nam?,,15,10
-Gói B,doi-09,"Bài hát ""Tiến quân ca"" - Quốc ca Việt Nam do nhạc sĩ nào sáng tác?",,15,10
-Gói A,doi-10,Đảo lớn nhất của Việt Nam tính theo diện tích là đảo nào?,,15,10
-Gói B,doi-10,Nhà Trần đã ba lần đánh thắng quân xâm lược Nguyên - Mông vào thế kỷ thứ mấy?,,15,10
-Gói A,doi-11,Chợ nổi Cái Răng là nét văn hóa đặc sắc của thành phố trực thuộc trung ương nào?,,15,10
-Gói B,doi-11,Cao nguyên đá Đồng Văn nằm ở tỉnh nào của nước ta?,,15,10
-Gói A,doi-12,"Ai là tác giả của ""Bình Ngô đại cáo"" - bản tuyên ngôn độc lập thứ hai của dân tộc?",,15,10
-Gói B,doi-12,"Bài thơ thần ""Nam quốc sơn hà"" tương truyền vang lên bên dòng sông nào?",,15,10
+Gói A,doi-01,Tuyên truyền an toàn PCCC và CNCH tại Nhà chung cư cao tầng và khu căn hộ hỗn hợp,,900,50
+Gói B,doi-01,Tuyên truyền an toàn PCCC và CNCH tại Chợ truyền thống và trung tâm thương mại,,900,50
+Gói A,doi-02,"Tuyên truyền an toàn PCCC và CNCH tại Nhà ở kết hợp sản xuất, kinh doanh (nhà ống liền kề)",,900,50
+Gói B,doi-02,"Tuyên truyền an toàn PCCC và CNCH tại Cơ sở sản xuất công nghiệp, kho tàng trong khu công nghiệp",,900,50
+Gói A,doi-03,Tuyên truyền an toàn PCCC và CNCH tại Bệnh viện và các cơ sở khám chữa bệnh,,900,50
+Gói B,doi-03,Tuyên truyền an toàn PCCC và CNCH tại Trường học và các cơ sở giáo dục đào tạo,,900,50
+Gói A,doi-04,"Tuyên truyền an toàn PCCC và CNCH tại Cơ sở kinh doanh dịch vụ karaoke, vũ trường, quán bar",,900,50
+Gói B,doi-04,Tuyên truyền an toàn PCCC và CNCH tại Cửa hàng kinh doanh xăng dầu và khí đốt hóa lỏng (LPG),,900,50
+Gói A,doi-05,"Tuyên truyền an toàn PCCC và CNCH tại Khu dân cư đô thị có ngõ sâu, hẹp và làng nghề truyền thống",,900,50
+Gói B,doi-05,"Tuyên truyền an toàn PCCC và CNCH trong sử dụng điện sinh hoạt, sạc xe đạp điện và xe máy điện",,900,50
+Gói A,doi-06,Tuyên truyền an toàn PCCC và CNCH tại Tòa nhà văn phòng làm việc và trụ sở cơ quan,,900,50
+Gói B,doi-06,"Tuyên truyền an toàn PCCC và CNCH tại Rừng phòng hộ, vườn quốc gia và khu bảo tồn thiên nhiên",,900,50
+Gói A,doi-07,Tuyên truyền kỹ năng tự thoát nạn và cứu nạn khi xảy ra cháy tại công trình ngầm và tầng hầm,,900,50
+Gói B,doi-07,"Tuyên truyền xây dựng và nhân rộng mô hình ""Tổ liên gia an toàn PCCC"" và Điểm chữa cháy công cộng",,900,50
+Gói A,doi-08,Tuyên truyền kỹ năng sử dụng bình chữa cháy xách tay và phương tiện cứu nạn ban đầu cho người dân,,900,50
+Gói B,doi-08,"Tuyên truyền an toàn PCCC trong thi công cải tạo, sửa chữa có hoạt động hàn cắt kim loại tại cơ sở",,900,50
+Gói A,doi-09,Tuyên truyền an toàn PCCC và kỹ năng thoát nạn tại Khách sạn và các cơ sở lưu trú du lịch,,900,50
+Gói B,doi-09,"Tuyên truyền an toàn PCCC trong bảo quản, vận chuyển và sử dụng hóa chất nguy hiểm cháy, nổ",,900,50
+Gói A,doi-10,"Tuyên truyền kỹ năng an toàn PCCC trong dịp Tết Nguyên đán, lễ hội và việc thắp hương thờ cúng",,900,50
+Gói B,doi-10,"Tuyên truyền hướng dẫn cài đặt và sử dụng ứng dụng ""Báo cháy 114"" hỗ trợ cứu nạn cứu hộ",,900,50
+Gói A,doi-11,"Tuyên truyền an toàn PCCC tại Cơ sở chế biến gỗ, may mặc và sản xuất vật liệu dễ bắt cháy",,900,50
+Gói B,doi-11,Tuyên truyền giải pháp mở lối thoát nạn khẩn cấp thứ hai đối với nhà ở có chuồng cọp lồng sắt,,900,50
+Gói A,doi-12,"Tuyên truyền vận động người dân tự trang bị bình cứu hỏa, búa thoát hiểm và mặt nạ lọc độc",,900,50
+Gói B,doi-12,"Tuyên truyền vai trò, trách nhiệm của người đứng đầu cơ quan, doanh nghiệp về công tác PCCC và CNCH",,900,50

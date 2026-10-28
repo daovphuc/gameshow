@@ -1,0 +1,19 @@
+{
+  "rules": {
+    ".read": true,
+    "shared_sheet_id": {
+      ".write": true
+    },
+    "live": {
+      ".write": true
+    },
+    "answers": {
+      ".write": "!newData.exists()",
+      "$questionKey": {
+        "$teamId": {
+          ".write": "!data.exists() && newData.exists() && $questionKey === root.child('live/round2/questionKey').val() && root.child('live/round2/status').val() === 'open' && (!root.child('live/round2/deadline').exists() || now <= root.child('live/round2/deadline').val()) && newData.child('answeredAt').val() === now"
+        }
+      }
+    }
+  }
+}

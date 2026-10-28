@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vòng 2 - Dẫn Chương Trình</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Noto+Serif:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="app-sidebar" class="app-sidebar" aria-label="Thanh điều hướng bên trái"></aside>
+
+    <main class="stage-main">
+      <div id="round2-stage"></div>
+    </main>
+  </div>
+
+  <script type="module">
+    import {
+      fetchQuizData,
+      loadAppState,
+      saveAppState,
+      renderAvatarHtml,
+      escapeHtml,
+      showToast,
+      wireStageLayout
+    } from "./js/app.js";
+    import { resolveImageUrl } from "./js/data.js";
+    import {
+      groupRound2BySet,
+      startRound2Question,
+      lockRound2Question,
+      revealRound2Question,
+      nextRound2Question,
+      calculateRound2Score,
+      computeRound2Ranking,
+      filterQuestionForTablet,
+      buildQuestionKey,
+      recomputeRound2FromAnswers
+    } from "./js/round2.js";
+    import { formatTimer } from "./js/timer.js";
+    import { get, set, update, listen, getServerTime } from "./js/backend.js";
+
+    let quizData = null;
+    let setsGrouped = {};
+    let availableSets = [];
+    let selectedSet = "1";
+    let currentQuestionIdx = 0; // 0 to 9
+
+    // Local live state mirror
+    let liveR2 = {
+      status: "idle", // "idle" | "open" | "locked" | "revealed"
+      questionKey: null,
+      activeQuestion: null,
+      shownAt: null,
+      deadline: null,
+      answers: {},
+      results: null,
+      history: [],
+      questionsMeta: {}
+    };
+
+    let timerInterval = null;
+    let currentAnswersUnsub = null;
+
+    function subscribeToQuestionAnswers(questionKey) {
+      if (currentAnswersUnsub) {
+        currentAnswersUnsub();
+        currentAnswersUnsub = null;
+      }
+      if (!questionKey) return;
+      currentAnswersUnsub = listen(`answers/${questionKey}`, (incomingAnswers) => {
+        liveR2.answers = incomingAnswers || {};
+        const counterEl = document.getElementById("r2-answered-counter");
+        if (counterEl && quizData) {
+          const count = Object.keys(liveR2.answers).length;
+          counterEl.textContent = `${count}/${quizData.teams.length} đội đã trả lời`;
+        }
+      });
+    }
+
+    function getQuestionsInActiveSet() {
+      return setsGrouped[selectedSet] || [];
+    }
+
+    function getCurrentQuestion() {
+      const list = getQuestionsInActiveSet();
+      return list[currentQuestionIdx] || null;
+    }
+
+    function stopTimerTick() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+    }
+
+    function startTimerTick() {
+      stopTimerTick();
+      timerInterval = setInterval(() => {
+        if (!liveR2.deadline) return;
+        const now = getServerTime();
+        const remainingMs = Math.max(0, liveR2.deadline - now);
+        const remainingSec = Math.ceil(remainingMs / 1000);
+
+        updateTimerDisplay(remainingSec);
+
+        // Auto-lock when time is up
+        if (remainingMs <= 0 && liveR2.status === "open") {
+          stopTimerTick();
+          handleLockQuestion();
+        }
+      }, 100);
+    }
+
+    function updateTimerDisplay(remainingSec) {
+      const digits = document.getElementById("r2-timer-digits");
+      const box = document.getElementById("r2-timer-box");
+      const warnText = document.getElementById("r2-timer-warning");
+      if (!digits || !box) return;
+
+      digits.textContent = formatTimer(remainingSec);
+      const isWarn = remainingSec <= 5 && remainingSec > 0;
+      const isZero = remainingSec <= 0;
+
+      box.classList.toggle("running", liveR2.status === "open" && !isWarn && !isZero);
+      box.classList.toggle("warning", isWarn);
+      box.classList.toggle("finished", isZero || liveR2.status === "locked" || liveR2.status === "revealed");
+
+      if (warnText) {
+        warnText.textContent = isZero ? "HẾT GIỜ!" : isWarn ? `⚠ Còn ${remainingSec}s!` : "";
+      }
+    }
+
+    async function handleStartQuestion() {
+      const q = getCurrentQuestion();
+      if (!q) return;
+
+      const serverTime = getServerTime();
+      liveR2 = startRound2Question(liveR2, q, serverTime);
+      const questionKey = buildQuestionKey(selectedSet, currentQuestionIdx);
+      liveR2.questionKey = questionKey;
+      if (!liveR2.questionsMeta) liveR2.questionsMeta = {};
+      liveR2.questionsMeta[questionKey] = {
+        shownAt: liveR2.shownAt,
+        deadline: liveR2.deadline
+      };
+
+      // Subscribe to answers on answers/<questionKey>
+      subscribeToQuestionAnswers(questionKey);
+
+      // Publish to backend (tablet gets payload without correct answer)
+      await update("live/round2", {
+        status: "open",
+        set: selectedSet,
+        questionIndex: currentQuestionIdx,
+        questionKey,
+        activeQuestion: filterQuestionForTablet(q),
+        shownAt: liveR2.shownAt,
+        deadline: liveR2.deadline,
+        results: null,
+        stats: null,
+        [`questionsMeta/${questionKey}`]: {
+          shownAt: liveR2.shownAt,
+          deadline: liveR2.deadline
+        }
+      });
+
+      renderStage();
+      startTimerTick();
+    }
+
+    async function handleLockQuestion() {
+      stopTimerTick();
+      liveR2 = lockRound2Question(liveR2);
+      updateTimerDisplay(0);
+      await update("live/round2", { status: "locked" });
+      renderStage();
+      showToast("Đã khóa nhận đáp án!");
+    }
+
+    async function handleRevealQuestion() {
+      const q = getCurrentQuestion();
+      if (!q) return;
+
+      const maxPts = Number(quizData.config.round2_max_points) || 1000;
+      const minPts = Number(quizData.config.round2_min_points) || 500;
+      liveR2 = revealRound2Question(liveR2, q, { maxPoints: maxPts, minPoints: minPts });
+
+      // Publish question reveal
+      await update("live/round2", {
+        status: "revealed",
+        activeQuestion: q, // Full question with correct answer
+        results: liveR2.results || {},
+        stats: liveR2.stats || {}
+      });
+
+      // Update round 2 totals for teams in live state
+      await updateAccumulatedScores();
+      renderStage();
+    }
+
+    async function updateAccumulatedScores() {
+      const allAnswers = (await get("answers")) || {};
+      const questions = getQuestionsInActiveSet();
+      const meta = liveR2.questionsMeta || {};
+      const divisor = Number(quizData.config.round2_divisor) || 500;
+
+      const recomputed = recomputeRound2FromAnswers({
+        questions,
+        allAnswers,
+        questionsMeta: meta,
+        teams: quizData.teams,
+        divisor
+      });
+
+      liveR2.history = recomputed.history;
+
+      const updates = {};
+      for (const [tId, score] of Object.entries(recomputed.scores)) {
+        updates[`scores/${tId}/round2`] = score;
+      }
+      await update("live", updates);
+    }
+
+    async function handleNextQuestion() {
+      currentQuestionIdx += 1;
+      liveR2.status = "idle";
+      liveR2.activeQuestion = null;
+      liveR2.answers = {};
+      liveR2.results = null;
+
+      await update("live/round2", {
+        status: "idle",
+        questionIndex: currentQuestionIdx,
+        questionKey: null,
+        activeQuestion: null,
+        results: null,
+        stats: null
+      });
+
+      renderStage();
+    }
+
+    function renderSetChooser(container) {
+      const optionsHtml = availableSets
+        .map(
+          (setKey) => `
+          <button type="button" class="btn btn-lg ${setKey === selectedSet ? "btn-primary" : ""}" data-pick-set="${escapeHtml(setKey)}">
+            Bộ đề #${escapeHtml(setKey)} (${setsGrouped[setKey]?.length || 0} câu)
+          </button>
+        `
+        )
+        .join("");
+
+      container.innerHTML = `
+        <div class="section-header">
+          <div>
+            <h1 class="section-title">${escapeHtml(quizData.config.round2_name)}</h1>
+            <p class="section-subtitle">
+              Chọn bộ đề 10 câu hỏi trắc nghiệm hoặc bấm "Chọn ngẫu nhiên".
+            </p>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem;">
+            <button type="button" id="btn-random-set" class="btn btn-secondary">
+              🎲 Chọn ngẫu nhiên bộ đề
+            </button>
+            <button type="button" id="btn-start-set" class="btn btn-primary">
+              Bắt đầu với Bộ đề #${escapeHtml(selectedSet)} →
+            </button>
+          </div>
+        </div>
+
+        <div class="panel-card" style="margin-top: 1.5rem;">
+          <h2 class="panel-title">Danh sách các bộ đề có sẵn:</h2>
+          <div style="display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap;">
+            ${optionsHtml}
+          </div>
+        </div>
+      `;
+
+      container.querySelectorAll("[data-pick-set]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          selectedSet = btn.dataset.pickSet;
+          renderStage();
+        });
+      });
+
+      document.getElementById("btn-random-set")?.addEventListener("click", () => {
+        if (availableSets.length > 0) {
+          const rand = availableSets[Math.floor(Math.random() * availableSets.length)];
+          selectedSet = rand;
+          showToast(`Đã chọn ngẫu nhiên Bộ đề #${rand}`);
+          renderStage();
+        }
+      });
+
+      document.getElementById("btn-start-set")?.addEventListener("click", async () => {
+        currentQuestionIdx = 0;
+        liveR2.status = "idle";
+        liveR2.activeSet = selectedSet;
+        liveR2.setStarted = true;
+        liveR2.history = [];
+        renderStage();
+        await update("live/round2", { set: selectedSet, setStarted: true, questionIndex: 0, status: "idle" });
+      });
+    }
+
+    function renderSummaryStage(container) {
+      stopTimerTick();
+
+      const questions = getQuestionsInActiveSet();
+      const divisor = Number(quizData.config.round2_divisor) || 500;
+
+      // Calculate stats per team
+      const teamStats = {};
+      for (const t of quizData.teams) {
+        teamStats[t.id] = { softwarePoints: 0, correctCount: 0, totalCorrectTimeMs: 0 };
+      }
+
+      for (const h of liveR2.history) {
+        if (!h.results) continue;
+        for (const [tId, res] of Object.entries(h.results)) {
+          if (!teamStats[tId]) {
+            teamStats[tId] = { softwarePoints: 0, correctCount: 0, totalCorrectTimeMs: 0 };
+          }
+          if (res.isCorrect) {
+            teamStats[tId].softwarePoints += Number(res.points) || 0;
+            teamStats[tId].correctCount += 1;
+            teamStats[tId].totalCorrectTimeMs += Number(res.responseTimeMs) || 0;
+          }
+        }
+      }
+
+      const ranked = computeRound2Ranking(quizData.teams, teamStats, divisor);
+
+      const rowsHtml = ranked
+        .map(
+          (entry) => `
+          <tr>
+            <td><strong>#${entry.rank}</strong></td>
+            <td>
+              <div style="display: flex; align-items: center; gap: 0.65rem;">
+                ${renderAvatarHtml(entry, "team-avatar-sm")}
+                <strong>${escapeHtml(entry.name)}</strong>
+              </div>
+            </td>
+            <td style="font-family: var(--font-mono); font-weight: 700;">${entry.correctCount}/${questions.length}</td>
+            <td style="font-family: var(--font-mono);">${(entry.totalCorrectTimeMs / 1000).toFixed(2)}s</td>
+            <td style="font-family: var(--font-mono); font-weight: 800; color: var(--accent); font-size: 1.15rem;">
+              ${entry.softwarePoints}
+            </td>
+            <td style="font-family: var(--font-mono); font-weight: 900; font-size: 1.25rem;">
+              ${entry.round2Score}đ
+            </td>
+          </tr>
+        `
+        )
+        .join("");
+
+      container.innerHTML = `
+        <div class="section-header">
+          <div>
+            <h1 class="section-title">Tổng Kết Vòng 2 — Bộ Đề #${escapeHtml(selectedSet)}</h1>
+            <p class="section-subtitle">
+              Hoàn thành 10 câu hỏi trắc nghiệm. Điểm số phần mềm đã được quy đổi vào Bảng điểm tổng hợp.
+            </p>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem;">
+            <a href="./round3.html" class="btn btn-primary btn-lg">Sang Vòng 3 →</a>
+          </div>
+        </div>
+
+        <section class="panel-card" style="margin-top: 1.5rem;">
+          <table class="scores-table">
+            <thead>
+              <tr>
+                <th>Hạng</th>
+                <th>Đội thi</th>
+                <th>Số câu đúng</th>
+                <th>Tổng thời gian đúng</th>
+                <th>Điểm phần mềm</th>
+                <th>Điểm quy đổi (÷500)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </section>
+      `;
+    }
+
+    function renderQuestionPresenter(container) {
+      const q = getCurrentQuestion();
+      if (!q) {
+        renderSummaryStage(container);
+        return;
+      }
+
+      const totalQuestions = getQuestionsInActiveSet().length;
+      const answeredCount = Object.keys(liveR2.answers || {}).length;
+      const totalTeams = quizData.teams.length;
+
+      const durationSec = Number(q.time_seconds) || 30;
+      const isRevealed = liveR2.status === "revealed";
+      const isLocked = liveR2.status === "locked" || isRevealed;
+
+      const options = [
+        { letter: "A", text: q.option_a },
+        { letter: "B", text: q.option_b },
+        { letter: "C", text: q.option_c },
+        { letter: "D", text: q.option_d }
+      ];
+
+      const optionsHtml = options
+        .map((opt) => {
+          const isCorrect = isRevealed && q.correct.toUpperCase() === opt.letter;
+          return `
+            <div class="r2-option-card opt-${opt.letter.toLowerCase()} ${isCorrect ? "revealed-correct" : ""}">
+              <span class="opt-letter">${opt.letter}</span>
+              <span style="flex: 1;">${escapeHtml(opt.text)}</span>
+              ${isCorrect ? `<span style="font-weight: 800; color: #2E7D4F;">✓ ĐÁP ÁN ĐÚNG</span>` : ""}
+            </div>
+          `;
+        })
+        .join("");
+
+      // Results table when revealed
+      let resultsHtml = "";
+      if (isRevealed && liveR2.results) {
+        const teamResultsList = quizData.teams.map((t) => {
+          const res = liveR2.results[t.id];
+          return {
+            team: t,
+            answered: Boolean(res),
+            choice: res?.answer || "—",
+            isCorrect: res?.isCorrect || false,
+            timeSec: res ? (res.responseTimeMs / 1000).toFixed(2) : "—",
+            points: res?.points || 0
+          };
+        });
+
+        resultsHtml = `
+          <div class="panel-card" style="margin-top: 2rem;">
+            <h2 class="panel-title">Kết quả trả lời của các đội câu #${q.number}:</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem; margin-top: 1rem;">
+              ${teamResultsList
+                .map(
+                  (item) => `
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.65rem 0.9rem; border-radius: var(--radius-sm); border: 1px solid var(--border); background-color: var(--surface);">
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    ${renderAvatarHtml(item.team, "team-avatar-sm")}
+                    <span style="font-weight: 600; font-size: 0.95rem;">${escapeHtml(item.team.name)}</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 0.6rem; font-family: var(--font-mono);">
+                    <span style="font-weight: 800; font-size: 1.1rem; color: ${item.isCorrect ? "#2E7D4F" : "#C94A38"};">
+                      ${item.choice}
+                    </span>
+                    <span style="font-size: 0.82rem; color: var(--text-muted);">${item.timeSec}s</span>
+                    <span style="font-weight: 800; color: var(--accent); min-width: 45px; text-align: right;">+${item.points}đ</span>
+                  </div>
+                </div>
+              `
+                )
+                .join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      container.innerHTML = `
+        <div class="question-stage">
+          <!-- Top Action Bar -->
+          <div class="screen-action-bar">
+            <div class="screen-left-group">
+              <button type="button" id="btn-screen-back" class="btn">
+                ← Bộ đề
+              </button>
+              <span class="meta-pill accent">Bộ #${escapeHtml(selectedSet)} • Câu ${currentQuestionIdx + 1}/${totalQuestions}</span>
+              <div class="r2-live-counter">
+                <span>⚡</span>
+                <span id="r2-answered-counter">${answeredCount}/${totalTeams} đội đã trả lời</span>
+              </div>
+            </div>
+
+            <div class="screen-right-group">
+              <div id="r2-timer-box" class="top-timer-box ${(liveR2.status === "locked" || liveR2.status === "revealed") ? "finished" : ""}">
+                <span id="r2-timer-digits" class="top-timer-digits">${
+                  formatTimer(
+                    (liveR2.status === "locked" || liveR2.status === "revealed")
+                      ? 0
+                      : (liveR2.status === "open" && liveR2.deadline)
+                        ? Math.max(0, Math.ceil((liveR2.deadline - getServerTime()) / 1000))
+                        : durationSec
+                  )
+                }</span>
+                <span id="r2-timer-warning" class="top-timer-warning-text">${
+                  (liveR2.status === "locked" || liveR2.status === "revealed") ? "HẾT GIỜ!" : ""
+                }</span>
+              </div>
+
+              ${
+                liveR2.status === "idle"
+                  ? `<button type="button" id="btn-open-question" class="btn btn-primary btn-lg">
+                      ▶ Hiện câu hỏi &amp; Bắt đầu giờ
+                    </button>`
+                  : liveR2.status === "open"
+                    ? `<button type="button" id="btn-lock-question" class="btn btn-danger btn-lg">
+                        🔒 Khóa câu trả lời
+                      </button>`
+                    : liveR2.status === "locked"
+                      ? `<button type="button" id="btn-reveal-question" class="btn btn-primary btn-lg">
+                          ★ Công bố đáp án
+                        </button>`
+                      : `<button type="button" id="btn-next-question" class="btn btn-primary btn-lg">
+                          ${currentQuestionIdx + 1 < totalQuestions ? "Câu tiếp theo →" : "Xem tổng kết Vòng 2 →"}
+                        </button>`
+              }
+            </div>
+          </div>
+
+          <!-- Question Body or Waiting State -->
+          ${
+            liveR2.status === "idle"
+              ? `<div class="panel-card" style="margin-top: 1.5rem; text-align: center; padding: 4.5rem 2rem;">
+                  <span class="meta-pill accent" style="font-size: 1.1rem; padding: 0.35rem 1.25rem;">
+                    Câu ${currentQuestionIdx + 1}/${totalQuestions}
+                  </span>
+                  <h2 style="font-family: var(--font-serif); font-size: 2.2rem; margin: 1.25rem 0 0.75rem;">
+                    Sẵn Sàng Cho Câu Hỏi Số ${currentQuestionIdx + 1}
+                  </h2>
+                  <p style="color: var(--text-muted); font-size: 1.15rem; max-width: 520px; margin: 0 auto;">
+                    Nội dung câu hỏi và 4 phương án trả lời đang được ẩn. Bấm <strong>"▶ Hiện câu hỏi &amp; Bắt đầu giờ"</strong> để bắt đầu tính giờ và hiển thị câu hỏi lên màn hình máy chiếu cùng máy tính bảng các đội.
+                  </p>
+                </div>`
+              : `<article class="question-card" style="margin-top: 1rem;">
+                  <p class="question-text" style="font-size: clamp(1.4rem, 2.5vw, 2.2rem);">${escapeHtml(q.question)}</p>
+                  ${
+                    resolveImageUrl(q.image_url)
+                      ? `<div class="question-image-wrap">
+                          <img class="question-image" src="${escapeHtml(resolveImageUrl(q.image_url))}" alt="" onerror="this.parentElement.remove()" />
+                        </div>`
+                      : ""
+                  }
+
+                  <div class="round2-options-grid">
+                    ${optionsHtml}
+                  </div>
+                </article>`
+          }
+
+          ${resultsHtml}
+        </div>
+      `;
+
+      document.getElementById("btn-screen-back")?.addEventListener("click", () => {
+        stopTimerTick();
+        currentQuestionIdx = 0;
+        liveR2.status = "idle";
+        renderStage();
+      });
+
+      document.getElementById("btn-open-question")?.addEventListener("click", handleStartQuestion);
+      document.getElementById("btn-lock-question")?.addEventListener("click", handleLockQuestion);
+      document.getElementById("btn-reveal-question")?.addEventListener("click", handleRevealQuestion);
+      document.getElementById("btn-next-question")?.addEventListener("click", handleNextQuestion);
+    }
+
+    function renderStage() {
+      const container = document.getElementById("round2-stage");
+      const questions = getQuestionsInActiveSet();
+
+      if (currentQuestionIdx >= questions.length && questions.length > 0) {
+        renderSummaryStage(container);
+      } else if (!liveR2.setStarted && liveR2.status === "idle" && currentQuestionIdx === 0 && !liveR2.activeQuestion) {
+        renderSetChooser(container);
+      } else {
+        renderQuestionPresenter(container);
+      }
+
+      wireStageLayout({
+        activePage: "round2",
+        config: quizData.config,
+        teams: quizData.teams,
+        onBack: () => {
+          if (liveR2.status === "idle" && currentQuestionIdx === 0) {
+            window.location.href = "./round1.html";
+          } else {
+            document.getElementById("btn-screen-back")?.click();
+          }
+        },
+        onContinue: () => {
+          if (liveR2.status === "idle") {
+            handleStartQuestion();
+          } else if (liveR2.status === "open") {
+            handleLockQuestion();
+          } else if (liveR2.status === "locked") {
+            handleRevealQuestion();
+          } else {
+            handleNextQuestion();
+          }
+        },
+        onReload: () => initRound2(true),
+        onSpace: () => {
+          if (liveR2.status === "idle") {
+            handleStartQuestion();
+            return true;
+          } else if (liveR2.status === "open") {
+            handleLockQuestion();
+            return true;
+          }
+          return false;
+        }
+      });
+    }
+
+    async function initRound2(forceRefresh = false) {
+      quizData = await fetchQuizData({ forceRefresh, portal: "host" });
+      document.title = `${quizData.config.round2_name} - ${quizData.config.show_title}`;
+
+      setsGrouped = groupRound2BySet(quizData.round2Questions);
+      availableSets = Object.keys(setsGrouped);
+
+      // Restore state from database
+      const remoteR2 = (await get("live/round2")) || {};
+      const storedAnswers = (await get("answers")) || {};
+
+      if (remoteR2.set && availableSets.includes(remoteR2.set)) {
+        selectedSet = remoteR2.set;
+      } else if (availableSets.length > 0 && !availableSets.includes(selectedSet)) {
+        selectedSet = availableSets[0];
+      }
+
+      liveR2.questionsMeta = remoteR2.questionsMeta || {};
+
+      // Recompute totals and history from stored answers
+      const questions = getQuestionsInActiveSet();
+      const divisor = Number(quizData.config.round2_divisor) || 500;
+      const recomputed = recomputeRound2FromAnswers({
+        questions,
+        allAnswers: storedAnswers,
+        questionsMeta: liveR2.questionsMeta,
+        teams: quizData.teams,
+        divisor
+      });
+      liveR2.history = recomputed.history;
+
+      // Restore current position and active status
+      if (remoteR2.questionIndex !== undefined && remoteR2.questionIndex !== null) {
+        currentQuestionIdx = Number(remoteR2.questionIndex) || 0;
+      } else {
+        currentQuestionIdx = recomputed.currentQuestionIndex;
+      }
+
+      liveR2.status = remoteR2.status || "idle";
+      liveR2.setStarted = Boolean(remoteR2.setStarted) || currentQuestionIdx > 0 || liveR2.status !== "idle";
+      liveR2.shownAt = remoteR2.shownAt || null;
+      liveR2.deadline = remoteR2.deadline || null;
+      liveR2.questionKey = remoteR2.questionKey || buildQuestionKey(selectedSet, currentQuestionIdx);
+
+      if (liveR2.status === "open" || liveR2.status === "locked" || liveR2.status === "revealed") {
+        liveR2.activeQuestion = remoteR2.activeQuestion || getCurrentQuestion();
+        if (remoteR2.results) liveR2.results = remoteR2.results;
+        if (remoteR2.stats) liveR2.stats = remoteR2.stats;
+        subscribeToQuestionAnswers(liveR2.questionKey);
+        if (liveR2.status === "open" && liveR2.deadline && liveR2.deadline > getServerTime()) {
+          startTimerTick();
+        }
+      }
+
+      // Update current round in live state
+      await update("live", { currentRound: "round2" });
+      // Republish totals rebuilt from stored answers, so a reload never loses them.
+      await updateAccumulatedScores();
+
+      renderStage();
+    }
+
+    initRound2(false);
+  </script>
+</body>
+</html>

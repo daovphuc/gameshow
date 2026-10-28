@@ -1,18 +1,29 @@
 key,value
-show_title,Đấu Trường Tri Thức 2026
-show_subtitle,Hội thi tìm hiểu kiến thức tổng hợp & bản lĩnh đồng đội
-round1_name,Vòng 1: Khởi Động
-round1_description,Mỗi đội lựa chọn 1 trong 2 gói câu hỏi được đề xuất và suy nghĩ trả lời câu hỏi trong thời gian đếm ngược.
-round2_name,Vòng 2: Vượt Chướng Ngại Vật
-round2_description,Phần thi tương tác trực tiếp trên sân khấu. Điểm số của từng đội được Ban thư ký cập nhật vào bảng điểm.
-round3_name,Vòng 3: Tăng Tốc & Về Đích
-round3_description,Bảng 50 ô câu hỏi bí mật với các mức điểm khác nhau. Đội thi chọn ô số và trả lời trong thời gian quy định.
-round1_time_seconds,15
-round3_time_seconds,20
-round1_default_points,10
-round3_default_points,20
+show_title,Hội thi cán bộ tuyên truyền kiểm tra giỏi về PCCC và CNCH
+show_subtitle,Hệ thống thi đấu trực tiếp đa màn hình
+round1_name,Phần thi thứ nhất: Tuyên truyền về PCCC và CNCH
+round1_description,Mỗi đội lựa chọn 1 trong 2 cơ sở/chủ đề và thuyết trình tuyên truyền (tối đa 15 phút).
+round2_name,"Phần thi thứ hai: Kiến thức pháp luật, nghiệp vụ về PCCC và CNCH"
+round2_description,10 câu hỏi trắc nghiệm A/B/C/D trên thiết bị iPad; tính điểm chính xác và tốc độ trả lời.
+round3_name,Phần thi thứ ba: Xử lý tình huống truyền thông về PCCC và CNCH
+round3_description,15 ô tình huống thực tế về PCCC và CNCH (2 phút chuẩn bị + 5 phút trả lời); Ban Giám khảo chấm điểm trên iPad.
+round1_time_seconds,900
+round1_default_points,50
+round1_max_content,45
+round1_max_manner,5
 round1_packages_offered,2
+round2_time_seconds,30
+round2_max_points,1000
+round2_min_points,500
+round2_divisor,500
+round3_time_seconds,420
+round3_default_points,30
+round3_max_content,25
+round3_max_manner,5
 warning_seconds,5
+password_host_sha256,
+password_judge_sha256,
+password_team_sha256,
 theme_mode,light
 bg_color,#F5F4ED
 surface_color,#FAF9F5

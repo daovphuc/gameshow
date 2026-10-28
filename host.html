@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dẫn chương trình - Hội Thi PCCC &amp; CNCH</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Noto+Serif:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="app-sidebar" class="app-sidebar" aria-label="Thanh điều hướng bên trái"></aside>
+
+    <main class="stage-main">
+      <section class="stage-hero">
+        <h1 id="hero-title" class="stage-title">Hội Thi Cán Bộ PCCC &amp; CNCH</h1>
+        <p id="hero-subtitle" class="stage-subtitle">Hệ thống điều khiển trung tâm dành cho người dẫn chương trình</p>
+      </section>
+
+      <section class="rounds-info-grid" aria-label="Thông tin các vòng thi">
+        <article class="round-info-card">
+          <span class="round-info-badge">Vòng 1</span>
+          <h2 id="info-round1-name" class="round-info-title">Vòng 1: Tự Giới Thiệu</h2>
+          <p id="info-round1-desc" class="round-info-desc"></p>
+          <div style="margin-top: 1.25rem;">
+            <a href="./round1.html" class="btn btn-primary btn-sm">Bắt đầu Vòng 1 →</a>
+          </div>
+        </article>
+
+        <article class="round-info-card">
+          <span class="round-info-badge">Vòng 2</span>
+          <h2 id="info-round2-name" class="round-info-title">Vòng 2: Trả Lời Câu Hỏi Trắc Nghiệm</h2>
+          <p id="info-round2-desc" class="round-info-desc"></p>
+          <div style="margin-top: 1.25rem;">
+            <a href="./round2.html" class="btn btn-primary btn-sm">Bắt đầu Vòng 2 →</a>
+          </div>
+        </article>
+
+        <article class="round-info-card">
+          <span class="round-info-badge">Vòng 3</span>
+          <h2 id="info-round3-name" class="round-info-title">Vòng 3: Xử Lý Tình Huống</h2>
+          <p id="info-round3-desc" class="round-info-desc"></p>
+          <div style="margin-top: 1.25rem;">
+            <a href="./round3.html" class="btn btn-primary btn-sm">Bắt đầu Vòng 3 →</a>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script type="module">
+    import { fetchQuizData, wireStageLayout } from "./js/app.js";
+
+    async function renderHome(forceRefresh = false) {
+      const data = await fetchQuizData({ forceRefresh, portal: "host" });
+      const cfg = data.config;
+
+      document.title = `${cfg.show_title} - Dẫn chương trình`;
+      document.getElementById("hero-title").textContent = cfg.show_title;
+      document.getElementById("hero-subtitle").textContent = cfg.show_subtitle || "";
+
+      document.getElementById("info-round1-name").textContent = cfg.round1_name;
+      document.getElementById("info-round1-desc").textContent = cfg.round1_description || "";
+
+      document.getElementById("info-round2-name").textContent = cfg.round2_name;
+      document.getElementById("info-round2-desc").textContent = cfg.round2_description || "";
+
+      document.getElementById("info-round3-name").textContent = cfg.round3_name;
+      document.getElementById("info-round3-desc").textContent = cfg.round3_description || "";
+
+      wireStageLayout({
+        activePage: "home",
+        config: cfg,
+        teams: data.teams,
+        onReload: () => renderHome(true)
+      });
+    }
+
+    renderHome(false);
+  </script>
+</body>
+</html>

@@ -1,30 +1,40 @@
 // Default configuration and Google Sheets URL helpers.
 
 export const DEFAULT_SHEET_ID = "";
-export const DEFAULT_WEB_APP_URL = "";
 export const DEFAULT_PASSWORD_SHA256 =
-  "63640264849a87c90356129d99ea165e37aa5fabc1fea46906df1a7ca50db492";
+  "2e696ebeea42795bc212e5bae856a9854206e2099d0762231eb4271774037239";
 
-export const SHEET_TABS = ["teams", "round1", "round3", "config", "scores"];
+export const SHEET_TABS = ["teams", "round1", "round2", "round3", "judges", "config"];
 
 export const DEFAULT_CONFIG = {
-  show_title: "Đấu Trường Tri Thức",
-  show_subtitle: "Hội thi tìm hiểu kiến thức tổng hợp",
-  round1_name: "Vòng 1: Khởi Động",
+  show_title: "Hội thi cán bộ tuyên truyền, kiểm tra giỏi về PCCC và CNCH",
+  show_subtitle: "Hội thi nghiệp vụ PCCC và CNCH toàn quốc",
+  round1_name: "Phần thi thứ nhất: Tuyên truyền về PCCC và CNCH",
   round1_description:
-    "Mỗi đội lựa chọn 1 trong 2 gói câu hỏi được đề xuất và suy nghĩ trả lời câu hỏi trong thời gian đếm ngược.",
-  round2_name: "Vòng 2: Vượt Chướng Ngại Vật",
+    "Mỗi đội lựa chọn 1 trong 2 cơ sở/chủ đề và thuyết trình tuyên truyền (tối đa 15 phút).",
+  round2_name: "Phần thi thứ hai: Kiến thức pháp luật, nghiệp vụ về PCCC và CNCH",
   round2_description:
-    "Phần thi tương tác trực tiếp trên sân khấu. Điểm số của từng đội được Ban thư ký cập nhật vào bảng điểm.",
-  round3_name: "Vòng 3: Tăng Tốc & Về Đích",
+    "10 câu hỏi trắc nghiệm A/B/C/D trên thiết bị iPad; tính điểm chính xác và tốc độ trả lời.",
+  round3_name: "Phần thi thứ ba: Xử lý tình huống truyền thông về PCCC và CNCH",
   round3_description:
-    "Bảng 50 ô câu hỏi bí mật với các mức điểm khác nhau. Đội thi chọn ô số và trả lời trong thời gian quy định.",
+    "15 ô tình huống thực tế về PCCC và CNCH (2 phút chuẩn bị + 5 phút trả lời); Ban Giám khảo chấm điểm trên iPad.",
   round1_time_seconds: 15,
-  round3_time_seconds: 20,
   round1_default_points: 10,
-  round3_default_points: 20,
+  round1_max_content: 45,
+  round1_max_manner: 5,
   round1_packages_offered: 2,
-  warning_seconds: 5
+  round2_time_seconds: 30,
+  round2_max_points: 1000,
+  round2_min_points: 500,
+  round2_divisor: 500,
+  round3_time_seconds: 20,
+  round3_default_points: 20,
+  round3_max_content: 25,
+  round3_max_manner: 5,
+  warning_seconds: 5,
+  password_host_sha256: "",
+  password_judge_sha256: "",
+  password_team_sha256: ""
 };
 
 export const TEAM_PALETTE = [

@@ -16,7 +16,8 @@ import {
   unlockRound3Tile,
   resetState,
   exportState,
-  importState
+  importState,
+  computeTeamScores
 } from "../js/state.js";
 
 const SAMPLE_TEAMS = [
@@ -115,4 +116,58 @@ test("unlock team/package/tile, reset, and export->import round-trip", () => {
   assert.equal(fresh.scores.t2.round2, 0);
   assert.deepEqual(fresh.round1.lockedTeams, []);
   assert.deepEqual(fresh.round3.openedTiles, []);
+});
+
+test("computeTeamScores derives round1 and round3 from judges and penalties, round2 from stored total or override", () => {
+  const teams = [
+    { id: "doi-01", name: "Đội Sao Vàng" },
+    { id: "doi-02", name: "Đội Hồng Hà" }
+  ];
+
+  const live = {
+    judgeScores: {
+      round1: {
+        "doi-01": {
+          "judge-01": { content: 40, manner: 4.5 }, // 44.5
+          "judge-02": { content: 42, manner: 4.5 }  // 46.5 -> avg 45.5
+        }
+      },
+      round3: {
+        "doi-01": {
+          "judge-01": { content: 24, manner: 4.0 }  // 28.0
+        }
+      }
+    },
+    penalties: {
+      round1: {
+        "doi-01": 1.0 // 45.5 - 1.0 = 44.5
+      },
+      round3: {
+        "doi-01": 2.0 // 28.0 - 2.0 = 26.0
+      }
+    },
+    scores: {
+      "doi-01": { round2: 18.0 },
+      "doi-02": { round1: 30, round2: 16.5, round3: 20 }
+    },
+    manualOverrides: {
+      round2: {
+        "doi-01": 19.5 // Overrides 18.0 -> 19.5
+      }
+    }
+  };
+
+  const scores = computeTeamScores({ teams, live });
+
+  // doi-01: r1 = 44.5, r2 = 19.5 (override), r3 = 26.0, total = 90.0
+  assert.equal(scores["doi-01"].round1, 44.5);
+  assert.equal(scores["doi-01"].round2, 19.5);
+  assert.equal(scores["doi-01"].round3, 26.0);
+  assert.equal(scores["doi-01"].total, 90.0);
+
+  // doi-02: falls back to stored scores since no judge scores or overrides
+  assert.equal(scores["doi-02"].round1, 30);
+  assert.equal(scores["doi-02"].round2, 16.5);
+  assert.equal(scores["doi-02"].round3, 20);
+  assert.equal(scores["doi-02"].total, 66.5);
 });

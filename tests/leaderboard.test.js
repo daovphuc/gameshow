@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import {
   computeLeaderboard,
   buildPodiumSlots,
-  getTeamInitials
+  getTeamInitials,
+  diffLeaderboard
 } from "../js/leaderboard.js";
 
 const TEAMS = [
@@ -21,7 +22,7 @@ test("computeLeaderboard ranks per-round and total, ties share a rank, and missi
     // t4 has no entry in scores -> should show 0
   };
 
-  // Total leaderboard
+  // Total leaderboard (without tieBreak flag, ties share rank)
   const totalBoard = computeLeaderboard(TEAMS, scores, "total");
   assert.equal(totalBoard.length, 4);
   assert.equal(totalBoard[0].score, 90);
@@ -51,6 +52,87 @@ test("computeLeaderboard ranks per-round and total, ties share a rank, and missi
   assert.equal(r2Board[1].rank, 1);
   assert.equal(r2Board[2].id, "t3");
   assert.equal(r2Board[2].rank, 3);
+});
+
+test("Total ranking with Điều 22 tie-break (round-1 rank, then round-3, then round-2)", () => {
+  const teams = [
+    { id: "A", name: "Đội A" },
+    { id: "B", name: "Đội B" },
+    { id: "C", name: "Đội C" },
+    { id: "D", name: "Đội D" }
+  ];
+
+  // All 4 teams have total score = 80
+  const scores = {
+    // Team A: R1=35, R3=25, R2=20 (total 80)
+    A: { round1: 35, round2: 20, round3: 25 },
+    // Team B: R1=40, R3=20, R2=20 (total 80) -> Higher R1 than A, C, D! -> Should be #1
+    B: { round1: 40, round2: 20, round3: 20 },
+    // Team C: R1=35, R3=30, R2=15 (total 80) -> Same R1 as A, but higher R3 (30 > 25)! -> Should be #2 (A is #3)
+    C: { round1: 35, round2: 15, round3: 30 },
+    // Team D: R1=30, R3=30, R2=20 (total 80) -> Lower R1 (30) -> Should be #4
+    D: { round1: 30, round2: 20, round3: 30 }
+  };
+
+  const ranked = computeLeaderboard(teams, scores, "total", { tieBreak: true });
+
+  assert.equal(ranked[0].id, "B", "Team B wins tie-break due to better Round 1 score (40)");
+  assert.equal(ranked[0].rank, 1);
+
+  assert.equal(ranked[1].id, "C", "Team C beats A on Round 3 score (30 vs 25) after tying on Round 1 (35)");
+  assert.equal(ranked[1].rank, 2);
+
+  assert.equal(ranked[2].id, "A", "Team A is 3rd");
+  assert.equal(ranked[2].rank, 3);
+
+  assert.equal(ranked[3].id, "D", "Team D has lowest Round 1 score (30)");
+  assert.equal(ranked[3].rank, 4);
+
+  // Now test Round 2 breaking tie when R1 and R3 are equal:
+  const scoresR2TieBreak = {
+    X: { round1: 30, round2: 25, round3: 25 }, // total 80
+    Y: { round1: 30, round2: 20, round3: 25 }  // total 75
+  };
+  const teamsXY = [{ id: "X", name: "X" }, { id: "Y", name: "Y" }];
+  const rankedXY = computeLeaderboard(teamsXY, scoresR2TieBreak, "total", { tieBreak: true });
+  assert.equal(rankedXY[0].id, "X");
+});
+
+test("Leaderboard order diff helper used by the animation (which rows moved/changed)", () => {
+  const prev = [
+    { id: "A", score: 50, rank: 1 },
+    { id: "B", score: 45, rank: 2 },
+    { id: "C", score: 40, rank: 3 }
+  ];
+
+  // Team C scores 20 points and moves to 1st place!
+  const next = [
+    { id: "C", score: 60, rank: 1 },
+    { id: "A", score: 50, rank: 2 },
+    { id: "B", score: 45, rank: 3 }
+  ];
+
+  const diff = diffLeaderboard(prev, next);
+  assert.equal(diff.hasChanged, true);
+
+  // C moved up from index 2 to 0
+  const cMove = diff.moved.find((m) => m.id === "C");
+  assert.equal(cMove.oldIndex, 2);
+  assert.equal(cMove.newIndex, 0);
+  assert.equal(cMove.direction, "up");
+
+  // A moved down from index 0 to 1
+  const aMove = diff.moved.find((m) => m.id === "A");
+  assert.equal(aMove.oldIndex, 0);
+  assert.equal(aMove.newIndex, 1);
+  assert.equal(aMove.direction, "down");
+
+  // Changed scores: C changed from 40 to 60 (+20)
+  assert.equal(diff.changedScores.length, 1);
+  assert.equal(diff.changedScores[0].id, "C");
+  assert.equal(diff.changedScores[0].oldScore, 40);
+  assert.equal(diff.changedScores[0].newScore, 60);
+  assert.equal(diff.changedScores[0].delta, 20);
 });
 
 test("buildPodiumSlots returns left-to-right order 4,2,1,3,5, subsets for 1-4 teams, and keeps shared ranks for ties", () => {

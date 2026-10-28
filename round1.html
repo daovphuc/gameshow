@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Vòng 1 - Đấu Trường Tri Thức</title>
+  <title>Vòng 1 - Dẫn Chương Trình</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Noto+Serif:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet" />
@@ -37,6 +37,7 @@
       finishRound1Package
     } from "./js/state.js";
     import { createTimer, startTimer, tickTimer, formatTimer } from "./js/timer.js";
+    import { set, update, listen, getServerTime } from "./js/backend.js";
 
     const PENDING_TEAM_KEY = "gameshow_r1_pending_team";
 
@@ -69,14 +70,26 @@
         return false;
       }
       const warnSec = Number(quizData?.config?.warning_seconds) || 5;
-      currentTimer = startTimer(currentTimer, Date.now());
+      const now = getServerTime();
+      currentTimer = startTimer(currentTimer, now);
       updateTimerDom();
       stopTimerLoop();
+
+      // Publish timer start to live state for judges & secondary screens
+      update("live/round1", {
+        timer: {
+          startedAt: now,
+          durationSeconds: currentTimer.totalSeconds,
+          status: "running"
+        }
+      });
+
       timerInterval = setInterval(() => {
-        currentTimer = tickTimer(currentTimer, Date.now(), warnSec);
+        currentTimer = tickTimer(currentTimer, getServerTime(), warnSec);
         updateTimerDom();
         if (currentTimer.finished) {
           stopTimerLoop();
+          update("live/round1/timer", { status: "finished" });
         }
       }, 100);
       return true;
@@ -122,13 +135,18 @@
       } else {
         sessionStorage.removeItem(PENDING_TEAM_KEY);
       }
+      // Broadcast active team to judges
+      update("live", {
+        currentRound: "round1",
+        stageTeamId: teamId || null
+      });
     }
 
-    // Back on the package-choice and question screens returns to the team list, not to home.
     function handleBack() {
       if (gameState.round1.activeSession) {
         gameState = cancelRound1Session(gameState, { releasePackage: true });
         saveAppState(gameState);
+        syncLiveState();
         setPendingTeam(null);
         stopTimerLoop();
         activeTimerKey = null;
@@ -140,16 +158,16 @@
         renderStage();
         return;
       }
-      window.location.href = "./index.html";
+      window.location.href = "./host.html";
     }
 
-    // Continue on the question screen finishes the package, locks the team, and returns to the team list.
     function handleContinue() {
       const session = gameState.round1.activeSession;
       if (session) {
         const team = quizData.teams.find((t) => t.id === session.teamId);
         gameState = finishRound1Package(gameState, session.teamId);
         saveAppState(gameState);
+        syncLiveState();
         setPendingTeam(null);
         stopTimerLoop();
         activeTimerKey = null;
@@ -166,18 +184,30 @@
         return;
       }
 
-      window.location.href = "./round3.html";
+      window.location.href = "./round2.html";
     }
 
     function selectPackageForTeam(teamId, packageId) {
       try {
         gameState = pickRound1Package(gameState, teamId, packageId);
         saveAppState(gameState);
+        syncLiveState();
         setPendingTeam(null);
         renderStage();
       } catch (err) {
         showToast(err.message || "Không thể chọn gói câu hỏi này.");
       }
+    }
+
+    function syncLiveState() {
+      set("live/round1", {
+        lockedTeams: gameState.round1.lockedTeams || [],
+        pickedPackages: gameState.round1.pickedPackages || [],
+        teamPackages: gameState.round1.teamPackages || {},
+        activeSession: gameState.round1.activeSession || null
+      });
+      set("live/currentRound", "round1");
+      set("live/stageTeamId", gameState.round1.activeSession?.teamId || pendingTeamId || null);
     }
 
     function renderTeamGridStage(container) {
@@ -200,7 +230,7 @@
               ${renderAvatarHtml(team, "team-avatar-lg")}
               <div class="team-card-name">${escapeHtml(team.name)}</div>
               <div class="team-card-status">
-                ${locked ? `✓ Đã hoàn thành${pickedLabel ? ` (${escapeHtml(pickedLabel)})` : ""}` : "Bấm để chọn gói câu hỏi"}
+                ${locked ? `✓ Đã hoàn thành${pickedLabel ? ` (${escapeHtml(pickedLabel)})` : ""}` : "Bấm để chọn gói chủ đề"}
               </div>
             </button>
           `;
@@ -212,7 +242,7 @@
           <div>
             <h1 class="section-title">${escapeHtml(quizData.config.round1_name)}</h1>
             <p class="section-subtitle">
-              Chọn đội thi trên sân khấu để hiển thị các gói câu hỏi của đội.
+              Chọn đội thi bước lên sân khấu để hiển thị các gói chủ đề giới thiệu.
             </p>
           </div>
         </div>
@@ -245,7 +275,6 @@
 
       const renderPkgCard = (pkg, idx) => {
         const timeSec = pkg.time_seconds || pkg.questions?.[0]?.time_seconds || quizData.config.round1_time_seconds;
-        const pts = pkg.points ?? pkg.questions?.[0]?.points ?? quizData.config.round1_default_points;
         return `
           <button type="button" class="package-card" data-package-id="${escapeHtml(pkg.id)}">
             <div>
@@ -254,12 +283,11 @@
               </span>
               <h2 class="package-card-title">${escapeHtml(pkg.package)}</h2>
               <p class="package-card-meta">
-                Điểm câu hỏi: <strong>${pts} điểm</strong> •
                 Thời gian: <strong>${timeSec} giây</strong>
               </p>
             </div>
             <div class="nav-card-footer">
-              <span>Mở câu hỏi của gói</span>
+              <span>Mở chủ đề của gói</span>
               <span>Chọn gói này →</span>
             </div>
           </button>
@@ -281,9 +309,9 @@
 
         <div class="section-header">
           <div>
-            <h1 class="section-title">Chọn 1 trong ${offered.length} gói câu hỏi</h1>
+            <h1 class="section-title">Chọn 1 trong ${offered.length} gói chủ đề</h1>
             <p class="section-subtitle">
-              Mỗi gói gồm 1 câu hỏi dành riêng cho ${escapeHtml(team.name)}.
+              Mỗi gói là một chủ đề tự giới thiệu dành riêng cho ${escapeHtml(team.name)}.
             </p>
           </div>
         </div>
@@ -291,8 +319,8 @@
         ${
           offered.length === 0
             ? `<div class="panel-card">
-                <h2 class="panel-title">Không còn gói câu hỏi khả dụng</h2>
-                <p class="panel-desc">Các gói câu hỏi của đội này đã được mở. Bạn có thể mở khóa lại trong trang Điểm số.</p>
+                <h2 class="panel-title">Không còn gói chủ đề khả dụng</h2>
+                <p class="panel-desc">Các gói của đội này đã hoàn thành. Bạn có thể mở khóa lại trong trang Điểm số.</p>
                 <a href="./scores.html" class="btn btn-primary">Mở trang Điểm số</a>
               </div>`
             : `<div class="packages-grid">
@@ -320,6 +348,7 @@
       if (!pkg) {
         gameState = cancelRound1Session(gameState);
         saveAppState(gameState);
+        syncLiveState();
         renderStage();
         return;
       }
@@ -331,7 +360,6 @@
 
       container.innerHTML = `
         <div class="question-stage">
-          <!-- Top Bar: Back top-left; Countdown + Continue top-right -->
           <div class="screen-action-bar">
             <div class="screen-left-group">
               <button type="button" id="btn-screen-back" class="btn">
@@ -341,7 +369,7 @@
                 ${renderAvatarHtml(team, "team-avatar-sm")}
                 <div>
                   <div style="font-size: 0.78rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
-                    ${escapeHtml(pkg.package)} • ${question.points} điểm
+                    ${escapeHtml(pkg.package)}
                   </div>
                   <div style="font-family: var(--font-serif); font-size: 1.3rem; font-weight: 700;">
                     ${escapeHtml(team.name)}
@@ -360,7 +388,7 @@
               </div>
 
               <button type="button" id="btn-screen-continue" class="btn btn-primary btn-lg">
-                Tiếp tục →
+                Hoàn thành phần thi →
               </button>
             </div>
           </div>
@@ -402,6 +430,7 @@
       wireStageLayout({
         activePage: "round1",
         config: quizData.config,
+        teams: quizData.teams,
         onBack: handleBack,
         onContinue: handleContinue,
         onReload: () => initRound1(true),
@@ -415,9 +444,30 @@
     }
 
     async function initRound1(forceRefresh = false) {
-      quizData = await fetchQuizData({ forceRefresh });
-      gameState = loadAppState(quizData.teams, quizData.scores);
+      quizData = await fetchQuizData({ forceRefresh, portal: "host" });
+      gameState = loadAppState(quizData.teams);
       document.title = `${quizData.config.round1_name} - ${quizData.config.show_title}`;
+
+      // Synchronise live round to round 1
+      update("live", {
+        currentRound: "round1"
+      });
+
+      // Listen for remote state updates
+      listen("live/round1", (remoteR1) => {
+        if (!remoteR1) return;
+        if (Array.isArray(remoteR1.lockedTeams)) {
+          gameState.round1.lockedTeams = remoteR1.lockedTeams;
+        }
+        if (Array.isArray(remoteR1.pickedPackages)) {
+          gameState.round1.pickedPackages = remoteR1.pickedPackages;
+        }
+        if (remoteR1.teamPackages) {
+          gameState.round1.teamPackages = remoteR1.teamPackages;
+        }
+        saveAppState(gameState);
+      });
+
       renderStage();
     }
 

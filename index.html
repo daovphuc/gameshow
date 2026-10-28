@@ -3,72 +3,91 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Trang chủ - Đấu Trường Tri Thức</title>
+  <title>Cổng Truy Cập - Hội Thi PCCC và CNCH</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Noto+Serif:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./css/style.css" />
 </head>
-<body>
-  <div class="app-shell">
-    <aside id="app-sidebar" class="app-sidebar" aria-label="Thanh điều hướng bên trái"></aside>
+<body class="auth-unlocked">
+  <div class="portal-chooser-wrap">
+    <header class="portal-chooser-hero">
+      <h1 id="hero-title" class="portal-chooser-title">Hội Thi Cán Bộ PCCC &amp; CNCH</h1>
+      <p id="hero-subtitle" class="portal-chooser-subtitle">
+        Hệ thống điều khiển thi đấu, chấm điểm và trả lời trắc nghiệm trực tiếp đa thiết bị.
+      </p>
+    </header>
 
-    <main class="stage-main">
-      <section class="stage-hero">
-        <h1 id="hero-title" class="stage-title">Đấu Trường Tri Thức</h1>
-        <p id="hero-subtitle" class="stage-subtitle">Hội thi tìm hiểu kiến thức tổng hợp</p>
-      </section>
+    <div class="portal-cards-grid">
+      <!-- Host Portal -->
+      <a href="./host.html" class="portal-card">
+        <div>
+          <span class="portal-card-badge">Máy chiếu PC / Dẫn chương trình</span>
+          <div class="portal-card-icon">🖥</div>
+          <h2 class="portal-card-title">Dẫn Chương Trình</h2>
+          <p class="portal-card-desc">
+            Điều khiển toàn bộ tiến trình hội thi, hiển thị câu hỏi trên màn hình LED lớn, phát lệnh tính giờ và công bố kết quả.
+          </p>
+        </div>
+        <div class="portal-card-cta">
+          <span>Vào màn hình MC</span>
+          <span>→</span>
+        </div>
+      </a>
 
-      <section class="rounds-info-grid" aria-label="Thông tin các vòng thi">
-        <article class="round-info-card">
-          <span class="round-info-badge">Vòng 1</span>
-          <h2 id="info-round1-name" class="round-info-title">Vòng 1: Khởi Động</h2>
-          <p id="info-round1-desc" class="round-info-desc"></p>
-        </article>
+      <!-- Judge Portal -->
+      <a href="./judge.html" class="portal-card">
+        <div>
+          <span class="portal-card-badge">Máy tính bảng iPad / Giám khảo</span>
+          <div class="portal-card-icon">📋</div>
+          <h2 class="portal-card-title">Ban Giám Khảo</h2>
+          <p class="portal-card-desc">
+            Chấm điểm nội dung và hình thức trực tiếp cho các đội thi theo thời gian thực ở Vòng 1 và Vòng 3; theo dõi bảng điểm Vòng 2.
+          </p>
+        </div>
+        <div class="portal-card-cta">
+          <span>Vào cổng Giám khảo</span>
+          <span>→</span>
+        </div>
+      </a>
 
-        <article class="round-info-card">
-          <span class="round-info-badge">Vòng 2</span>
-          <h2 id="info-round2-name" class="round-info-title">Vòng 2: Vượt Chướng Ngại Vật</h2>
-          <p id="info-round2-desc" class="round-info-desc"></p>
-        </article>
-
-        <article class="round-info-card">
-          <span class="round-info-badge">Vòng 3</span>
-          <h2 id="info-round3-name" class="round-info-title">Vòng 3: Tăng Tốc &amp; Về Đích</h2>
-          <p id="info-round3-desc" class="round-info-desc"></p>
-        </article>
-      </section>
-    </main>
+      <!-- Team Portal -->
+      <a href="./team.html" class="portal-card">
+        <div>
+          <span class="portal-card-badge">Máy tính bảng iPad / Đội thi</span>
+          <div class="portal-card-icon">📱</div>
+          <h2 class="portal-card-title">Đội Thi Đấu</h2>
+          <p class="portal-card-desc">
+            Đăng nhập theo tên đội, theo dõi câu hỏi và bấm nút A / B / C / D để trả lời trực tiếp trong phần thi trắc nghiệm Vòng 2.
+          </p>
+        </div>
+        <div class="portal-card-cta">
+          <span>Vào cổng Đội thi</span>
+          <span>→</span>
+        </div>
+      </a>
+    </div>
   </div>
 
   <script type="module">
-    import { fetchQuizData, wireStageLayout } from "./js/app.js";
+    import { fetchQuizData } from "./js/app.js";
 
-    async function renderHome(forceRefresh = false) {
-      const data = await fetchQuizData({ forceRefresh });
-      const cfg = data.config;
-
-      document.title = `${cfg.show_title} - Trang chủ`;
-      document.getElementById("hero-title").textContent = cfg.show_title;
-      document.getElementById("hero-subtitle").textContent = cfg.show_subtitle || "";
-
-      document.getElementById("info-round1-name").textContent = cfg.round1_name;
-      document.getElementById("info-round1-desc").textContent = cfg.round1_description || "";
-
-      document.getElementById("info-round2-name").textContent = cfg.round2_name;
-      document.getElementById("info-round2-desc").textContent = cfg.round2_description || "";
-
-      document.getElementById("info-round3-name").textContent = cfg.round3_name;
-      document.getElementById("info-round3-desc").textContent = cfg.round3_description || "";
-
-      wireStageLayout({
-        activePage: "home",
-        config: cfg,
-        onReload: () => renderHome(true)
-      });
+    async function initHome() {
+      try {
+        const data = await fetchQuizData({ portal: "host" });
+        if (data?.config?.show_title) {
+          document.title = `${data.config.show_title} - Cổng truy cập`;
+          document.getElementById("hero-title").textContent = data.config.show_title;
+        }
+        if (data?.config?.show_subtitle) {
+          document.getElementById("hero-subtitle").textContent = data.config.show_subtitle;
+        }
+      } catch {
+        // Fallback to static text
+      }
     }
 
-    renderHome(false);
+    initHome();
   </script>
 </body>
 </html>

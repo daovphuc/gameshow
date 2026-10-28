@@ -157,16 +157,18 @@ test("normaliseRound3 parses numbers, applies defaults, resolves image_url, has 
   assert.equal(tiles[1].image_url, "images/cau-2.jpg");
 });
 
-test("sample CSV files in data/sample parse and normalise cleanly with 12 teams, 24 team-owned round-1 packages, 50 round-3 questions, and no answer fields", () => {
+test("sample CSV files in data/sample parse and normalise cleanly with 12 teams, 3 judges, 2 round-2 sets of 10 questions, 24 team-owned round-1 packages, and 15 round-3 questions", () => {
   const sampleDir = path.resolve("data/sample");
   const teamsCsv = fs.readFileSync(path.join(sampleDir, "teams.csv"), "utf8");
   const round1Csv = fs.readFileSync(path.join(sampleDir, "round1.csv"), "utf8");
+  const round2Csv = fs.readFileSync(path.join(sampleDir, "round2.csv"), "utf8");
   const round3Csv = fs.readFileSync(path.join(sampleDir, "round3.csv"), "utf8");
+  const judgesCsv = fs.readFileSync(path.join(sampleDir, "judges.csv"), "utf8");
   const configCsv = fs.readFileSync(path.join(sampleDir, "config.csv"), "utf8");
-  const scoresCsv = fs.readFileSync(path.join(sampleDir, "scores.csv"), "utf8");
 
-  const data = normaliseAllData({ teamsCsv, round1Csv, round3Csv, configCsv, scoresCsv });
+  const data = normaliseAllData({ teamsCsv, round1Csv, round2Csv, round3Csv, judgesCsv, configCsv });
   assert.equal(data.teams.length, 12);
+  assert.equal(data.judges.length, 3);
   assert.equal(data.round1Packages.length, 24);
   for (const pkg of data.round1Packages) {
     assert.ok(pkg.team_id);
@@ -174,12 +176,13 @@ test("sample CSV files in data/sample parse and normalise cleanly with 12 teams,
     assert.equal("answer" in pkg, false);
     assert.equal("answer" in pkg.questions[0], false);
   }
-  assert.equal(data.round3Questions.length, 50);
+  assert.equal(data.round2Questions.length, 20);
+  assert.equal(data.round3Questions.length, 15);
   for (const tile of data.round3Questions) {
     assert.equal("answer" in tile, false);
   }
-  assert.equal(data.config.round1_time_seconds, 15);
-  assert.equal(data.config.round3_time_seconds, 20);
+  assert.equal(data.config.round1_time_seconds, 900);
+  assert.equal(data.config.round2_time_seconds, 30);
+  assert.equal(data.config.round3_time_seconds, 420);
   assert.equal(data.config.warning_seconds, 5);
-  assert.equal(Object.keys(data.scores).length, 12);
 });

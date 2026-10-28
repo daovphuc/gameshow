@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Vòng 3 - Đấu Trường Tri Thức</title>
+  <title>Vòng 3 - Dẫn Chương Trình</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Noto+Serif:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet" />
@@ -34,6 +34,7 @@
       closeRound3Tile
     } from "./js/state.js";
     import { createTimer, startTimer, tickTimer, formatTimer } from "./js/timer.js";
+    import { set, update, listen, getServerTime } from "./js/backend.js";
 
     const SELECTED_TEAM_KEY = "gameshow_r3_selected_team";
 
@@ -67,14 +68,26 @@
         return false;
       }
       const warnSec = Number(quizData?.config?.warning_seconds) || 5;
-      currentTimer = startTimer(currentTimer, Date.now());
+      const now = getServerTime();
+      currentTimer = startTimer(currentTimer, now);
       updateTimerDom();
       stopTimerLoop();
+
+      // Publish live timer for judges and secondary screens
+      update("live/round3", {
+        timer: {
+          startedAt: now,
+          durationSeconds: currentTimer.totalSeconds,
+          status: "running"
+        }
+      });
+
       timerInterval = setInterval(() => {
-        currentTimer = tickTimer(currentTimer, Date.now(), warnSec);
+        currentTimer = tickTimer(currentTimer, getServerTime(), warnSec);
         updateTimerDom();
         if (currentTimer.finished) {
           stopTimerLoop();
+          update("live/round3/timer", { status: "finished" });
         }
       }, 100);
       return true;
@@ -120,24 +133,36 @@
         gameState = updateRound3TileSession(gameState, { selectedTeamId });
         saveAppState(gameState);
       }
+      syncLiveState();
+    }
+
+    function syncLiveState() {
+      update("live", {
+        currentRound: "round3",
+        stageTeamId: selectedTeamId || null,
+        "round3/openedTiles": gameState.round3.openedTiles || [],
+        "round3/activeTile": gameState.round3.activeTile || null
+      });
     }
 
     function handleBack() {
       if (gameState.round3.activeTile) {
         gameState = closeRound3Tile(gameState);
         saveAppState(gameState);
+        syncLiveState();
         stopTimerLoop();
         activeTimerKey = null;
         renderStage();
         return;
       }
-      window.location.href = "./round1.html";
+      window.location.href = "./round2.html";
     }
 
     function handleContinue() {
       if (gameState.round3.activeTile) {
         gameState = closeRound3Tile(gameState);
         saveAppState(gameState);
+        syncLiveState();
         stopTimerLoop();
         activeTimerKey = null;
         renderStage();
@@ -185,7 +210,7 @@
           <div>
             <h1 class="section-title">${escapeHtml(quizData.config.round3_name)}</h1>
             <p class="section-subtitle">
-              Chọn đội đang trả lời từ danh sách thả xuống, sau đó bấm mở ô câu hỏi trên bảng.
+              Chọn đội đang trả lời từ danh sách thả xuống, sau đó bấm mở ô câu hỏi tình huống trên bảng.
             </p>
           </div>
         </div>
@@ -211,8 +236,13 @@
       container.querySelectorAll(".tile-btn:not(.opened)").forEach((btn) => {
         btn.addEventListener("click", () => {
           const num = Number(btn.dataset.tileNumber);
+          const tile = quizData.round3Questions.find((q) => q.number === num);
           gameState = openRound3Tile(gameState, num, selectedTeamId || quizData.teams[0]?.id || null);
+          if (tile && gameState.round3.activeTile) {
+            gameState.round3.activeTile.question = tile.question;
+          }
           saveAppState(gameState);
+          syncLiveState();
           renderStage();
         });
       });
@@ -223,6 +253,7 @@
       if (!tile) {
         gameState = closeRound3Tile(gameState);
         saveAppState(gameState);
+        syncLiveState();
         renderStage();
         return;
       }
@@ -232,11 +263,10 @@
 
       container.innerHTML = `
         <div class="question-stage">
-          <!-- Top Bar: Back + Team Dropdown top-left; Countdown + Continue top-right -->
           <div class="screen-action-bar">
             <div class="screen-left-group">
               <button type="button" id="btn-screen-back" class="btn">
-                ← Quay lại
+                ← Quay lại bảng ô số
               </button>
               <span class="meta-pill accent">Ô số #${tile.number} • ${tile.points} điểm</span>
               <div class="team-select-group">
@@ -257,7 +287,7 @@
               </div>
 
               <button type="button" id="btn-screen-continue" class="btn btn-primary btn-lg">
-                Tiếp tục →
+                Đóng ô câu hỏi →
               </button>
             </div>
           </div>
@@ -300,6 +330,7 @@
       wireStageLayout({
         activePage: "round3",
         config: quizData.config,
+        teams: quizData.teams,
         onBack: handleBack,
         onContinue: handleContinue,
         onReload: () => initRound3(true),
@@ -313,9 +344,25 @@
     }
 
     async function initRound3(forceRefresh = false) {
-      quizData = await fetchQuizData({ forceRefresh });
-      gameState = loadAppState(quizData.teams, quizData.scores);
+      quizData = await fetchQuizData({ forceRefresh, portal: "host" });
+      gameState = loadAppState(quizData.teams);
       document.title = `${quizData.config.round3_name} - ${quizData.config.show_title}`;
+
+      update("live", {
+        currentRound: "round3"
+      });
+
+      listen("live/round3", (remoteR3) => {
+        if (!remoteR3) return;
+        if (Array.isArray(remoteR3.openedTiles)) {
+          gameState.round3.openedTiles = remoteR3.openedTiles;
+        }
+        if (remoteR3.activeTile !== undefined) {
+          gameState.round3.activeTile = remoteR3.activeTile;
+        }
+        saveAppState(gameState);
+      });
+
       renderStage();
     }
 

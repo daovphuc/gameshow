@@ -2,7 +2,8 @@
 
 import { DEFAULT_CONFIG, TEAM_PALETTE } from "./config.js";
 import { parseCsv } from "./csv.js";
-import { normaliseScores } from "./scores.js";
+import { normaliseRound2 } from "./round2.js";
+import { normaliseJudges } from "./judges.js";
 
 function toRows(input) {
   if (typeof input === "string") {
@@ -60,10 +61,18 @@ export function normaliseConfig(input = []) {
 
   const numericKeys = new Set([
     "round1_time_seconds",
-    "round3_time_seconds",
     "round1_default_points",
-    "round3_default_points",
+    "round1_max_content",
+    "round1_max_manner",
     "round1_packages_offered",
+    "round2_time_seconds",
+    "round2_max_points",
+    "round2_min_points",
+    "round2_divisor",
+    "round3_time_seconds",
+    "round3_default_points",
+    "round3_max_content",
+    "round3_max_manner",
     "warning_seconds"
   ]);
 
@@ -119,11 +128,10 @@ export function normaliseTeams(input = []) {
 
 /**
  * Normalises rows from the `round1` tab into single-question team packages.
- * - Required fields per row: `package`, `team_id`, `question` (rows without `team_id` are skipped).
+ * - Required fields per row: `package`, `team_id`, `question`.
  * - Optional fields: `image_url`, `time_seconds`, `points`.
- * - Packages are keyed as `<team_id>::<package>` so every team can have its own "Gói A", "Gói B".
- * - Rule for duplicate rows of the same package key: the FIRST valid row wins; extra rows for the
- *   same package are ignored so a package never has more than one question.
+ * - Packages are keyed as `<team_id>::<package>`.
+ * - Rule for duplicate rows of the same package key: the FIRST valid row wins.
  * @param {Array<Record<string, any>>|string} input
  * @param {Record<string, any>} [config]
  * @returns {Array<{
@@ -198,7 +206,6 @@ export function normaliseRound1(input = [], config = DEFAULT_CONFIG) {
 
 /**
  * Returns Round 1 packages belonging to `teamId` that have not yet been picked.
- * Every package belongs to one team (`pkg.team_id === teamId`); there is no shared pool.
  * @param {Array<{id?: string, package: string, team_id?: string, questions: Array<any>}>} packages
  * @param {string} teamId
  * @param {Iterable<string>} [pickedPackages]
@@ -233,7 +240,7 @@ export function getOfferedPackages(packages = [], teamId, pickedPackages = [], l
 export const getPackagesForTeam = getOfferedPackages;
 
 /**
- * Normalises rows from the `round3` tab into ordered question tiles.
+ * Normalises rows from the `round3` tab into ordered situation question tiles.
  * Required fields: number, question.
  * Optional fields: image_url, time_seconds, points.
  * @param {Array<Record<string, any>>|string} input
@@ -284,26 +291,37 @@ export function normaliseRound3(input = [], config = DEFAULT_CONFIG) {
 
 /**
  * Normalises all sheet tabs together.
- * @param {{teamsCsv?: any, round1Csv?: any, round3Csv?: any, configCsv?: any, scoresCsv?: any}} raw
+ * @param {{
+ *   teamsCsv?: any,
+ *   round1Csv?: any,
+ *   round2Csv?: any,
+ *   round3Csv?: any,
+ *   judgesCsv?: any,
+ *   configCsv?: any
+ * }} raw
  */
 export function normaliseAllData({
   teamsCsv = [],
   round1Csv = [],
+  round2Csv = [],
   round3Csv = [],
-  configCsv = [],
-  scoresCsv = []
+  judgesCsv = [],
+  configCsv = []
 } = {}) {
   const config = normaliseConfig(configCsv);
   const teams = normaliseTeams(teamsCsv);
   const round1Packages = normaliseRound1(round1Csv, config);
+  const round2Questions = normaliseRound2(round2Csv, config);
   const round3Questions = normaliseRound3(round3Csv, config);
-  const scores = normaliseScores(scoresCsv, teams);
+  const judges = normaliseJudges(judgesCsv);
 
   return {
     config,
     teams,
     round1Packages,
+    round2Questions,
     round3Questions,
-    scores
+    judges,
+    scores: {}
   };
 }

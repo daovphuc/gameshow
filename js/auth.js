@@ -5,6 +5,12 @@ import { DEFAULT_PASSWORD_SHA256 } from "./config.js";
 
 export { DEFAULT_PASSWORD_SHA256 };
 
+export const PORTALS = {
+  HOST: "host",
+  JUDGE: "judge",
+  TEAM: "team"
+};
+
 function getSubtleCrypto(customSubtle) {
   if (customSubtle) return customSubtle;
   if (globalThis.crypto && globalThis.crypto.subtle) {
@@ -28,25 +34,71 @@ export async function sha256Hex(text, subtleCrypto) {
 }
 
 /**
- * Resolves the active SHA-256 password hash: `config.password_sha256` overrides `defaultHash`.
+ * Resolves the active SHA-256 password hash for a specific portal:
+ * Checks `config.password_<portal>_sha256`, falls back to `config.password_sha256`, falls back to `defaultHash`.
  * Normalises to lowercase trimmed hex.
+ * @param {"host"|"judge"|"team"|string} portal
+ * @param {Record<string, any>} [config]
+ * @param {string} [defaultHash]
+ * @returns {string}
+ */
+export function resolvePortalPasswordHash(portal = "host", config = {}, defaultHash = DEFAULT_PASSWORD_SHA256) {
+  const portalKey = `password_${String(portal).toLowerCase()}_sha256`;
+  const portalOverride =
+    config && config[portalKey] !== undefined && config[portalKey] !== null
+      ? String(config[portalKey]).trim().toLowerCase()
+      : "";
+  if (portalOverride) {
+    return portalOverride;
+  }
+
+  const generalOverride =
+    config && config.password_sha256 !== undefined && config.password_sha256 !== null
+      ? String(config.password_sha256).trim().toLowerCase()
+      : "";
+  if (generalOverride) {
+    return generalOverride;
+  }
+
+  return String(defaultHash || DEFAULT_PASSWORD_SHA256).trim().toLowerCase();
+}
+
+/**
+ * Resolves the active SHA-256 password hash (defaults to host portal).
  * @param {Record<string, any>} [config]
  * @param {string} [defaultHash]
  * @returns {string}
  */
 export function resolvePasswordHash(config = {}, defaultHash = DEFAULT_PASSWORD_SHA256) {
-  const fromConfig =
-    config && config.password_sha256 !== undefined && config.password_sha256 !== null
-      ? String(config.password_sha256).trim().toLowerCase()
-      : "";
-  if (fromConfig) {
-    return fromConfig;
-  }
-  return String(defaultHash || DEFAULT_PASSWORD_SHA256).trim().toLowerCase();
+  return resolvePortalPasswordHash("host", config, defaultHash);
 }
 
 /**
- * Checks whether a candidate password matches the expected SHA-256 hash (case-insensitive hex).
+ * Checks whether a candidate password matches the expected SHA-256 hash for a specific portal.
+ * @param {string} candidatePassword
+ * @param {"host"|"judge"|"team"|string} portal
+ * @param {Record<string, any>} [config]
+ * @param {string} [defaultHash]
+ * @param {SubtleCrypto} [subtleCrypto]
+ * @returns {Promise<boolean>}
+ */
+export async function verifyPortalPassword(
+  candidatePassword,
+  portal = "host",
+  config = {},
+  defaultHash = DEFAULT_PASSWORD_SHA256,
+  subtleCrypto
+) {
+  if (typeof candidatePassword !== "string" || candidatePassword.length === 0) {
+    return false;
+  }
+  const expected = resolvePortalPasswordHash(portal, config, defaultHash);
+  const actual = await sha256Hex(candidatePassword, subtleCrypto);
+  return actual.toLowerCase() === expected.toLowerCase();
+}
+
+/**
+ * Checks whether a candidate password matches the expected SHA-256 hash (defaults to host portal).
  * @param {string} candidatePassword
  * @param {Record<string, any>} [config]
  * @param {string} [defaultHash]
@@ -59,10 +111,5 @@ export async function verifyPassword(
   defaultHash = DEFAULT_PASSWORD_SHA256,
   subtleCrypto
 ) {
-  if (typeof candidatePassword !== "string" || candidatePassword.length === 0) {
-    return false;
-  }
-  const expected = resolvePasswordHash(config, defaultHash);
-  const actual = await sha256Hex(candidatePassword, subtleCrypto);
-  return actual.toLowerCase() === expected.toLowerCase();
+  return verifyPortalPassword(candidatePassword, "host", config, defaultHash, subtleCrypto);
 }

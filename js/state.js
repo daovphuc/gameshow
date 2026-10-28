@@ -1,6 +1,9 @@
-// Pure game state management for Round 1, Round 2 (manual), Round 3, locks, and JSON backup.
+// Pure game state management for Round 1, Round 2, Round 3, judge scores,
+// penalties, locks, and live sync (DOM-free).
 
 import { getOfferedPackages } from "./data.js";
+import { calculateTeamRoundScore } from "./judges.js";
+import { calculateRound2Score } from "./round2.js";
 
 function cloneState(state) {
   return JSON.parse(JSON.stringify(state));
@@ -38,14 +41,36 @@ export function createInitialState(teams = []) {
   }
 
   return {
-    version: 1,
+    version: 2,
+    currentRound: "round1",
     scores,
     answeredQuestions: {},
+    judgeScores: {
+      round1: {},
+      round3: {}
+    },
+    penalties: {
+      round1: {},
+      round3: {}
+    },
+    manualOverrides: {
+      round2: {}
+    },
     round1: {
       lockedTeams: [],
       pickedPackages: [],
       teamPackages: {},
       activeSession: null
+    },
+    round2: {
+      activeSet: "1",
+      currentQuestionIndex: 0,
+      activeQuestion: null,
+      shownAt: null,
+      deadline: null,
+      answers: {},
+      results: null,
+      history: []
     },
     round3: {
       openedTiles: [],
@@ -273,8 +298,6 @@ export function closeRound3Tile(state) {
 
 /**
  * Records a Correct/Wrong answer for a team in a given round.
- * Correct adds `points` to that team's score in `round`; Wrong adds 0.
- * If `questionKey` is provided, re-marking the same question key updates the previous decision cleanly.
  * @param {object} state
  * @param {{round: number|string, teamId: string, points: number, correct: boolean, questionKey?: string}} params
  */
@@ -341,7 +364,11 @@ export function setRoundScore(state, teamId, round, score) {
  * @param {number} score
  */
 export function setRound2Score(state, teamId, score) {
-  return setRoundScore(state, teamId, 2, score);
+  const next = setRoundScore(state, teamId, 2, score);
+  if (!next.manualOverrides) next.manualOverrides = {};
+  if (!next.manualOverrides.round2) next.manualOverrides.round2 = {};
+  next.manualOverrides.round2[teamId] = Number(score) || 0;
+  return next;
 }
 
 /**
@@ -356,6 +383,50 @@ export function adjustRoundScore(state, teamId, round, delta) {
   const next = cloneState(state);
   ensureTeamEntry(next.scores, teamId);
   next.scores[teamId][roundKey] += Number(delta) || 0;
+  return next;
+}
+
+/**
+ * Sets a judge score for a team in Round 1 or Round 3.
+ * @param {object} state
+ * @param {{
+ *   round: "round1"|"round3"|1|3,
+ *   teamId: string,
+ *   judgeId: string,
+ *   content: number,
+ *   manner: number
+ * }} params
+ */
+export function setJudgeScore(state, { round, teamId, judgeId, content, manner }) {
+  const roundKey = normaliseRoundKey(round);
+  const next = cloneState(state);
+  if (!next.judgeScores) next.judgeScores = { round1: {}, round3: {} };
+  if (!next.judgeScores[roundKey]) next.judgeScores[roundKey] = {};
+  if (!next.judgeScores[roundKey][teamId]) next.judgeScores[roundKey][teamId] = {};
+
+  next.judgeScores[roundKey][teamId][judgeId] = {
+    content: Number(content) || 0,
+    manner: Number(manner) || 0
+  };
+
+  return next;
+}
+
+/**
+ * Sets a team's penalty for overtime or infractions (Điều 19).
+ * @param {object} state
+ * @param {{
+ *   round: "round1"|"round3"|1|3,
+ *   teamId: string,
+ *   penalty: number
+ * }} params
+ */
+export function setTeamPenalty(state, { round, teamId, penalty }) {
+  const roundKey = normaliseRoundKey(round);
+  const next = cloneState(state);
+  if (!next.penalties) next.penalties = { round1: {}, round3: {} };
+  if (!next.penalties[roundKey]) next.penalties[roundKey] = {};
+  next.penalties[roundKey][teamId] = Math.max(0, Number(penalty) || 0);
   return next;
 }
 
@@ -412,7 +483,7 @@ export function unlockRound3Tile(state, tileNumber) {
 }
 
 /**
- * Resets the entire game state back to zero.
+ * Resets the entire game state back to initial.
  * @param {Array<{id: string}>} [teams]
  */
 export function resetState(teams = []) {
@@ -453,12 +524,25 @@ export function importState(jsonString) {
   }
 
   return {
-    version: Number(parsed.version) || 1,
+    version: Number(parsed.version) || 2,
+    currentRound: parsed.currentRound || "round1",
     scores,
     answeredQuestions:
       parsed.answeredQuestions && typeof parsed.answeredQuestions === "object"
         ? { ...parsed.answeredQuestions }
         : {},
+    judgeScores:
+      parsed.judgeScores && typeof parsed.judgeScores === "object"
+        ? { ...parsed.judgeScores }
+        : { round1: {}, round3: {} },
+    penalties:
+      parsed.penalties && typeof parsed.penalties === "object"
+        ? { ...parsed.penalties }
+        : { round1: {}, round3: {} },
+    manualOverrides:
+      parsed.manualOverrides && typeof parsed.manualOverrides === "object"
+        ? { ...parsed.manualOverrides }
+        : { round2: {} },
     round1: {
       lockedTeams: Array.isArray(parsed.round1?.lockedTeams)
         ? parsed.round1.lockedTeams.map(String)
@@ -472,6 +556,16 @@ export function importState(jsonString) {
           : {},
       activeSession: parsed.round1?.activeSession || null
     },
+    round2: {
+      activeSet: String(parsed.round2?.activeSet || "1"),
+      currentQuestionIndex: Number(parsed.round2?.currentQuestionIndex) || 0,
+      activeQuestion: parsed.round2?.activeQuestion || null,
+      shownAt: parsed.round2?.shownAt || null,
+      deadline: parsed.round2?.deadline || null,
+      answers: parsed.round2?.answers || {},
+      results: parsed.round2?.results || null,
+      history: Array.isArray(parsed.round2?.history) ? parsed.round2.history : []
+    },
     round3: {
       openedTiles: Array.isArray(parsed.round3?.openedTiles)
         ? parsed.round3.openedTiles.map(Number).filter(Number.isFinite)
@@ -479,4 +573,81 @@ export function importState(jsonString) {
       activeTile: parsed.round3?.activeTile || null
     }
   };
+}
+
+/**
+ * Pure function deriving each team's round1, round2, round3, and total scores
+ * from the authoritative live data:
+ * - Round 1: average of judges who scored (content + manner) minus penalty (or existing score if no judges)
+ * - Round 2: stored round-2 score unless manual override exists
+ * - Round 3: average of judges who scored (content + manner) minus penalty (or existing score if no judges)
+ * - Total: round1 + round2 + round3
+ *
+ * @param {{
+ *   teams?: Array<{id: string, name?: string}>,
+ *   live?: Record<string, any>,
+ *   config?: Record<string, any>
+ * }} params
+ * @returns {Record<string, {round1: number, round2: number, round3: number, total: number}>}
+ */
+export function computeTeamScores({ teams = [], live = {}, config = {} } = {}) {
+  const result = {};
+  const cfg = config || {};
+  const maxContentR1 = Number(cfg.round1_max_content) || 45;
+  const maxMannerR1 = Number(cfg.round1_max_manner) || 5;
+  const maxContentR3 = Number(cfg.round3_max_content) || 25;
+  const maxMannerR3 = Number(cfg.round3_max_manner) || 5;
+
+  for (const team of teams) {
+    if (!team || !team.id) continue;
+    const teamId = team.id;
+
+    // Round 1
+    const r1Judges = live?.judgeScores?.round1?.[teamId] || {};
+    const r1Penalty = Number(live?.penalties?.round1?.[teamId]) || 0;
+    const r1Calc = calculateTeamRoundScore({
+      judgeScores: r1Judges,
+      penalty: r1Penalty,
+      maxContent: maxContentR1,
+      maxManner: maxMannerR1
+    });
+
+    let r1Final = r1Calc.finalScore;
+    if (r1Calc.judgeCount === 0 && r1Penalty === 0 && live?.scores?.[teamId]?.round1 !== undefined) {
+      r1Final = Number(live.scores[teamId].round1) || 0;
+    }
+
+    // Round 2: manual override takes precedence over stored round2 score
+    let r2Final = Number(live?.scores?.[teamId]?.round2) || 0;
+    const r2Override = live?.manualOverrides?.round2?.[teamId];
+    if (r2Override !== undefined && r2Override !== null && String(r2Override).trim() !== "") {
+      r2Final = Number(r2Override) || 0;
+    }
+
+    // Round 3
+    const r3Judges = live?.judgeScores?.round3?.[teamId] || {};
+    const r3Penalty = Number(live?.penalties?.round3?.[teamId]) || 0;
+    const r3Calc = calculateTeamRoundScore({
+      judgeScores: r3Judges,
+      penalty: r3Penalty,
+      maxContent: maxContentR3,
+      maxManner: maxMannerR3
+    });
+
+    let r3Final = r3Calc.finalScore;
+    if (r3Calc.judgeCount === 0 && r3Penalty === 0 && live?.scores?.[teamId]?.round3 !== undefined) {
+      r3Final = Number(live.scores[teamId].round3) || 0;
+    }
+
+    const total = Math.round((r1Final + r2Final + r3Final) * 100) / 100;
+
+    result[teamId] = {
+      round1: r1Final,
+      round2: r2Final,
+      round3: r3Final,
+      total
+    };
+  }
+
+  return result;
 }
