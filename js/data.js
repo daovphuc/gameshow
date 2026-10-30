@@ -10,7 +10,9 @@ function toRows(input) {
   if (typeof input === "string") {
     return parseCsv(input);
   }
-  return Array.isArray(input) ? input : [];
+  if (Array.isArray(input)) return input;
+  if (input && typeof input === "object") return Object.entries(input).map(([key, value]) => ({ key, value }));
+  return [];
 }
 
 function parsePositiveNumber(value, fallback) {

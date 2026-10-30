@@ -36,7 +36,7 @@ function notifyStatus(next) {
 
 function getLocalTree() {
   if (typeof window === "undefined") {
-    return { live: createInitialState([]), sheetId: "" };
+    return { live: createInitialState([]), content: null };
   }
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -46,7 +46,7 @@ function getLocalTree() {
   } catch {
     // Ignore storage parse error
   }
-  const initial = { live: createInitialState([]), sheetId: "" };
+  const initial = { live: createInitialState([]), content: null };
   try {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initial));
   } catch {

@@ -2,24 +2,19 @@
 // theme application, connection status, collapsible left sidebar,
 // and right-side live leaderboard drawer with FLIP animation.
 
-import {
-  DEFAULT_SHEET_ID,
-  SHEET_TABS,
-  extractSheetId,
-  buildTabUrl
-} from "./config.js";
+import { CONTENT_TABS, SHEET_TABS } from "./config.js";
 import { getActiveSession, saveActiveSession, clearActiveSession, validateSession } from "./auth.js";
 import { normaliseAllData, resolveImageUrl } from "./data.js";
+import { contentToQuizData, isContentEmpty } from "./content.js";
 import { createInitialState, syncStateWithTeams, exportState, importState, computeTeamScores } from "./state.js";
 import { getTeamInitials, computeLeaderboard, diffLeaderboard } from "./leaderboard.js";
 import { LIGHT_THEME, mergeTheme, themeToCssVars } from "./theme.js";
 import { initBackend, listen, get, set, getServerTime, getConnectionStatus, onStatusChange } from "./backend.js";
 
 export const STORAGE_KEYS = {
-  SHEET_ID: "gameshow_sheet_id",
   SIDEBAR_COLLAPSED: "gameshow_sidebar_collapsed",
   STATE: "gameshow_state",
-  DATA_CACHE: "gameshow_data_cache_v3",
+  DATA_CACHE: "gameshow_data_cache_v4",
   AUTH_SESSION: "gameshow_auth_session",
   LEADERBOARD_DRAWER_OPEN: "gameshow_lb_panel_open"
 };
@@ -42,7 +37,7 @@ export function ensurePortalSession(portal = "host", accounts = []) {
   }
   // Valid login: reveal the page (css hides .app-shell until then).
   document.body.classList.add("auth-unlocked");
-  // Refresh display_name if updated in sheet
+  // Refresh display_name if updated
   if (validAccount.display_name && session.display_name !== validAccount.display_name) {
     session.display_name = validAccount.display_name;
     saveActiveSession(session);
@@ -69,36 +64,6 @@ export function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
-export function getSheetId() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    if (params.has("sheet")) {
-      const fromUrl = extractSheetId(params.get("sheet") || "");
-      localStorage.setItem(STORAGE_KEYS.SHEET_ID, fromUrl);
-      sessionStorage.removeItem(STORAGE_KEYS.DATA_CACHE);
-      return fromUrl;
-    }
-    const stored = localStorage.getItem(STORAGE_KEYS.SHEET_ID);
-    if (stored !== null) {
-      return extractSheetId(stored);
-    }
-  } catch {
-    // Ignore storage errors
-  }
-  return DEFAULT_SHEET_ID;
-}
-
-export function setSheetId(rawInput) {
-  const clean = extractSheetId(rawInput || "");
-  try {
-    localStorage.setItem(STORAGE_KEYS.SHEET_ID, clean);
-    sessionStorage.removeItem(STORAGE_KEYS.DATA_CACHE);
-  } catch {
-    // Ignore storage errors
-  }
-  return clean;
-}
-
 export function isSidebarCollapsed() {
   try {
     return localStorage.getItem(STORAGE_KEYS.SIDEBAR_COLLAPSED) === "1";
@@ -116,10 +81,10 @@ export function setSidebarCollapsed(collapsed) {
   document.body.classList.toggle("sidebar-collapsed", Boolean(collapsed));
 }
 
-export function applyResolvedTheme(sheetConfig = {}) {
+export function applyResolvedTheme(config = {}) {
   const resolved = mergeTheme({
     defaults: LIGHT_THEME,
-    sheet: sheetConfig,
+    sheet: config,
     local: {}
   });
   const vars = themeToCssVars(resolved);
@@ -132,79 +97,54 @@ export function applyResolvedTheme(sheetConfig = {}) {
 }
 
 /**
- * Fetches all contest data from Google Sheet or fallback sample CSVs.
- * Synchronises sheet ID from the database if configured.
+ * Loads default contest data from local sample CSV files.
+ * @param {boolean} forceRefresh
+ * @returns {Promise<Record<string, any>>}
+ */
+export async function fetchSampleQuizData(forceRefresh = false) {
+  const fetched = {};
+  await Promise.all(
+    CONTENT_TABS.map(async (tab) => {
+      const res = await fetch(`./data/sample/${encodeURIComponent(tab)}.csv`, {
+        cache: forceRefresh ? "no-store" : "default"
+      });
+      if (!res.ok) {
+        throw new Error(`Không thể tải dữ liệu mẫu tab "${tab}".`);
+      }
+      fetched[`${tab}Csv`] = await res.text();
+    })
+  );
+  return normaliseAllData(fetched);
+}
+
+/**
+ * Fetches contest data from live backend content node or falls back to sample CSVs.
  * @param {{forceRefresh?: boolean, portal?: string}} options
  */
 export async function fetchQuizData({ forceRefresh = false, portal = "host" } = {}) {
   await initBackend();
 
-  // Check if database has a shared sheet ID from the host
+  let remoteContent = null;
   try {
-    const sharedSheetId = await get("sheetId");
-    if (sharedSheetId && typeof sharedSheetId === "string" && sharedSheetId.trim()) {
-      const cleanShared = extractSheetId(sharedSheetId);
-      const current = getSheetId();
-      if (cleanShared && cleanShared !== current) {
-        setSheetId(cleanShared);
-      }
-    }
+    remoteContent = await get("content");
   } catch {
     // Ignore database read error
   }
 
-  const sheetId = getSheetId();
+  let data;
+  let isSample = false;
 
-  if (!forceRefresh) {
-    try {
-      const cachedRaw = sessionStorage.getItem(STORAGE_KEYS.DATA_CACHE);
-      if (cachedRaw) {
-        const cached = JSON.parse(cachedRaw);
-        if (cached && cached.sheetId === sheetId && cached.data) {
-          applyResolvedTheme(cached.data.config);
-          const session = portal ? ensurePortalSession(portal, cached.data.accounts) : getActiveSession();
-          return { ...cached.data, sheetId, isSample: !sheetId, session };
-        }
-      }
-    } catch {
-      // Ignore cache error
-    }
-  }
-
-  const fetched = {};
-  try {
-    await Promise.all(
-      SHEET_TABS.map(async (tab) => {
-        const url = buildTabUrl(tab, sheetId);
-        try {
-          const res = await fetch(url, { cache: forceRefresh ? "no-store" : "default" });
-          if (!res.ok) {
-            throw new Error(`Không thể tải dữ liệu tab "${tab}".`);
-          }
-          fetched[`${tab}Csv`] = await res.text();
-        } catch (err) {
-          throw err;
-        }
-      })
-    );
-  } catch (err) {
-    // Keep the login on a network error; the page shows the load error instead.
-    throw err;
-  }
-
-  const data = normaliseAllData(fetched);
-  try {
-    sessionStorage.setItem(
-      STORAGE_KEYS.DATA_CACHE,
-      JSON.stringify({ sheetId, data })
-    );
-  } catch {
-    // Ignore storage quota errors
+  if (remoteContent && !isContentEmpty(remoteContent)) {
+    data = contentToQuizData(remoteContent);
+    isSample = false;
+  } else {
+    data = await fetchSampleQuizData(forceRefresh);
+    isSample = true;
   }
 
   applyResolvedTheme(data.config);
   const session = portal ? ensurePortalSession(portal, data.accounts) : getActiveSession();
-  return { ...data, sheetId, isSample: !sheetId, session };
+  return { ...data, isSample, session };
 }
 
 export function loadAppState(teams = []) {
@@ -425,7 +365,6 @@ export function wireStageLayout({
       { id: "scores", href: "./scores.html", icon: "✎", label: "Điểm số" }
     ];
 
-    const sheetIdVal = escapeHtml(getSheetId());
     const showTitle = escapeHtml(config.show_title || "Hội thi PCCC và CNCH");
     const session = getActiveSession(undefined, "host");
     const displayName = session?.display_name || session?.username || "Dẫn chương trình";
@@ -473,32 +412,26 @@ export function wireStageLayout({
         </nav>
 
         <div class="sidebar-settings-section">
-          <details class="sidebar-details">
-            <summary>
-              <span>⚙ Cài đặt &amp; Dữ liệu</span>
-              <span style="font-size: 0.75rem; color: var(--text-muted);">▾</span>
-            </summary>
-            <div class="sidebar-settings-body">
-              <div>
-                <label class="sidebar-field-label" for="sidebar-sheet-id">Link Google Sheet</label>
-                <input
-                  type="text"
-                  id="sidebar-sheet-id"
-                  class="sidebar-input"
-                  value="${sheetIdVal}"
-                  placeholder="Dán link Google Sheet..."
-                />
-              </div>
-
-              <button type="button" id="btn-sidebar-save" class="btn btn-primary btn-sm" style="width: 100%;">
-                Lưu cài đặt
-              </button>
-
-              <button type="button" id="btn-reload-data" class="btn btn-sm" style="width: 100%;">
-                ↻ Tải lại dữ liệu
-              </button>
-            </div>
-          </details>
+          <div class="sidebar-section-title" style="padding: 0.5rem 0.85rem 0.25rem; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">
+            Cài đặt &amp; Dữ liệu
+          </div>
+          <a
+            href="./content.html"
+            class="sidebar-link ${activePage === "content" ? "active" : ""}"
+            title="Cấu hình nội dung"
+          >
+            <span class="sidebar-link-icon">⚙</span>
+            <span class="sidebar-link-label">Cấu hình nội dung</span>
+          </a>
+          <button
+            type="button"
+            id="btn-reload-data"
+            class="sidebar-link"
+            title="Tải lại dữ liệu"
+          >
+            <span class="sidebar-link-icon">↻</span>
+            <span class="sidebar-link-label">Tải lại dữ liệu</span>
+          </button>
         </div>
       </div>
 
@@ -553,42 +486,30 @@ export function wireStageLayout({
       }
     });
 
-    document.getElementById("btn-sidebar-save")?.addEventListener("click", async () => {
-      const rawSheet = document.getElementById("sidebar-sheet-id")?.value || "";
-      const cleanSheet = setSheetId(rawSheet);
-      const sheetInput = document.getElementById("sidebar-sheet-id");
-      if (sheetInput) sheetInput.value = cleanSheet;
-
-      // Share sheet ID to all devices via database
-      try {
-        await set("sheetId", cleanSheet);
-      } catch {
-        // Ignore DB write error
-      }
-
-      if (typeof onReload === "function") {
-        try {
-          await onReload();
-          showToast("Đã lưu cài đặt và đồng bộ tới toàn bộ thiết bị!");
-        } catch (err) {
-          showToast(err.message || "Không thể tải dữ liệu, vui lòng kiểm tra lại đường dẫn.");
-        }
-      } else {
-        showToast("Đã lưu cài đặt!");
-      }
-    });
-
     const reloadBtn = document.getElementById("btn-reload-data");
     if (reloadBtn && typeof onReload === "function") {
       reloadBtn.addEventListener("click", async () => {
         reloadBtn.disabled = true;
         try {
           await onReload();
-          showToast("Đã tải lại dữ liệu!");
+          showToast("Đã tải lại dữ liệu mới nhất!");
         } catch (err) {
-          showToast(err.message || "Không thể tải dữ liệu.");
+          showToast(err.message || "Không thể tải lại dữ liệu.");
         } finally {
           reloadBtn.disabled = false;
+        }
+      });
+    }
+
+    // Auto update when content changes in backend (unless we are editing on content.html)
+    if (activePage !== "content" && typeof onReload === "function") {
+      listen("content", async (newContent) => {
+        if (newContent) {
+          try {
+            await onReload();
+          } catch {
+            // Ignore background reload errors
+          }
         }
       });
     }
