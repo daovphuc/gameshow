@@ -3,7 +3,7 @@
 
 Website tĩnh tổ chức thi đấu chuyên nghiệp dành cho hội thi PCCC và CNCH qua 3 vòng thi, vận hành trực tiếp trên máy chiếu sân khấu và các thiết bị máy tính bảng (iPad) của Ban Giám khảo và các Đội thi, lưu trữ miễn phí trên **GitHub Pages**.
 
-Toàn bộ danh sách đội thi, câu hỏi, ban giám khảo và cấu hình được quản lý trực quan trên một **Google Sheet công khai (chế độ chỉ xem)**. Trạng thái thi đấu trực tiếp (câu hỏi hiện tại, đồng hồ đếm ngược, đáp án đội thi, điểm số ban giám khảo, bảng tổng sắp) được đồng bộ hóa tức thì (real-time) giữa tất cả các thiết bị qua **Firebase Realtime Database** (gói miễn phí Spark) hoặc tự động chạy **Chế độ thử trên 1 máy (Local Mode)** khi chưa cấu hình Firebase.
+Toàn bộ danh sách đội thi, gói câu hỏi, ban giám khảo, tài khoản và cấu hình được quản lý trực tiếp ngay trong ứng dụng qua trang **"Cấu hình nội dung" (`content.html`)**. Trạng thái thi đấu trực tiếp (câu hỏi hiện tại, đồng hồ đếm ngược, đáp án đội thi, điểm số ban giám khảo, bảng tổng sắp) được đồng bộ hóa tức thì (real-time) giữa tất cả các thiết bị qua **Firebase Realtime Database** (gói miễn phí Spark) hoặc tự động chạy **Chế độ thử trên 1 máy (Local Mode)** khi chưa cấu hình Firebase.
 
 ---
 
@@ -15,11 +15,12 @@ Hệ thống được thiết kế tối ưu cho 3 vai trò sử dụng tại h�
    - Vận hành trên máy tính của người dẫn chương trình kết nối máy chiếu hoặc màn hình LED lớn.
    - Bao gồm các màn hình chuyên biệt:
      - `host.html`: Tổng quan 3 vòng thi và thông tin hội thi.
-     - `round1.html`: Vòng 1 — Tự giới thiệu & Khởi động (mỗi đội chọn 1 gói câu hỏi riêng).
+     - `round1.html`: Vòng 1 — Tuyên truyền PCCC (mỗi đội chọn 1 gói câu hỏi riêng).
      - `round2.html`: Vòng 2 — Trắc nghiệm kiến thức (chọn bộ đề, mở câu hỏi, đếm ngược đồng bộ tới tất cả iPad, tự động khóa khi hết giờ, công bố đáp án và thống kê số đội trả lời).
-     - `round3.html`: Vòng 3 — Xử lý tình huống (bảng 50 ô số tương tác).
+     - `round3.html`: Vòng 3 — Xử lý tình huống truyền thông (bảng ô số tương tác).
      - `leaderboard.html`: Bảng xếp hạng vinh danh Top 5 trên bục cúp chiến thắng với hoạt họa ánh kim sang trọng.
      - `scores.html`: Quản lý điểm số chi tiết từng giám khảo, trừ điểm vi phạm/quá giờ, ghi đè điểm sự cố và xuất báo cáo Excel CSV.
+     - `content.html`: Trình soạn thảo và quản trị nội dung trực tiếp dành cho MC.
    - **Thanh bảng điểm trực tiếp (Live Leaderboard Drawer)**: Xuất hiện ở cạnh phải của mọi màn hình MC, hỗ trợ mở/đóng nhanh bằng nút `★ Bảng điểm`, tích hợp hiệu ứng chuyển động mượt mà (FLIP animation) tự động tráo đổi vị trí các đội khi điểm số thay đổi.
 
 2. **Cổng Ban Giám khảo (`judge.html`)**:
@@ -61,7 +62,7 @@ Hệ thống sử dụng cơ sở dữ liệu thời gian thực **Firebase Real
 {
   "rules": {
     ".read": true,
-    "shared_sheet_id": {
+    "content": {
       ".write": true
     },
     "live": {
@@ -80,7 +81,8 @@ Hệ thống sử dụng cơ sở dữ liệu thời gian thực **Firebase Real
 ```
 3. Nhấn nút **Publish (Xuất bản)**.
    > **Tác dụng của quy tắc:**
-   > - Cho phép mọi thiết bị đọc trạng thái thi đấu trực tiếp.
+   > - Cho phép mọi thiết bị đọc cấu hình nội dung và trạng thái thi đấu trực tiếp.
+   > - Cho phép MC cập nhật cấu hình nội dung (`content`) và điều khiển trận đấu (`live`).
    > - Nghiêm cấm đội thi gửi đáp án lần 2 (chống sửa đáp án đã chọn).
    > - Tự động từ chối đáp án gửi sau khi hết thời gian đếm ngược (`now <= deadline`).
    > - Cho phép người dẫn chương trình xóa câu trả lời cũ khi chuyển câu hỏi mới.
@@ -120,48 +122,51 @@ export const firebaseConfig = {
 
 ---
 
-## 3. Cấu Hình Google Sheets
+## 3. Cấu Hình Nội Dung Trực Tiếp Trong Ứng Dụng (Trang `content.html`)
 
-Hệ thống đọc dữ liệu từ một bảng tính Google Sheet được chia sẻ ở chế độ **"Bất kỳ ai có đường liên kết đều có thể xem"**.
+Hệ thống tích hợp sẵn trình soạn thảo nội dung trực quan cho MC tại trang **"Cấu hình nội dung" (`content.html`)**, truy cập trực tiếp từ thanh bên (sidebar) của Dẫn chương trình trong mục **Cài đặt & Dữ liệu**.
 
-### Tạo Sheet từ mẫu có sẵn
-Tải file mẫu [`sheet-template/gameshow-template.xlsx`](./sheet-template/gameshow-template.xlsx) lên Google Drive, mở file và chọn **Tệp → Lưu dưới dạng Google Trang tính**.
+Toàn bộ dữ liệu được lưu trữ tại nút `content/` trên Firebase Realtime Database (hoặc bộ nhớ nội bộ ở chế độ Local Mode) và tự động đồng bộ tức thì tới tất cả các màn hình:
 
-Bảng tính gồm 7 tab:
-1. `teams`: Danh sách các đội thi (`id`, `name`, `image_url`, `color`).
-2. `round1`: Câu hỏi Vòng 1 theo từng đội (`package`, `team_id`, `question`, `image_url`, `time_seconds`, `points`).
-3. `round2`: Ngân hàng câu hỏi trắc nghiệm Vòng 2 (`set`, `number`, `question`, `image_url`, `option_a`, `option_b`, `option_c`, `option_d`, `correct`, `time_seconds`).
-4. `round3`: Bảng câu hỏi tình huống Vòng 3 (`number`, `question`, `image_url`, `time_seconds`, `points`).
-5. `judges`: Danh sách Ban Giám khảo (`id`, `name`).
-6. `accounts`: Danh sách tài khoản người dùng (`username`, `password`, `role`, `ref_id`, `display_name`).
-7. `config`: Cấu hình tên chương trình, thời gian đếm ngược, thang điểm và giao diện.
+1. **Đội thi**: Thêm, sửa tên, xóa đội thi, chọn màu sắc đại diện và ảnh đại diện của đội. Ảnh không tải lên database: chép file ảnh vào thư mục `images/` của dự án rồi commit, sau đó nhập tên file (ví dụ `doi01.png`) hoặc một link https vào ô ảnh; trang hiển thị ảnh xem trước. Ảnh câu hỏi các vòng dùng cùng cách này.
+2. **Vòng 1**: Chỉnh sửa các gói câu hỏi (tên gói, đội sở hữu, nội dung câu hỏi, thời gian và điểm số).
+3. **Vòng 2**: Chỉnh sửa ngân hàng câu hỏi trắc nghiệm chia theo từng bộ đề (nội dung câu hỏi, 4 phương án lựa chọn A/B/C/D, đáp án đúng, thời gian làm bài).
+4. **Vòng 3**: Quản lý danh sách các ô tình huống truyền thông (số thứ tự ô, nội dung tình huống, thời gian suy nghĩ và điểm số).
+5. **Ban Giám khảo**: Thêm, sửa họ tên và mã định danh của các thành viên Ban Giám khảo.
+6. **Tài khoản**: Thêm, sửa tài khoản đăng nhập (tên đăng nhập, mật khẩu, vai trò và đối tượng liên kết) hoặc bấm **"⚡ Tạo lại tài khoản mặc định"** để tự động tạo tài khoản cho MC, từng giám khảo và từng đội thi.
+7. **Cài đặt chung**: Điều chỉnh tên hội thi, tiêu đề phụ, thời gian đếm ngược và thang điểm từng vòng thi.
+
+### Các nút chức năng tiện ích:
+- **💾 Lưu vào hệ thống**: Kiểm tra tính hợp lệ của toàn bộ dữ liệu (chống trùng ID, chống thiếu đáp án hoặc liên kết sai) rồi lưu vào cơ sở dữ liệu, đồng bộ ngay lập tức tới máy chiếu và tất cả iPad.
+- **↻ Nạp dữ liệu mẫu**: Tải lại dữ liệu mẫu chuẩn từ các file `data/sample/*.csv` vào trình soạn thảo (kèm hộp thoại xác nhận).
+- **⬇ Xuất / ⬆ Nhập file sao lưu (JSON)**: Cho phép sao lưu toàn bộ nội dung hội thi ra file JSON về máy tính và khôi phục lại bất kỳ lúc nào mà không cần kết nối mạng.
 
 ---
 
-## 4. Quản Lý Tài Khoản Đăng Nhập (Tab `accounts`)
+## 4. Quản Lý Tài Khoản Đăng Nhập
 
-Thay vì dùng mật khẩu chung cho từng cổng, hệ thống sử dụng cơ chế tài khoản riêng biệt trong tab `accounts`. Vai trò của tài khoản sẽ tự động quyết định cổng mà người dùng truy cập:
+Hệ thống sử dụng cơ chế tài khoản riêng biệt để phân quyền tự động cho từng thiết bị:
 
 - `username`: Tên đăng nhập (không phân biệt chữ hoa, chữ thường).
 - `password`: Mật khẩu đăng nhập dạng văn bản thuần (plain-text).
 - `role`: Vai trò người dùng, gồm 3 giá trị: `host` (Dẫn chương trình), `judge` (Ban Giám khảo), `team` (Đội thi).
-- `ref_id`: Mã giám khảo (tương ứng cột `id` trong tab `judges`) hoặc mã đội (tương ứng cột `id` trong tab `teams`); để trống đối với vai trò `host`.
+- `ref_id`: Mã giám khảo (vd: `gk-01`) hoặc mã đội (vd: `doi-01`); để trống đối với vai trò `host`.
 - `display_name`: Tên hiển thị người dùng (tùy chọn, tự động lấy theo tên giám khảo/đội thi nếu để trống).
 
 > ⚠️ **Cảnh báo bảo mật:**
-> Mật khẩu được lưu trữ dưới dạng văn bản thuần nhằm tạo sự tiện lợi tối đa cho Ban tổ chức không chuyên về kỹ thuật. Đây là cơ chế ngăn khán giả hoặc người lạ bấm nhầm vào trang điều khiển/chấm điểm. Bất kỳ ai có đường link Google Sheet đều có thể đọc được mật khẩu trong tab này.
+> Mật khẩu được lưu trữ dưới dạng văn bản thuần nhằm tạo sự tiện lợi tối đa cho Ban tổ chức không chuyên về kỹ thuật. Đây là cơ chế ngăn khán giả hoặc người lạ bấm nhầm vào trang điều khiển/chấm điểm. Cơ sở dữ liệu `content/` ở chế độ đọc công khai cho toàn bộ thiết bị dự thi.
 
-### Tài khoản mặc định (khi tab `accounts` bị thiếu hoặc trống)
-Nếu chưa cấu hình tài khoản trong sheet, hệ thống tự động khởi tạo các tài khoản mặc định sau với mật khẩu chung là `122345678910`:
+### Tài khoản mặc định (khi cơ sở dữ liệu trống hoặc bấm tạo lại)
+Hệ thống tự động khởi tạo các tài khoản mặc định sau với mật khẩu chung là `122345678910`:
 - **Dẫn chương trình:** `mc`
-- **Ban Giám khảo:** `gk1`, `gk2`, `gk3`... (tự động liên kết tương ứng từng giám khảo trong tab `judges`)
-- **Đội thi đấu:** `doi01`, `doi02`, `doi03`... (tự động liên kết tương ứng từng đội trong tab `teams`)
+- **Ban Giám khảo:** `gk1`, `gk2`, `gk3`... (tự động liên kết tương ứng từng giám khảo)
+- **Đội thi đấu:** `doi01`, `doi02`, `doi03`... (tự động liên kết tương ứng từng đội)
 
 ### Cơ chế ghi nhớ phiên và đồng bộ
 - Người dùng chỉ cần đăng nhập một lần trên thiết bị; thông tin đăng nhập được lưu an toàn trên máy cho đến khi bấm **"Đăng xuất"** (nút đăng xuất hiển thị rõ tên tài khoản hiện tại).
 - Giám khảo và đội thi khi đăng nhập sẽ vào thẳng danh tính của mình, loại bỏ hoàn toàn bước chọn danh tính thủ công.
 - Bất kỳ ai truy cập trực tiếp vào trang của cổng thi mà chưa đăng nhập đúng vai trò sẽ tự động được chuyển hướng về trang chủ `index.html`.
-- Khi Ban tổ chức chỉnh sửa tài khoản hoặc đổi mật khẩu trên Google Sheet, thay đổi sẽ có hiệu lực ngay sau khi bấm **"↻ Tải lại dữ liệu"** (hoặc tải lại trang); tài khoản bị xóa khỏi bảng tính hoặc bị đổi mật khẩu sẽ tự động bị đăng xuất.
+- Khi Ban tổ chức chỉnh sửa tài khoản hoặc đổi mật khẩu trong trang cấu hình nội dung, thay đổi sẽ có hiệu lực ngay lập tức.
 
 ---
 
@@ -218,7 +223,7 @@ Hệ thống tự động thực hiện đầy đủ các quy định theo Thể
 
 ## 8. Chạy Kiểm Thử Tự Động
 
-Kiểm tra toàn bộ 34 bài kiểm thử logic (không phụ thuộc DOM hay mạng):
+Kiểm tra toàn bộ các bài kiểm thử logic (không phụ thuộc DOM hay mạng):
 ```bash
 npm test
 ```

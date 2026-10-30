@@ -8,3 +8,4 @@ import "./auth.test.js";
 import "./round2.test.js";
 import "./judges.test.js";
 import "./report.test.js";
+import "./content.test.js";

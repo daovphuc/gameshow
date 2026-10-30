@@ -1,7 +1,7 @@
 {
   "rules": {
     ".read": true,
-    "shared_sheet_id": {
+    "content": {
       ".write": true
     },
     "live": {

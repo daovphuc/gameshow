@@ -86,6 +86,8 @@
 
   <script type="module">
     import { fetchQuizData, escapeHtml, logoutUser } from "./js/app.js";
+    import { contentToQuizData } from "./js/content.js";
+    import { listen } from "./js/backend.js";
     import {
       authenticate,
       getActiveSession,
@@ -196,6 +198,18 @@
       } catch {
         // Fallback to static text
       }
+
+      listen("content", (newContent) => {
+        if (newContent) {
+          quizData = contentToQuizData(newContent);
+          if (quizData?.config?.show_title) {
+            document.title = quizData.config.show_title;
+            const heroEl = document.getElementById("hero-title");
+            if (heroEl) heroEl.textContent = quizData.config.show_title;
+          }
+          renderActiveSession(quizData?.accounts || []);
+        }
+      });
 
       // Wire tile clicks
       document.querySelectorAll(".home-tile").forEach((tile) => {
