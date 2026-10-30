@@ -65,41 +65,13 @@ Hệ thống sử dụng cơ sở dữ liệu thời gian thực **Firebase Real
       ".write": true
     },
     "live": {
-      ".write": "!newData.exists() || !newData.hasChild('round2') || !newData.child('round2/answers').exists()",
-      "stage": {
-        ".write": true
-      },
-      "scores": {
-        ".write": true
-      },
-      "penalties": {
-        ".write": true
-      },
-      "judges": {
-        ".write": true
-      },
-      "round1": {
-        ".write": true
-      },
-      "round3": {
-        ".write": true
-      },
-      "round2": {
-        ".write": "!newData.child('answers').exists()",
-        "state": { ".write": true },
-        "set_id": { ".write": true },
-        "q_index": { ".write": true },
-        "question": { ".write": true },
-        "shownAt": { ".write": true },
-        "deadline": { ".write": true },
-        "stats": { ".write": true },
-        "results": { ".write": true },
-        "scores": { ".write": true },
-        "answers": {
-          ".write": "!newData.exists()",
-          "$teamId": {
-            ".write": "!data.exists() && newData.exists() && (!root.child('live/round2/deadline').exists() || now <= root.child('live/round2/deadline').val())"
-          }
+      ".write": true
+    },
+    "answers": {
+      ".write": "!newData.exists()",
+      "$questionKey": {
+        "$teamId": {
+          ".write": "!data.exists() && newData.exists() && $questionKey === root.child('live/round2/questionKey').val() && root.child('live/round2/status').val() === 'open' && (!root.child('live/round2/deadline').exists() || now <= root.child('live/round2/deadline').val()) && newData.child('answeredAt').val() === now"
         }
       }
     }
