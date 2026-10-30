@@ -342,6 +342,10 @@ export function wireLiveLeaderboardPanel({ teams = [], getLiveScores } = {}) {
  * Renders and wires the collapsible left sidebar, connection status badge,
  * and keyboard shortcuts on host pages.
  */
+let contentListenerStarted = false;
+let contentReloadHandler = null;
+let lastContentJson = null;
+
 export function wireStageLayout({
   activePage = "home",
   config = {},
@@ -501,17 +505,28 @@ export function wireStageLayout({
       });
     }
 
-    // Auto update when content changes in backend (unless we are editing on content.html)
+    // Auto update when content changes in backend (unless we are editing on content.html).
+    // Subscribe once per page: onReload re-renders and calls wireStageLayout again.
     if (activePage !== "content" && typeof onReload === "function") {
-      listen("content", async (newContent) => {
-        if (newContent) {
+      contentReloadHandler = onReload;
+      if (!contentListenerStarted) {
+        contentListenerStarted = true;
+        listen("content", async (newContent) => {
+          const serialized = JSON.stringify(newContent ?? null);
+          if (lastContentJson === null) {
+            // First callback carries the content this page was just rendered from.
+            lastContentJson = serialized;
+            return;
+          }
+          if (serialized === lastContentJson || !newContent) return;
+          lastContentJson = serialized;
           try {
-            await onReload();
+            await contentReloadHandler?.();
           } catch {
             // Ignore background reload errors
           }
-        }
-      });
+        });
+      }
     }
   }
 
