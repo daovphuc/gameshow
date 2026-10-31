@@ -18,7 +18,7 @@
         <div>
           <h1 class="section-title">⚙ Cấu Hình Nội Dung Hội Thi</h1>
           <p class="section-subtitle" style="margin-top: 0.25rem; font-size: 0.95rem; color: var(--text-muted);">
-            Quản trị danh sách đội thi, gói câu hỏi 3 vòng, ban giám khảo, tài khoản đăng nhập và cài đặt hội thi
+            Quản trị danh sách đội thi, thứ tự thi đấu, gói câu hỏi 3 vòng, ban giám khảo, tài khoản đăng nhập và cài đặt hội thi
           </p>
         </div>
       </div>
@@ -53,6 +53,9 @@
         <button type="button" class="editor-tab-btn active" data-tab="teams">
           👥 Đội thi (<span id="count-teams">0</span>)
         </button>
+        <button type="button" class="editor-tab-btn" data-tab="round_order">
+          📋 Thứ tự thi
+        </button>
         <button type="button" class="editor-tab-btn" data-tab="round1">
           ① Vòng 1 (<span id="count-round1">0</span>)
         </button>
@@ -80,6 +83,27 @@
           <button type="button" id="btn-add-team" class="btn btn-primary btn-sm">+ Thêm đội thi</button>
         </div>
         <div id="teams-list"></div>
+      </section>
+
+      <!-- Panel: Round Order -->
+      <section id="panel-round_order" class="editor-panel">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+          <div>
+            <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0;">Thứ tự thi &amp; Đội thi đấu từng vòng</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.2rem 0 0;">Thiết lập danh sách các đội tham gia và thứ tự thi đấu cho từng vòng thi (Vòng 1, Vòng 2, Vòng 3).</p>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button type="button" id="btn-reset-round-order" class="btn btn-sm">↻ Đặt lại theo danh sách đội</button>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem;">
+          <button type="button" class="btn btn-sm round-order-tab-btn active" data-order-round="round1">Vòng 1</button>
+          <button type="button" class="btn btn-sm round-order-tab-btn" data-order-round="round2">Vòng 2</button>
+          <button type="button" class="btn btn-sm round-order-tab-btn" data-order-round="round3">Vòng 3</button>
+        </div>
+
+        <div id="round-order-list"></div>
       </section>
 
       <!-- Panel: Round 1 -->
@@ -135,7 +159,7 @@
         <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
           <div>
             <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0;">Tài khoản đăng nhập</h2>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.2rem 0 0;">Quản lý tên đăng nhập, mật khẩu và liên kết tương ứng với Dẫn chương trình, Giám khảo hoặc Đội thi.</p>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.2rem 0 0;">Quản lý tên đăng nhập, mật khẩu và liên kết tương ứng với Dẫn chương trình, Giám khảo, Giám khảo tổng hoặc Đội thi.</p>
           </div>
           <div style="display: flex; gap: 0.5rem;">
             <button type="button" id="btn-gen-default-accounts" class="btn btn-sm" title="Tạo tự động tài khoản cho MC, từng giám khảo và từng đội thi">⚡ Tạo lại tài khoản mặc định</button>
@@ -155,6 +179,8 @@
     </main>
   </div>
 
+  <datalist id="preset-team-names"></datalist>
+
   <script type="module">
     import {
       fetchQuizData,
@@ -164,21 +190,30 @@
       wireStageLayout,
       ensurePortalSession
     } from "./js/app.js";
-    import { TEAM_PALETTE } from "./js/config.js";
+    import { TEAM_PALETTE, PRESET_TEAM_NAMES } from "./js/config.js";
     import { set, get } from "./js/backend.js";
     import {
       validateContent,
       csvToContent,
       exportContentToJson,
       importContentFromJson,
-      contentToQuizData
+      contentToQuizData,
+      getRoundTeams,
+      isTeamInRound
     } from "./js/content.js";
     import { generateDefaultAccounts } from "./js/auth.js";
     import { resolveImageUrl } from "./js/data.js";
 
+    // Populate preset team names datalist
+    const datalistEl = document.getElementById("preset-team-names");
+    if (datalistEl && Array.isArray(PRESET_TEAM_NAMES)) {
+      datalistEl.innerHTML = PRESET_TEAM_NAMES.map((name) => `<option value="${escapeHtml(name)}"></option>`).join("");
+    }
+
     // Working copy of content in editor
     let content = {
       teams: [],
+      round_order: { round1: [], round2: [], round3: [] },
       round1: [],
       round2: [],
       round3: [],
@@ -189,6 +224,7 @@
 
     let activeTab = "teams";
     let activeR2Set = "1";
+    let activeOrderRound = "round1";
 
     /**
      * Renders an image preview component with "Không tìm thấy ảnh" error state.
@@ -277,7 +313,7 @@
 
                 <div class="editor-field">
                   <label class="editor-label">Tên đội thi</label>
-                  <input type="text" class="editor-input" data-team-field="name" data-index="${idx}" value="${escapeHtml(team.name || '')}" placeholder="vd: Đội Sao Vàng" required />
+                  <input type="text" class="editor-input" data-team-field="name" data-index="${idx}" value="${escapeHtml(team.name || '')}" list="preset-team-names" placeholder="vd: Đội 01 - Cục Cảnh sát PCCC và CNCH" required />
                 </div>
 
                 <div class="editor-field">
@@ -358,7 +394,127 @@
           if (confirm(`Bạn có chắc muốn xóa đội "${content.teams[idx]?.name || 'này'}"?`)) {
             content.teams.splice(idx, 1);
             renderTeams();
+            renderRoundOrder();
             updateBadgeCounts();
+          }
+        });
+      });
+    }
+
+    function renderRoundOrder() {
+      const container = document.getElementById("round-order-list");
+      if (!container) return;
+
+      if (!content.round_order) {
+        content.round_order = { round1: [], round2: [], round3: [] };
+      }
+
+      // Ensure this round has an array; default to all teams if empty or undefined
+      if (!Array.isArray(content.round_order[activeOrderRound]) || content.round_order[activeOrderRound].length === 0) {
+        content.round_order[activeOrderRound] = content.teams.map((t) => t.id);
+      }
+
+      const currentOrderedIds = content.round_order[activeOrderRound];
+      const teamsMap = new Map(content.teams.map((t) => [t.id, t]));
+
+      const participating = currentOrderedIds
+        .map((id) => teamsMap.get(id))
+        .filter(Boolean);
+
+      const participatingIdSet = new Set(participating.map((t) => t.id));
+      const nonParticipating = content.teams.filter((t) => !participatingIdSet.has(t.id));
+
+      const roundLabel = activeOrderRound === "round1" ? "Vòng 1" : activeOrderRound === "round2" ? "Vòng 2" : "Vòng 3";
+
+      container.innerHTML = `
+        <div style="margin-bottom: 0.85rem; font-weight: 700; color: var(--text-muted); font-size: 0.95rem;">
+          Số đội tham gia ${roundLabel}: <span style="color: var(--accent); font-weight: 800; font-size: 1.1rem;">${participating.length}</span> / ${content.teams.length} đội
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+          ${participating
+            .map((team, idx) => {
+              return `
+                <div class="editor-card" style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; margin-bottom: 0;">
+                  <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <input type="checkbox" class="order-team-check" data-team-id="${escapeHtml(team.id)}" checked style="width: 18px; height: 18px; cursor: pointer;" title="Bỏ chọn để không tham gia vòng này" />
+                    <span style="font-weight: 800; font-size: 1rem; min-width: 2.2rem; color: var(--accent);">#${idx + 1}</span>
+                    <div style="width: 28px; height: 28px; border-radius: 50%; background-color: ${escapeHtml(team.color || '#D97757')}; display: inline-flex; align-items: center; justify-content: center; color: #FFF; font-weight: 700; font-size: 0.8rem;">
+                      ${escapeHtml((team.name || '?').substring(0, 2).toUpperCase())}
+                    </div>
+                    <div>
+                      <strong style="font-size: 1rem;">${escapeHtml(team.name)}</strong>
+                      <span style="font-size: 0.82rem; color: var(--text-muted); margin-left: 0.5rem;">(${escapeHtml(team.id)})</span>
+                    </div>
+                  </div>
+
+                  <div style="display: flex; gap: 0.35rem;">
+                    <button type="button" class="btn btn-sm btn-order-move" data-move-dir="-1" data-index="${idx}" ${idx === 0 ? "disabled" : ""} title="Chuyển lên">▲</button>
+                    <button type="button" class="btn btn-sm btn-order-move" data-move-dir="1" data-index="${idx}" ${idx === participating.length - 1 ? "disabled" : ""} title="Chuyển xuống">▼</button>
+                  </div>
+                </div>
+              `;
+            })
+            .join("")}
+
+          ${
+            nonParticipating.length > 0
+              ? `
+                <div style="margin-top: 1.25rem;">
+                  <h4 style="font-size: 0.95rem; color: var(--text-muted); margin: 0 0 0.5rem;">Đội không tham gia ${roundLabel} (tích chọn để đưa vào vòng thi):</h4>
+                  <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    ${nonParticipating
+                      .map(
+                        (team) => `
+                        <div class="editor-card" style="display: flex; align-items: center; padding: 0.6rem 1rem; opacity: 0.65; margin-bottom: 0;">
+                          <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <input type="checkbox" class="order-team-check" data-team-id="${escapeHtml(team.id)}" style="width: 18px; height: 18px; cursor: pointer;" title="Tích chọn để tham gia vòng này" />
+                            <div style="width: 24px; height: 24px; border-radius: 50%; background-color: ${escapeHtml(team.color || '#D97757')}; display: inline-flex; align-items: center; justify-content: center; color: #FFF; font-weight: 700; font-size: 0.75rem;">
+                              ${escapeHtml((team.name || '?').substring(0, 2).toUpperCase())}
+                            </div>
+                            <div>
+                              <span>${escapeHtml(team.name)}</span>
+                              <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.4rem;">(${escapeHtml(team.id)})</span>
+                            </div>
+                          </div>
+                        </div>
+                      `
+                      )
+                      .join("")}
+                  </div>
+                </div>
+              `
+              : ""
+          }
+        </div>
+      `;
+
+      container.querySelectorAll(".order-team-check").forEach((chk) => {
+        chk.addEventListener("change", (e) => {
+          const tId = e.target.dataset.teamId;
+          const isChecked = e.target.checked;
+          let list = content.round_order[activeOrderRound] || [];
+          if (isChecked) {
+            if (!list.includes(tId)) list.push(tId);
+          } else {
+            list = list.filter((id) => id !== tId);
+          }
+          content.round_order[activeOrderRound] = list;
+          renderRoundOrder();
+        });
+      });
+
+      container.querySelectorAll(".btn-order-move").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const idx = Number(btn.dataset.index);
+          const dir = Number(btn.dataset.moveDir);
+          const list = content.round_order[activeOrderRound];
+          const targetIdx = idx + dir;
+          if (targetIdx >= 0 && targetIdx < list.length) {
+            const temp = list[idx];
+            list[idx] = list[targetIdx];
+            list[targetIdx] = temp;
+            renderRoundOrder();
           }
         });
       });
@@ -466,111 +622,118 @@
 
     function renderRound2() {
       const container = document.getElementById("round2-list");
-      const setSelector = document.getElementById("r2-set-selector");
-      if (!container || !setSelector) return;
+      const selector = document.getElementById("r2-set-selector");
+      if (!container || !selector) return;
 
-      // Extract available sets
-      const allSets = Array.from(new Set(content.round2.map((q) => String(q.set || '1')))).sort();
-      if (allSets.length === 0) allSets.push("1");
-      if (!allSets.includes(activeR2Set)) activeR2Set = allSets[0];
+      const sets = Array.from(new Set(content.round2.map((q) => String(q.set || '1'))));
+      if (sets.length === 0) sets.push("1");
+      if (!sets.includes(activeR2Set)) activeR2Set = sets[0];
 
-      setSelector.innerHTML = `
-        <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">Bộ đề:</span>
-        ${allSets
+      // Render set selector buttons
+      selector.innerHTML = `
+        <span style="font-size: 0.9rem; font-weight: 700; color: var(--text-muted);">Bộ đề:</span>
+        ${sets
           .map(
             (s) => `
-          <button type="button" class="btn btn-sm ${s === activeR2Set ? 'btn-primary' : ''}" data-select-r2-set="${escapeHtml(s)}">
-            Bộ ${escapeHtml(s)} (${content.round2.filter((q) => String(q.set || '1') === s).length} câu)
-          </button>
-        `
+            <button type="button" class="btn btn-sm ${s === activeR2Set ? 'btn-primary' : ''}" data-select-r2-set="${escapeHtml(s)}">
+              Bộ #${escapeHtml(s)} (${content.round2.filter((q) => String(q.set || '1') === s).length} câu)
+            </button>
+          `
           )
           .join("")}
       `;
 
-      setSelector.querySelectorAll("[data-select-r2-set]").forEach((btn) => {
+      selector.querySelectorAll("[data-select-r2-set]").forEach((btn) => {
         btn.addEventListener("click", () => {
           activeR2Set = btn.dataset.selectR2Set;
           renderRound2();
         });
       });
 
-      const filteredQuestions = content.round2
-        .map((q, idx) => ({ q, originalIndex: idx }))
-        .filter((item) => String(item.q.set || "1") === activeR2Set);
+      const currentSetQuestions = content.round2
+        .map((q, rawIdx) => ({ ...q, rawIdx }))
+        .filter((q) => String(q.set || "1") === activeR2Set);
 
-      if (filteredQuestions.length === 0) {
-        container.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Chưa có câu hỏi nào trong Bộ ${activeR2Set}. Bấm "+ Thêm câu hỏi" để tạo mới.</div>`;
+      if (currentSetQuestions.length === 0) {
+        container.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Chưa có câu hỏi nào trong Bộ đề #${activeR2Set}. Bấm "+ Thêm câu hỏi" để tạo mới.</div>`;
         return;
       }
 
-      container.innerHTML = filteredQuestions
-        .map(({ q, originalIndex }, localIdx) => {
+      container.innerHTML = currentSetQuestions
+        .map((q) => {
+          const rawIdx = q.rawIdx;
+          const correctVal = String(q.correct || 'A').toUpperCase();
+
           return `
-            <div class="editor-card" data-r2-index="${originalIndex}">
+            <div class="editor-card" data-r2-index="${rawIdx}">
               <div class="editor-card-header">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
-                  <span class="meta-pill accent">Câu ${q.number || localIdx + 1}</span>
-                  <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 700;">(Bộ ${escapeHtml(q.set || '1')})</span>
+                  <span class="meta-pill accent">Bộ #${escapeHtml(q.set || activeR2Set)} • Câu #${q.number || 1}</span>
+                  <h3 class="editor-card-title">${escapeHtml(q.question || 'Câu hỏi trắc nghiệm')}</h3>
                 </div>
-                <button type="button" class="btn btn-sm btn-danger" data-remove-r2="${originalIndex}">Xóa câu</button>
+                <button type="button" class="btn btn-sm btn-danger" data-remove-r2="${rawIdx}">Xóa câu</button>
+              </div>
+
+              <div class="editor-grid-3">
+                <div class="editor-field">
+                  <label class="editor-label">Thuộc Bộ đề</label>
+                  <input type="text" class="editor-input" data-r2-field="set" data-index="${rawIdx}" value="${escapeHtml(q.set || activeR2Set)}" required />
+                </div>
+                <div class="editor-field">
+                  <label class="editor-label">Số thứ tự câu</label>
+                  <input type="number" class="editor-input" data-r2-field="number" data-index="${rawIdx}" value="${q.number || 1}" min="1" required />
+                </div>
+                <div class="editor-grid-2">
+                  <div class="editor-field">
+                    <label class="editor-label">Thời gian (giây)</label>
+                    <input type="number" class="editor-input" data-r2-field="time_seconds" data-index="${rawIdx}" value="${q.time_seconds || 30}" min="5" />
+                  </div>
+                  <div class="editor-field">
+                    <label class="editor-label">Đáp án đúng</label>
+                    <select class="editor-select" data-r2-field="correct" data-index="${rawIdx}" style="font-weight: 700; color: var(--primary);">
+                      <option value="A" ${correctVal === 'A' ? 'selected' : ''}>A</option>
+                      <option value="B" ${correctVal === 'B' ? 'selected' : ''}>B</option>
+                      <option value="C" ${correctVal === 'C' ? 'selected' : ''}>C</option>
+                      <option value="D" ${correctVal === 'D' ? 'selected' : ''}>D</option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
               <div class="editor-field">
-                <label class="editor-label">Nội dung câu hỏi trắc nghiệm</label>
-                <textarea class="editor-textarea" data-r2-field="question" data-index="${originalIndex}" rows="2" placeholder="Nhập nội dung câu hỏi...">${escapeHtml(q.question || '')}</textarea>
+                <label class="editor-label">Nội dung câu hỏi</label>
+                <textarea class="editor-textarea" data-r2-field="question" data-index="${rawIdx}" rows="2" placeholder="Nhập nội dung câu hỏi...">${escapeHtml(q.question || '')}</textarea>
+              </div>
+
+              <div class="editor-grid-2" style="margin-top: 0.5rem;">
+                <div class="editor-field">
+                  <label class="editor-label">Phương án A</label>
+                  <input type="text" class="editor-input" data-r2-field="option_a" data-index="${rawIdx}" value="${escapeHtml(q.option_a || '')}" placeholder="Nội dung phương án A" required />
+                </div>
+                <div class="editor-field">
+                  <label class="editor-label">Phương án B</label>
+                  <input type="text" class="editor-input" data-r2-field="option_b" data-index="${rawIdx}" value="${escapeHtml(q.option_b || '')}" placeholder="Nội dung phương án B" required />
+                </div>
+                <div class="editor-field">
+                  <label class="editor-label">Phương án C</label>
+                  <input type="text" class="editor-input" data-r2-field="option_c" data-index="${rawIdx}" value="${escapeHtml(q.option_c || '')}" placeholder="Nội dung phương án C" required />
+                </div>
+                <div class="editor-field">
+                  <label class="editor-label">Phương án D</label>
+                  <input type="text" class="editor-input" data-r2-field="option_d" data-index="${rawIdx}" value="${escapeHtml(q.option_d || '')}" placeholder="Nội dung phương án D" required />
+                </div>
               </div>
 
               <div class="editor-field" style="margin-top: 0.5rem;">
                 <label class="editor-label">Ảnh minh họa câu hỏi (tùy chọn)</label>
                 <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
                   <div style="flex: 1; min-width: 260px;">
-                    <input type="text" class="editor-input" data-r2-field="image_url" data-index="${originalIndex}" value="${escapeHtml(q.image_url || '')}" placeholder="vd: v2-cau-01.jpg hoặc https://..." />
+                    <input type="text" class="editor-input" data-r2-field="image_url" data-index="${rawIdx}" value="${escapeHtml(q.image_url || '')}" placeholder="vd: r2-q1.png hoặc https://..." />
                     <span style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">Chép ảnh vào thư mục images/ của dự án rồi nhập tên file</span>
                   </div>
-                  <div id="r2-preview-box-${originalIndex}">
+                  <div id="r2-preview-box-${rawIdx}">
                     ${renderImagePreviewHtml(q.image_url)}
                   </div>
-                </div>
-              </div>
-
-              <div class="editor-grid-2" style="margin-top: 0.5rem;">
-                <div class="editor-field">
-                  <label class="editor-label">Phương án A</label>
-                  <input type="text" class="editor-input" data-r2-field="option_a" data-index="${originalIndex}" value="${escapeHtml(q.option_a || '')}" placeholder="Phương án A..." required />
-                </div>
-                <div class="editor-field">
-                  <label class="editor-label">Phương án B</label>
-                  <input type="text" class="editor-input" data-r2-field="option_b" data-index="${originalIndex}" value="${escapeHtml(q.option_b || '')}" placeholder="Phương án B..." required />
-                </div>
-                <div class="editor-field">
-                  <label class="editor-label">Phương án C</label>
-                  <input type="text" class="editor-input" data-r2-field="option_c" data-index="${originalIndex}" value="${escapeHtml(q.option_c || '')}" placeholder="Phương án C..." required />
-                </div>
-                <div class="editor-field">
-                  <label class="editor-label">Phương án D</label>
-                  <input type="text" class="editor-input" data-r2-field="option_d" data-index="${originalIndex}" value="${escapeHtml(q.option_d || '')}" placeholder="Phương án D..." required />
-                </div>
-              </div>
-
-              <div class="editor-grid-3" style="margin-top: 0.5rem;">
-                <div class="editor-field">
-                  <label class="editor-label">Đáp án đúng</label>
-                  <select class="editor-select" data-r2-field="correct" data-index="${originalIndex}" style="font-weight: 700;">
-                    <option value="A" ${q.correct === 'A' ? 'selected' : ''}>Đáp án A</option>
-                    <option value="B" ${q.correct === 'B' ? 'selected' : ''}>Đáp án B</option>
-                    <option value="C" ${q.correct === 'C' ? 'selected' : ''}>Đáp án C</option>
-                    <option value="D" ${q.correct === 'D' ? 'selected' : ''}>Đáp án D</option>
-                  </select>
-                </div>
-
-                <div class="editor-field">
-                  <label class="editor-label">Thời gian làm bài (giây)</label>
-                  <input type="number" class="editor-input" data-r2-field="time_seconds" data-index="${originalIndex}" value="${q.time_seconds || 30}" min="5" />
-                </div>
-
-                <div class="editor-field">
-                  <label class="editor-label">Bộ đề</label>
-                  <input type="text" class="editor-input" data-r2-field="set" data-index="${originalIndex}" value="${escapeHtml(q.set || '1')}" />
                 </div>
               </div>
             </div>
@@ -583,7 +746,10 @@
           const idx = Number(e.target.dataset.index);
           const field = e.target.dataset.r2Field;
           content.round2[idx][field] = e.target.value;
-          if (field === "image_url") {
+          if (field === "question") {
+            const cardTitle = container.querySelector(`[data-r2-index="${idx}"] .editor-card-title`);
+            if (cardTitle) cardTitle.textContent = e.target.value || 'Câu hỏi trắc nghiệm';
+          } else if (field === "image_url") {
             const box = document.getElementById(`r2-preview-box-${idx}`);
             if (box) box.innerHTML = renderImagePreviewHtml(e.target.value);
           }
@@ -742,6 +908,7 @@
       container.innerHTML = content.accounts
         .map((acc, idx) => {
           const role = String(acc.role || "team").toLowerCase();
+          const isRefDisabled = role === "host" || role === "head_judge";
 
           // Options for ref_id depending on role
           let refOptions = `<option value="">(Không cần liên kết)</option>`;
@@ -765,7 +932,7 @@
             <div class="editor-card" data-acc-index="${idx}">
               <div class="editor-card-header">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
-                  <span class="meta-pill ${role === 'host' ? 'accent' : ''}">${escapeHtml(role.toUpperCase())}</span>
+                  <span class="meta-pill ${role === 'host' || role === 'head_judge' ? 'accent' : ''}">${escapeHtml(role.toUpperCase())}</span>
                   <h3 class="editor-card-title">${escapeHtml(acc.username || `Tài khoản ${idx + 1}`)}</h3>
                 </div>
                 <button type="button" class="btn btn-sm btn-danger" data-remove-acc="${idx}">Xóa tài khoản</button>
@@ -774,7 +941,7 @@
               <div class="editor-grid-4">
                 <div class="editor-field">
                   <label class="editor-label">Tên đăng nhập</label>
-                  <input type="text" class="editor-input" data-acc-field="username" data-index="${idx}" value="${escapeHtml(acc.username || '')}" placeholder="vd: mc, gk1, doi01" required />
+                  <input type="text" class="editor-input" data-acc-field="username" data-index="${idx}" value="${escapeHtml(acc.username || '')}" placeholder="vd: mc, gktong, gk1, doi01" required />
                 </div>
 
                 <div class="editor-field">
@@ -786,6 +953,7 @@
                   <label class="editor-label">Vai trò</label>
                   <select class="editor-select" data-acc-field="role" data-index="${idx}">
                     <option value="host" ${role === 'host' ? 'selected' : ''}>Dẫn chương trình (host)</option>
+                    <option value="head_judge" ${role === 'head_judge' ? 'selected' : ''}>Giám khảo tổng (head_judge)</option>
                     <option value="judge" ${role === 'judge' ? 'selected' : ''}>Ban Giám khảo (judge)</option>
                     <option value="team" ${role === 'team' ? 'selected' : ''}>Đội thi (team)</option>
                   </select>
@@ -793,7 +961,7 @@
 
                 <div class="editor-field">
                   <label class="editor-label">Đối tượng liên kết</label>
-                  <select class="editor-select" data-acc-field="ref_id" data-index="${idx}" ${role === 'host' ? 'disabled' : ''}>
+                  <select class="editor-select" data-acc-field="ref_id" data-index="${idx}" ${isRefDisabled ? 'disabled' : ''}>
                     ${refOptions}
                   </select>
                 </div>
@@ -814,6 +982,9 @@
           const field = e.target.dataset.accField;
           content.accounts[idx][field] = e.target.value;
           if (field === "role") {
+            if (e.target.value === "host" || e.target.value === "head_judge") {
+              content.accounts[idx].ref_id = "";
+            }
             renderAccounts();
           }
         });
@@ -899,22 +1070,14 @@
               <input type="text" class="editor-input" data-cfg-field="round2_description" value="${escapeHtml(cfg.round2_description || '')}" />
             </div>
           </div>
-          <div class="editor-grid-4" style="margin-top: 0.5rem;">
+          <div class="editor-grid-2" style="margin-top: 0.5rem;">
             <div class="editor-field">
-              <label class="editor-label">Thời gian (giây)</label>
+              <label class="editor-label">Thời gian mỗi câu (giây)</label>
               <input type="number" class="editor-input" data-cfg-field="round2_time_seconds" value="${cfg.round2_time_seconds || 30}" />
             </div>
             <div class="editor-field">
-              <label class="editor-label">Điểm tối đa (0s)</label>
-              <input type="number" class="editor-input" data-cfg-field="round2_max_points" value="${cfg.round2_max_points || 1000}" />
-            </div>
-            <div class="editor-field">
-              <label class="editor-label">Điểm tối thiểu (chót)</label>
-              <input type="number" class="editor-input" data-cfg-field="round2_min_points" value="${cfg.round2_min_points || 500}" />
-            </div>
-            <div class="editor-field">
-              <label class="editor-label">Hệ số quy đổi điểm</label>
-              <input type="number" class="editor-input" data-cfg-field="round2_divisor" value="${cfg.round2_divisor || 500}" />
+              <label class="editor-label">Điểm mỗi câu đúng</label>
+              <input type="number" class="editor-input" data-cfg-field="round2_points_per_correct" value="${cfg.round2_points_per_correct !== undefined ? cfg.round2_points_per_correct : 2}" min="0" step="0.5" />
             </div>
           </div>
         </div>
@@ -964,6 +1127,7 @@
 
     function renderAllPanels() {
       renderTeams();
+      renderRoundOrder();
       renderRound1();
       renderRound2();
       renderRound3();
@@ -993,6 +1157,7 @@
       if (remoteContent && typeof remoteContent === "object" && Object.keys(remoteContent).length > 0) {
         content = {
           teams: remoteContent.teams || [],
+          round_order: remoteContent.round_order || { round1: [], round2: [], round3: [] },
           round1: remoteContent.round1 || [],
           round2: remoteContent.round2 || [],
           round3: remoteContent.round3 || [],
@@ -1005,6 +1170,7 @@
         const sampleData = await fetchSampleQuizData();
         content = {
           teams: sampleData.teams || [],
+          round_order: { round1: [], round2: [], round3: [] },
           round1: sampleData.round1Packages.map((p) => ({
             package: p.package,
             team_id: p.team_id,
@@ -1052,18 +1218,41 @@
         });
       });
 
+      // Round order round selector
+      document.querySelectorAll(".round-order-tab-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          activeOrderRound = btn.dataset.orderRound;
+          document.querySelectorAll(".round-order-tab-btn").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          renderRoundOrder();
+        });
+      });
+
+      // Button: Reset Round Order
+      document.getElementById("btn-reset-round-order")?.addEventListener("click", () => {
+        const roundName = activeOrderRound === "round1" ? "Vòng 1" : activeOrderRound === "round2" ? "Vòng 2" : "Vòng 3";
+        if (confirm(`Đặt lại thứ tự ${roundName} theo đúng danh sách đội ban đầu?`)) {
+          if (!content.round_order) content.round_order = {};
+          content.round_order[activeOrderRound] = content.teams.map((t) => t.id);
+          renderRoundOrder();
+          showToast(`Đã đặt lại thứ tự thi đấu ${roundName} theo danh sách đội!`);
+        }
+      });
+
       // Button: Add Team
       document.getElementById("btn-add-team")?.addEventListener("click", () => {
         const nextIdx = content.teams.length + 1;
         const autoId = `doi-${String(nextIdx).padStart(2, "0")}`;
         const autoColor = TEAM_PALETTE[content.teams.length % TEAM_PALETTE.length];
+        const defaultName = PRESET_TEAM_NAMES[nextIdx - 1] || `Đội ${nextIdx}`;
         content.teams.push({
           id: autoId,
-          name: `Đội ${nextIdx}`,
+          name: defaultName,
           color: autoColor,
           image_url: ""
         });
         renderTeams();
+        renderRoundOrder();
         updateBadgeCounts();
       });
 
@@ -1193,6 +1382,9 @@
 
           renderErrors([]); // Clear errors
           await set("content", content);
+          if (content.round_order) {
+            await set("content/round_order", content.round_order);
+          }
           showToast("✓ Đã lưu cấu hình nội dung thành công và đồng bộ tới toàn bộ thiết bị!");
         } catch (err) {
           showToast(`Lỗi khi lưu dữ liệu: ${err.message || 'Không thể kết nối'}`);
@@ -1213,6 +1405,7 @@
           const sampleData = await fetchSampleQuizData(true);
           content = {
             teams: sampleData.teams || [],
+            round_order: sampleData.round_order || { round1: [], round2: [], round3: [] },
             round1: sampleData.round1Packages.map((p) => ({
               package: p.package,
               team_id: p.team_id,

@@ -63,7 +63,8 @@ export function isContentEmpty(content) {
  *   round3Csv?: string|Array<any>,
  *   judgesCsv?: string|Array<any>,
  *   accountsCsv?: string|Array<any>,
- *   configCsv?: string|Array<any>|Record<string, any>
+ *   configCsv?: string|Array<any>|Record<string, any>,
+ *   round_order?: Record<string, Array<string>>
  * }} param0
  * @returns {{
  *   teams: Array<any>,
@@ -72,6 +73,7 @@ export function isContentEmpty(content) {
  *   round3: Array<any>,
  *   judges: Array<any>,
  *   accounts: Array<any>,
+ *   round_order: Record<string, Array<string>>,
  *   config: Record<string, any>
  * }}
  */
@@ -82,7 +84,8 @@ export function csvToContent({
   round3Csv = "",
   judgesCsv = "",
   accountsCsv = "",
-  configCsv = ""
+  configCsv = "",
+  round_order = {}
 } = {}) {
   const teams = toRows(teamsCsv);
   const round1 = toRows(round1Csv);
@@ -99,6 +102,7 @@ export function csvToContent({
     round3,
     judges,
     accounts,
+    round_order: round_order || {},
     config
   };
 }
@@ -137,6 +141,7 @@ export function contentToQuizData(content = {}, sampleFallback = null) {
     round3Questions,
     judges,
     accounts,
+    round_order: content?.round_order || {},
     scores: {}
   };
 }
@@ -155,6 +160,73 @@ export function resolveQuizData(content, sampleFallback) {
 }
 
 /**
+ * Returns participating teams for a given round in configured order.
+ * If round_order is not configured or empty for this round, returns all teams in their default order.
+ *
+ * @param {Array<{id: string, name?: string}>} allTeams
+ * @param {Record<string, Array<string>>|Array<string>} [roundOrder]
+ * @param {string} [roundKey]
+ * @returns {Array<any>}
+ */
+export function getRoundTeams(allTeams = [], roundOrder = {}, roundKey = null) {
+  const teamsList = Array.isArray(allTeams) ? allTeams : [];
+  if (!roundOrder) {
+    return teamsList.map((t, idx) => ({ ...t, orderNumber: idx + 1 }));
+  }
+
+  let orderedIds = null;
+  if (Array.isArray(roundOrder)) {
+    orderedIds = roundOrder;
+  } else if (typeof roundOrder === "object") {
+    if (roundKey && Array.isArray(roundOrder[roundKey])) {
+      orderedIds = roundOrder[roundKey];
+    } else if (!roundKey && Array.isArray(roundOrder.round1)) {
+      orderedIds = roundOrder.round1;
+    }
+  }
+
+  if (!orderedIds || orderedIds.length === 0) {
+    return teamsList.map((t, idx) => ({ ...t, orderNumber: idx + 1 }));
+  }
+
+  const teamMap = new Map(teamsList.map((t) => [String(t.id).trim(), t]));
+  const result = [];
+
+  for (let i = 0; i < orderedIds.length; i++) {
+    const id = String(orderedIds[i]).trim();
+    const team = teamMap.get(id);
+    if (team) {
+      result.push({
+        ...team,
+        orderNumber: i + 1
+      });
+    }
+  }
+
+  return result;
+}
+
+export const getParticipatingTeams = getRoundTeams;
+
+/**
+ * Checks whether a team participates in a given round.
+ *
+ * @param {string} teamId
+ * @param {Array<{id: string}>} allTeams
+ * @param {Record<string, Array<string>>|Array<string>} [roundOrder]
+ * @param {string} [roundKey]
+ * @returns {boolean}
+ */
+export function isTeamInRound(teamId, allTeams = [], roundOrder = {}, roundKey = null) {
+  if (!teamId) return false;
+  const cleanId = String(teamId).trim();
+  const participating = getRoundTeams(allTeams, roundOrder, roundKey);
+  return participating.some((t) => String(t.id).trim() === cleanId);
+}
+
+export const isTeamParticipating = isTeamInRound;
+
+/**
  * Validates content and returns an object indicating validity and Vietnamese error messages.
  * Rejects:
  * - Duplicate team ids
@@ -163,6 +235,7 @@ export function resolveQuizData(content, sampleFallback) {
  * - Duplicate round 3 tile numbers
  * - Account linked to unknown team or judge
  * - data: URLs for images (teams, round 1, round 2, round 3)
+ * - Round order containing unknown team ids or duplicates
  *
  * @param {any} content
  * @returns {{ valid: boolean, errors: Array<string> }}
@@ -317,7 +390,7 @@ export function validateContent(content = {}) {
   // 6. Accounts validation
   const accounts = Array.isArray(content.accounts) ? content.accounts : [];
   const seenUsernames = new Set();
-  const validRoles = new Set(["host", "judge", "team"]);
+  const validRoles = new Set(["host", "judge", "team", "head_judge"]);
 
   accounts.forEach((acc, index) => {
     const username = acc?.username !== undefined && acc?.username !== null ? String(acc.username).trim() : "";
@@ -339,7 +412,7 @@ export function validateContent(content = {}) {
     }
 
     if (!validRoles.has(role)) {
-      errors.push(`${label} có vai trò "${role}" không hợp lệ (phải là host, judge hoặc team).`);
+      errors.push(`${label} có vai trò "${role}" không hợp lệ (phải là host, judge, head_judge hoặc team).`);
       return;
     }
 
@@ -352,7 +425,44 @@ export function validateContent(content = {}) {
         errors.push(`${label} liên kết với giám khảo không tồn tại ("${refId}").`);
       }
     }
+    // Note: head_judge does not require ref_id
   });
+
+  // 7. Round order validation
+  if (content.round_order && typeof content.round_order === "object") {
+    const roundLabels = {
+      round1: "Vòng 1",
+      round2: "Vòng 2",
+      round3: "Vòng 3"
+    };
+
+    for (const [rKey, rLabel] of Object.entries(roundLabels)) {
+      const orderList = content.round_order[rKey];
+      if (orderList !== undefined && orderList !== null) {
+        if (!Array.isArray(orderList)) {
+          errors.push(`Thứ tự thi ${rLabel} phải là danh sách.`);
+          continue;
+        }
+
+        const seenOrderIds = new Set();
+        orderList.forEach((teamId, index) => {
+          const cleanId = String(teamId ?? "").trim();
+          if (!cleanId) {
+            errors.push(`Thứ tự thi ${rLabel} tại vị trí thứ ${index + 1} bị trống.`);
+            return;
+          }
+          if (!validTeamIds.has(cleanId)) {
+            errors.push(`Thứ tự thi ${rLabel} liên kết với đội thi không tồn tại ("${cleanId}").`);
+          }
+          if (seenOrderIds.has(cleanId)) {
+            errors.push(`Thứ tự thi ${rLabel} chứa đội thi bị trùng lặp ("${cleanId}").`);
+          } else {
+            seenOrderIds.add(cleanId);
+          }
+        });
+      }
+    }
+  }
 
   return {
     valid: errors.length === 0,

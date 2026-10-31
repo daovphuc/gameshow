@@ -90,7 +90,7 @@
       <section class="panel-card">
         <h2 class="panel-title">Bảng Điểm Chi Tiết Các Đội Thi</h2>
         <p class="panel-desc">
-          Điểm Vòng 1 &amp; 3 tự động tính từ trung bình điểm Ban Giám khảo trừ điểm phạt. Vòng 2 tự động quy đổi từ điểm phần mềm kèm ô ghi đè khi có sự cố.
+          Điểm Vòng 1 &amp; 3 tự động tính từ trung bình điểm Ban Giám khảo trừ điểm phạt. Vòng 2 tính 2 điểm/câu đúng kèm ô ghi đè khi có sự cố.
         </p>
         <div class="scores-table-wrap">
           <table class="scores-table">
@@ -98,13 +98,35 @@
               <tr>
                 <th style="min-width: 140px;">Đội thi</th>
                 <th>Vòng 1 (Điểm GK - Phạt)</th>
-                <th>Vòng 2 (Phần mềm / Ghi đè)</th>
+                <th>Vòng 2 (Điểm trắc nghiệm / Ghi đè)</th>
                 <th>Vòng 3 (Điểm GK - Phạt)</th>
                 <th>Tổng điểm</th>
                 <th>Trạng thái V1</th>
               </tr>
             </thead>
             <tbody id="scores-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Round 2 Statistics Table -->
+      <section class="panel-card" style="margin-top: 1.5rem;">
+        <h2 class="panel-title">Bảng Thống Kê Vòng 2 (Trắc Nghiệm)</h2>
+        <p class="panel-desc">
+          Thứ hạng sắp xếp theo: Điểm số giảm dần &rarr; Tổng thời gian trả lời câu đúng tăng dần (nhanh hơn xếp trên) &rarr; Thứ tự đội thi.
+        </p>
+        <div class="scores-table-wrap">
+          <table class="scores-table">
+            <thead>
+              <tr>
+                <th style="width: 70px; text-align: center;">Hạng</th>
+                <th style="min-width: 140px;">Đội thi</th>
+                <th style="text-align: center;">Điểm số</th>
+                <th style="text-align: center;">Số câu đúng</th>
+                <th style="text-align: center;">Tổng thời gian câu đúng (s)</th>
+              </tr>
+            </thead>
+            <tbody id="r2-stats-tbody"></tbody>
           </table>
         </div>
       </section>
@@ -154,12 +176,14 @@
       computeTeamScores
     } from "./js/state.js";
     import { calculateTeamRoundScore } from "./js/judges.js";
-    import { calculateRound2Score } from "./js/round2.js";
+    import { calculateRound2Score, computeRound2Ranking, recomputeRound2FromAnswers } from "./js/round2.js";
+    import { getRoundTeams } from "./js/content.js";
     import { buildReportCsv } from "./js/report.js";
     import { get, listen, update, resetLiveState } from "./js/backend.js";
 
     let quizData = null;
     let gameState = null;
+    let round2Stats = {};
 
     async function syncScoresToBackend() {
       saveAppState(gameState);
@@ -330,6 +354,33 @@
         })
         .join("");
 
+      // Render Round 2 stats table
+      const r2Participating = getRoundTeams(quizData.teams, quizData.round_order, "round2");
+      const r2Ranking = computeRound2Ranking(r2Participating, round2Stats || gameState.round2Stats || {});
+      const r2Tbody = document.getElementById("r2-stats-tbody");
+      if (r2Tbody) {
+        r2Tbody.innerHTML = r2Ranking.map((entry) => `
+          <tr>
+            <td style="text-align: center; font-weight: 700;">#${entry.rank}</td>
+            <td>
+              <div style="display: flex; align-items: center; gap: 0.65rem;">
+                ${renderAvatarHtml(entry, "team-avatar-sm")}
+                <strong>${escapeHtml(entry.name)}</strong>
+              </div>
+            </td>
+            <td style="text-align: center; font-family: var(--font-mono); font-weight: 700; color: var(--accent);">
+              ${entry.points}đ
+            </td>
+            <td style="text-align: center; font-family: var(--font-mono);">
+              ${entry.correctCount}
+            </td>
+            <td style="text-align: center; font-family: var(--font-mono);">
+              ${(entry.totalCorrectTimeSeconds || 0).toFixed(2)}s
+            </td>
+          </tr>
+        `).join("");
+      }
+
       // Penalty inputs
       tbody.querySelectorAll("[data-penalty-team]").forEach((input) => {
         input.addEventListener("change", () => {
@@ -491,10 +542,29 @@
       gameState = loadAppState(quizData.teams);
       document.title = `Điểm số - ${quizData.config.show_title}`;
 
+      try {
+        const storedAnswers = (await get("answers")) || {};
+        const remoteR2 = (await get("live/round2")) || {};
+        const pointsPerCorrect = Number(quizData.config?.round2_points_per_correct) || 2;
+        const recomputed = recomputeRound2FromAnswers({
+          questions: quizData.round2Questions,
+          allAnswers: storedAnswers,
+          questionsMeta: remoteR2.questionsMeta || {},
+          teams: quizData.teams,
+          pointsPerCorrect
+        });
+        round2Stats = recomputed.teamStats;
+      } catch {
+        round2Stats = gameState.round2Stats || {};
+      }
+
       // Subscribe to remote live updates
       listen("live", (remoteLive) => {
         if (!remoteLive) return;
         gameState = { ...gameState, ...remoteLive };
+        if (remoteLive.round2Stats) {
+          round2Stats = remoteLive.round2Stats;
+        }
         saveAppState(gameState);
         renderAdminPage();
       });

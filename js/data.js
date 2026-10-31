@@ -69,6 +69,7 @@ export function normaliseConfig(input = []) {
     "round1_max_manner",
     "round1_packages_offered",
     "round2_time_seconds",
+    "round2_points_per_correct",
     "round2_max_points",
     "round2_min_points",
     "round2_divisor",

@@ -157,7 +157,7 @@ test("normaliseRound3 parses numbers, applies defaults, resolves image_url, has 
   assert.equal(tiles[1].image_url, "images/cau-2.jpg");
 });
 
-test("sample CSV files in data/sample parse and normalise cleanly with 12 teams, 3 judges, 2 round-2 sets of 10 questions, 24 team-owned round-1 packages, and 15 round-3 questions", () => {
+test("sample CSV files in data/sample parse and normalise cleanly with 35 teams, 3 judges, 2 round-2 sets of 10 questions, 70 team-owned round-1 packages, and 15 round-3 questions", () => {
   const sampleDir = path.resolve("data/sample");
   const teamsCsv = fs.readFileSync(path.join(sampleDir, "teams.csv"), "utf8");
   const round1Csv = fs.readFileSync(path.join(sampleDir, "round1.csv"), "utf8");
@@ -168,10 +168,10 @@ test("sample CSV files in data/sample parse and normalise cleanly with 12 teams,
   const configCsv = fs.readFileSync(path.join(sampleDir, "config.csv"), "utf8");
 
   const data = normaliseAllData({ teamsCsv, round1Csv, round2Csv, round3Csv, judgesCsv, accountsCsv, configCsv });
-  assert.equal(data.teams.length, 12);
+  assert.equal(data.teams.length, 35);
   assert.equal(data.judges.length, 3);
-  assert.equal(data.accounts.length, 16);
-  assert.equal(data.round1Packages.length, 24);
+  assert.equal(data.accounts.length, 40);
+  assert.equal(data.round1Packages.length, 70);
   for (const pkg of data.round1Packages) {
     assert.ok(pkg.team_id);
     assert.equal(pkg.questions.length, 1);

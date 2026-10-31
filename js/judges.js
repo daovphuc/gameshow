@@ -153,3 +153,81 @@ export function compareRound1Or3Teams(a, b) {
   }
   return 0;
 }
+
+/**
+ * Builds per-judge score write entries for one team, clamped to limits.
+ * Used by head judge to save paper ballots across all judges at once.
+ *
+ * @param {{
+ *   round?: string,
+ *   roundKey?: string,
+ *   teamId?: string,
+ *   judges?: Array<{id: string, name?: string}>,
+ *   scores?: Record<string, {content?: any, manner?: any}>,
+ *   scoresByJudge?: Record<string, {content?: any, manner?: any}>,
+ *   maxContent?: number,
+ *   maxManner?: number
+ * }|string} params
+ * @returns {Array<{judgeId: string, judgeName?: string, content: number, manner: number, score: number, path: string, teamId: string, round: string}>}
+ */
+export function buildPerJudgeScoreWrites(params, ...rest) {
+  let round = "round1";
+  let teamId = "";
+  let judges = [];
+  let scores = {};
+  let maxContent = 45;
+  let maxManner = 5;
+
+  if (params && typeof params === "object" && !Array.isArray(params)) {
+    round = params.round || params.roundKey || "round1";
+    teamId = params.teamId || "";
+    judges = params.judges || [];
+    scores = params.scores || params.scoresByJudge || {};
+    maxContent = params.maxContent !== undefined ? params.maxContent : 45;
+    maxManner = params.maxManner !== undefined ? params.maxManner : 5;
+  } else {
+    teamId = params || "";
+    judges = rest[0] || [];
+    scores = rest[1] || {};
+    const opts = rest[2] || {};
+    round = opts.round || opts.roundKey || "round1";
+    maxContent = opts.maxContent !== undefined ? opts.maxContent : 45;
+    maxManner = opts.maxManner !== undefined ? opts.maxManner : 5;
+  }
+
+  const results = [];
+  const updates = {};
+  const scoresByJudge = {};
+
+  for (const j of judges) {
+    const jId = String(j?.id || "").trim();
+    if (!jId) continue;
+    const raw = scores[jId] || {};
+    const content = clampScore(raw.content !== undefined ? raw.content : 0, maxContent);
+    const manner = clampScore(raw.manner !== undefined ? raw.manner : 0, maxManner);
+    const score = Math.round((content + manner) * 100) / 100;
+    const path = `live/judgeScores/${round}/${teamId}/${jId}`;
+
+    const entry = {
+      judgeId: jId,
+      judgeName: j.name || jId,
+      content,
+      manner,
+      score,
+      teamId,
+      round,
+      path
+    };
+
+    results.push(entry);
+    results[jId] = entry;
+    scoresByJudge[jId] = { content, manner, score };
+    updates[path] = { content, manner, score };
+  }
+
+  results.updates = updates;
+  results.scores = scoresByJudge;
+  return results;
+}
+
+export const buildHeadJudgeScoreWrites = buildPerJudgeScoreWrites;

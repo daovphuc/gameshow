@@ -190,3 +190,11 @@ test("getTeamInitials extracts readable 2-character Vietnamese initials", () => 
   assert.equal(getTeamInitials("Hồng Hà"), "HH");
   assert.equal(getTeamInitials("Đội 1"), "Đ1");
 });
+
+test("getTeamInitials uses the place name for police teams and keeps short codes", () => {
+  assert.equal(getTeamInitials("Công an TP. Hà Nội"), "HN");
+  assert.equal(getTeamInitials("Công an TP. Hồ Chí Minh"), "HCM");
+  assert.equal(getTeamInitials("Công an TP. Huế"), "HU");
+  assert.equal(getTeamInitials("Công an tỉnh Đắk Lắk"), "ĐL");
+  assert.equal(getTeamInitials("T06"), "T06");
+});

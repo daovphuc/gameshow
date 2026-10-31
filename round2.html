@@ -18,6 +18,17 @@
     </main>
   </div>
 
+  <!-- Modal Thống Kê Vòng 2 -->
+  <div id="r2-stats-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 9999; align-items: center; justify-content: center; padding: 1.5rem;">
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 1.5rem; box-shadow: var(--shadow-xl);">
+      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+        <h2 style="font-family: var(--font-serif); font-size: 1.4rem; margin: 0;">📊 Bảng Thống Kê Vòng 2</h2>
+        <button type="button" id="btn-close-r2-stats-modal" class="btn btn-sm">✕ Đóng</button>
+      </div>
+      <div id="r2-stats-modal-body"></div>
+    </div>
+  </div>
+
   <script type="module">
     import {
       fetchQuizData,
@@ -29,6 +40,7 @@
       wireStageLayout
     } from "./js/app.js";
     import { resolveImageUrl } from "./js/data.js";
+    import { getRoundTeams } from "./js/content.js";
     import {
       groupRound2BySet,
       startRound2Question,
@@ -76,8 +88,9 @@
         liveR2.answers = incomingAnswers || {};
         const counterEl = document.getElementById("r2-answered-counter");
         if (counterEl && quizData) {
+          const participatingTeams = getRoundTeams(quizData.teams, quizData.round_order, "round2");
           const count = Object.keys(liveR2.answers).length;
-          counterEl.textContent = `${count}/${quizData.teams.length} đội đã trả lời`;
+          counterEl.textContent = `${count}/${participatingTeams.length} đội đã trả lời`;
         }
       });
     }
@@ -149,53 +162,46 @@
         deadline: liveR2.deadline
       };
 
-      // Subscribe to answers on answers/<questionKey>
-      subscribeToQuestionAnswers(questionKey);
+      // Publish question to tablets (without correct answer)
+      const tabletQuestion = filterQuestionForTablet(q);
 
-      // Publish to backend (tablet gets payload without correct answer)
       await update("live/round2", {
         status: "open",
-        set: selectedSet,
         questionIndex: currentQuestionIdx,
         questionKey,
-        activeQuestion: filterQuestionForTablet(q),
+        activeQuestion: tabletQuestion,
         shownAt: liveR2.shownAt,
         deadline: liveR2.deadline,
-        results: null,
-        stats: null,
-        [`questionsMeta/${questionKey}`]: {
-          shownAt: liveR2.shownAt,
-          deadline: liveR2.deadline
-        }
+        [`questionsMeta/${questionKey}`]: liveR2.questionsMeta[questionKey]
       });
 
-      renderStage();
+      subscribeToQuestionAnswers(questionKey);
       startTimerTick();
+      renderStage();
     }
 
     async function handleLockQuestion() {
       stopTimerTick();
       liveR2 = lockRound2Question(liveR2);
-      updateTimerDisplay(0);
-      await update("live/round2", { status: "locked" });
+
+      await update("live/round2", {
+        status: "locked"
+      });
+
       renderStage();
-      showToast("Đã khóa nhận đáp án!");
     }
 
     async function handleRevealQuestion() {
       const q = getCurrentQuestion();
       if (!q) return;
 
-      const maxPts = Number(quizData.config.round2_max_points) || 1000;
-      const minPts = Number(quizData.config.round2_min_points) || 500;
-      liveR2 = revealRound2Question(liveR2, q, { maxPoints: maxPts, minPoints: minPts });
+      const pointsPerCorrect = Number(quizData.config?.round2_points_per_correct) || 2;
+      liveR2 = revealRound2Question(liveR2, q, { pointsPerCorrect });
 
-      // Publish question reveal
       await update("live/round2", {
         status: "revealed",
-        activeQuestion: q, // Full question with correct answer
-        results: liveR2.results || {},
-        stats: liveR2.stats || {}
+        results: liveR2.results,
+        stats: liveR2.stats
       });
 
       // Update round 2 totals for teams in live state
@@ -207,14 +213,14 @@
       const allAnswers = (await get("answers")) || {};
       const questions = getQuestionsInActiveSet();
       const meta = liveR2.questionsMeta || {};
-      const divisor = Number(quizData.config.round2_divisor) || 500;
+      const pointsPerCorrect = Number(quizData.config?.round2_points_per_correct) || 2;
 
       const recomputed = recomputeRound2FromAnswers({
         questions,
         allAnswers,
         questionsMeta: meta,
         teams: quizData.teams,
-        divisor
+        pointsPerCorrect
       });
 
       liveR2.history = recomputed.history;
@@ -223,6 +229,7 @@
       for (const [tId, score] of Object.entries(recomputed.scores)) {
         updates[`scores/${tId}/round2`] = score;
       }
+      updates["round2Stats"] = recomputed.teamStats;
       await update("live", updates);
     }
 
@@ -243,6 +250,88 @@
       });
 
       renderStage();
+    }
+
+    function buildRound2RankingData() {
+      const participatingTeams = getRoundTeams(quizData.teams, quizData.round_order, "round2");
+      const teamStats = {};
+      for (const t of participatingTeams) {
+        teamStats[t.id] = { points: 0, correctCount: 0, totalCorrectTimeMs: 0 };
+      }
+
+      for (const h of liveR2.history) {
+        if (!h.results) continue;
+        for (const [tId, res] of Object.entries(h.results)) {
+          if (!teamStats[tId]) {
+            teamStats[tId] = { points: 0, correctCount: 0, totalCorrectTimeMs: 0 };
+          }
+          if (res.isCorrect) {
+            teamStats[tId].points += Number(res.points) || 0;
+            teamStats[tId].correctCount += 1;
+            teamStats[tId].totalCorrectTimeMs += Number(res.responseTimeMs) || 0;
+          }
+        }
+      }
+
+      return computeRound2Ranking(participatingTeams, teamStats);
+    }
+
+    function renderRound2StatsTableHtml() {
+      const ranked = buildRound2RankingData();
+      const questions = getQuestionsInActiveSet();
+
+      return `
+        <table class="scores-table" style="width: 100%;">
+          <thead>
+            <tr>
+              <th style="width: 80px;">Thứ hạng</th>
+              <th>Đội thi</th>
+              <th>Điểm số</th>
+              <th>Số câu đúng</th>
+              <th>Tổng thời gian câu đúng</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${ranked
+              .map(
+                (entry) => `
+                <tr>
+                  <td><strong>#${entry.rank}</strong></td>
+                  <td>
+                    <div style="display: flex; align-items: center; gap: 0.65rem;">
+                      ${renderAvatarHtml(entry, "team-avatar-sm")}
+                      <strong>${escapeHtml(entry.name)}</strong>
+                    </div>
+                  </td>
+                  <td style="font-family: var(--font-mono); font-weight: 900; font-size: 1.25rem; color: var(--accent);">
+                    ${entry.points}đ
+                  </td>
+                  <td style="font-family: var(--font-mono); font-weight: 700;">
+                    ${entry.correctCount}/${questions.length || 10}
+                  </td>
+                  <td style="font-family: var(--font-mono); font-size: 1.05rem;">
+                    ${(entry.totalCorrectTimeMs / 1000).toFixed(2)}s
+                  </td>
+                </tr>
+              `
+              )
+              .join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function openStatsModal() {
+      const modal = document.getElementById("r2-stats-modal");
+      const body = document.getElementById("r2-stats-modal-body");
+      if (!modal || !body) return;
+      body.innerHTML = renderRound2StatsTableHtml();
+      modal.style.display = "flex";
+    }
+
+    function closeStatsModal() {
+      const modal = document.getElementById("r2-stats-modal");
+      if (modal) modal.style.display = "none";
     }
 
     function renderSetChooser(container) {
@@ -313,61 +402,12 @@
     function renderSummaryStage(container) {
       stopTimerTick();
 
-      const questions = getQuestionsInActiveSet();
-      const divisor = Number(quizData.config.round2_divisor) || 500;
-
-      // Calculate stats per team
-      const teamStats = {};
-      for (const t of quizData.teams) {
-        teamStats[t.id] = { softwarePoints: 0, correctCount: 0, totalCorrectTimeMs: 0 };
-      }
-
-      for (const h of liveR2.history) {
-        if (!h.results) continue;
-        for (const [tId, res] of Object.entries(h.results)) {
-          if (!teamStats[tId]) {
-            teamStats[tId] = { softwarePoints: 0, correctCount: 0, totalCorrectTimeMs: 0 };
-          }
-          if (res.isCorrect) {
-            teamStats[tId].softwarePoints += Number(res.points) || 0;
-            teamStats[tId].correctCount += 1;
-            teamStats[tId].totalCorrectTimeMs += Number(res.responseTimeMs) || 0;
-          }
-        }
-      }
-
-      const ranked = computeRound2Ranking(quizData.teams, teamStats, divisor);
-
-      const rowsHtml = ranked
-        .map(
-          (entry) => `
-          <tr>
-            <td><strong>#${entry.rank}</strong></td>
-            <td>
-              <div style="display: flex; align-items: center; gap: 0.65rem;">
-                ${renderAvatarHtml(entry, "team-avatar-sm")}
-                <strong>${escapeHtml(entry.name)}</strong>
-              </div>
-            </td>
-            <td style="font-family: var(--font-mono); font-weight: 700;">${entry.correctCount}/${questions.length}</td>
-            <td style="font-family: var(--font-mono);">${(entry.totalCorrectTimeMs / 1000).toFixed(2)}s</td>
-            <td style="font-family: var(--font-mono); font-weight: 800; color: var(--accent); font-size: 1.15rem;">
-              ${entry.softwarePoints}
-            </td>
-            <td style="font-family: var(--font-mono); font-weight: 900; font-size: 1.25rem;">
-              ${entry.round2Score}đ
-            </td>
-          </tr>
-        `
-        )
-        .join("");
-
       container.innerHTML = `
         <div class="section-header">
           <div>
-            <h1 class="section-title">Tổng Kết Vòng 2 — Bộ Đề #${escapeHtml(selectedSet)}</h1>
+            <h1 class="section-title">Thống Kê Vòng 2 — Bộ Đề #${escapeHtml(selectedSet)}</h1>
             <p class="section-subtitle">
-              Hoàn thành 10 câu hỏi trắc nghiệm. Điểm số phần mềm đã được quy đổi vào Bảng điểm tổng hợp.
+              Hoàn thành các câu hỏi trắc nghiệm Vòng 2. Xếp hạng theo Điểm số giảm dần, ưu tiên tổng thời gian câu đúng ngắn hơn.
             </p>
           </div>
 
@@ -377,21 +417,7 @@
         </div>
 
         <section class="panel-card" style="margin-top: 1.5rem;">
-          <table class="scores-table">
-            <thead>
-              <tr>
-                <th>Hạng</th>
-                <th>Đội thi</th>
-                <th>Số câu đúng</th>
-                <th>Tổng thời gian đúng</th>
-                <th>Điểm phần mềm</th>
-                <th>Điểm quy đổi (÷500)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
+          ${renderRound2StatsTableHtml()}
         </section>
       `;
     }
@@ -405,7 +431,7 @@
 
       const totalQuestions = getQuestionsInActiveSet().length;
       const answeredCount = Object.keys(liveR2.answers || {}).length;
-      const totalTeams = quizData.teams.length;
+      const participatingTeams = getRoundTeams(quizData.teams, quizData.round_order, "round2");
 
       const durationSec = Number(q.time_seconds) || 30;
       const isRevealed = liveR2.status === "revealed";
@@ -434,7 +460,7 @@
       // Results table when revealed
       let resultsHtml = "";
       if (isRevealed && liveR2.results) {
-        const teamResultsList = quizData.teams.map((t) => {
+        const teamResultsList = participatingTeams.map((t) => {
           const res = liveR2.results[t.id];
           return {
             team: t,
@@ -471,6 +497,14 @@
                 .join("")}
             </div>
           </div>
+
+          <!-- Bảng Thống kê Vòng 2 Tạm Tính -->
+          <div class="panel-card" style="margin-top: 1.5rem;">
+            <h2 class="panel-title">📊 Bảng Thống Kê Vòng 2 (Tạm tính đến câu #${q.number}):</h2>
+            <div style="margin-top: 1rem;">
+              ${renderRound2StatsTableHtml()}
+            </div>
+          </div>
         `;
       }
 
@@ -485,8 +519,11 @@
               <span class="meta-pill accent">Bộ #${escapeHtml(selectedSet)} • Câu ${currentQuestionIdx + 1}/${totalQuestions}</span>
               <div class="r2-live-counter">
                 <span>⚡</span>
-                <span id="r2-answered-counter">${answeredCount}/${totalTeams} đội đã trả lời</span>
+                <span id="r2-answered-counter">${answeredCount}/${participatingTeams.length} đội đã trả lời</span>
               </div>
+              <button type="button" id="btn-toggle-r2-stats" class="btn btn-sm btn-secondary">
+                📊 Thống kê Vòng 2
+              </button>
             </div>
 
             <div class="screen-right-group">
@@ -566,6 +603,7 @@
         renderStage();
       });
 
+      document.getElementById("btn-toggle-r2-stats")?.addEventListener("click", openStatsModal);
       document.getElementById("btn-open-question")?.addEventListener("click", handleStartQuestion);
       document.getElementById("btn-lock-question")?.addEventListener("click", handleLockQuestion);
       document.getElementById("btn-reveal-question")?.addEventListener("click", handleRevealQuestion);
@@ -627,6 +665,12 @@
       setsGrouped = groupRound2BySet(quizData.round2Questions);
       availableSets = Object.keys(setsGrouped);
 
+      // Wire close modal
+      document.getElementById("btn-close-r2-stats-modal")?.addEventListener("click", closeStatsModal);
+      document.getElementById("r2-stats-modal")?.addEventListener("click", (e) => {
+        if (e.target.id === "r2-stats-modal") closeStatsModal();
+      });
+
       // Restore state from database
       const remoteR2 = (await get("live/round2")) || {};
       const storedAnswers = (await get("answers")) || {};
@@ -641,13 +685,13 @@
 
       // Recompute totals and history from stored answers
       const questions = getQuestionsInActiveSet();
-      const divisor = Number(quizData.config.round2_divisor) || 500;
+      const pointsPerCorrect = Number(quizData.config?.round2_points_per_correct) || 2;
       const recomputed = recomputeRound2FromAnswers({
         questions,
         allAnswers: storedAnswers,
         questionsMeta: liveR2.questionsMeta,
         teams: quizData.teams,
-        divisor
+        pointsPerCorrect
       });
       liveR2.history = recomputed.history;
 
@@ -676,12 +720,11 @@
 
       // Update current round in live state
       await update("live", { currentRound: "round2" });
-      // Republish totals rebuilt from stored answers, so a reload never loses them.
+      // Republish totals rebuilt from stored answers
       await updateAccumulatedScores();
 
       listen("live", (remoteLive) => {
         if (!remoteLive) return;
-        // If contest was reset
         if (remoteLive.currentRound === "round1" && !remoteLive.round2?.setStarted && remoteLive.round2?.status === "idle") {
           stopTimerTick();
           currentQuestionIdx = 0;

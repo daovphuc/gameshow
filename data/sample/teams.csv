@@ -1,13 +1,36 @@
 id,name,image_url,color
-doi-01,Đội Sao Vàng,,#D97757
-doi-02,Đội Hồng Hà,,#2E7D4F
-doi-03,Đội Cửu Long,,#3B6E8C
-doi-04,Đội Trường Sơn,,#8C5A3B
-doi-05,Đội Đông Đô,,#9E3E50
-doi-06,Đội Lam Sơn,,#5D6B38
-doi-07,Đội Bạch Đằng,,#2D7B74
-doi-08,Đội Thăng Long,,#B86B28
-doi-09,Đội Phù Đổng,,#6A4C8C
-doi-10,Đội Vạn Xuân,,#B5483A
-doi-11,Đội Đại Việt,,#3A6680
-doi-12,Đội Âu Lạc,,#7A6334
+doi-01,Công an TP. Hà Nội,,#D97757
+doi-02,Công an TP. Hải Phòng,,#2E7D4F
+doi-03,Công an TP. Huế,,#3B6E8C
+doi-04,Công an TP. Đà Nẵng,,#8C5A3B
+doi-05,Công an TP. Hồ Chí Minh,,#9E3E50
+doi-06,Công an TP. Cần Thơ,,#5D6B38
+doi-07,Công an tỉnh Lai Châu,,#2D7B74
+doi-08,Công an tỉnh Điện Biên,,#B86B28
+doi-09,Công an tỉnh Sơn La,,#6A4C8C
+doi-10,Công an tỉnh Lào Cai,,#B5483A
+doi-11,Công an tỉnh Tuyên Quang,,#3A6680
+doi-12,Công an tỉnh Cao Bằng,,#7A6334
+doi-13,Công an tỉnh Lạng Sơn,,#4E7A58
+doi-14,Công an tỉnh Thái Nguyên,,#A65638
+doi-15,Công an tỉnh Phú Thọ,,#D97757
+doi-16,Công an tỉnh Bắc Ninh,,#2E7D4F
+doi-17,Công an tỉnh Quảng Ninh,,#3B6E8C
+doi-18,Công an tỉnh Hưng Yên,,#8C5A3B
+doi-19,Công an tỉnh Ninh Bình,,#9E3E50
+doi-20,Công an tỉnh Thanh Hóa,,#5D6B38
+doi-21,Công an tỉnh Nghệ An,,#2D7B74
+doi-22,Công an tỉnh Hà Tĩnh,,#B86B28
+doi-23,Công an tỉnh Quảng Trị,,#6A4C8C
+doi-24,Công an tỉnh Quảng Ngãi,,#B5483A
+doi-25,Công an tỉnh Gia Lai,,#3A6680
+doi-26,Công an tỉnh Đắk Lắk,,#7A6334
+doi-27,Công an tỉnh Khánh Hòa,,#4E7A58
+doi-28,Công an tỉnh Lâm Đồng,,#A65638
+doi-29,Công an tỉnh Đồng Nai,,#D97757
+doi-30,Công an tỉnh Tây Ninh,,#2E7D4F
+doi-31,Công an tỉnh Đồng Tháp,,#3B6E8C
+doi-32,Công an tỉnh Vĩnh Long,,#8C5A3B
+doi-33,Công an tỉnh An Giang,,#9E3E50
+doi-34,Công an tỉnh Cà Mau,,#5D6B38
+doi-35,T06,,#2D7B74

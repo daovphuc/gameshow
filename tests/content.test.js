@@ -12,7 +12,9 @@ import {
   validateContent,
   isContentEmpty,
   exportContentToJson,
-  importContentFromJson
+  importContentFromJson,
+  getRoundTeams,
+  isTeamInRound
 } from "../js/content.js";
 
 const sampleDir = path.resolve("data/sample");
@@ -45,32 +47,32 @@ test("converting sample CSV data into stored content shape and back into app qui
     configCsv
   });
 
-  const quizData = contentToQuizData(storedContent);
+  const convertedQuizData = contentToQuizData(storedContent);
 
-  // 1. Teams
-  assert.deepEqual(quizData.teams, currentQuizData.teams);
+  // Teams match
+  assert.deepEqual(convertedQuizData.teams, currentQuizData.teams);
 
-  // 2. Round 1 packages
-  assert.deepEqual(quizData.round1Packages, currentQuizData.round1Packages);
+  // Judges match
+  assert.deepEqual(convertedQuizData.judges, currentQuizData.judges);
 
-  // 3. Round 2 sets
+  // Round 1 packages match
+  assert.deepEqual(convertedQuizData.round1Packages, currentQuizData.round1Packages);
+
+  // Round 2 questions and grouping match
+  assert.deepEqual(convertedQuizData.round2Questions, currentQuizData.round2Questions);
   assert.deepEqual(
-    groupRound2BySet(quizData.round2Questions),
+    groupRound2BySet(convertedQuizData.round2Questions),
     groupRound2BySet(currentQuizData.round2Questions)
   );
-  assert.deepEqual(quizData.round2Questions, currentQuizData.round2Questions);
 
-  // 4. Round 3 tiles
-  assert.deepEqual(quizData.round3Questions, currentQuizData.round3Questions);
+  // Round 3 tiles match
+  assert.deepEqual(convertedQuizData.round3Questions, currentQuizData.round3Questions);
 
-  // 5. Judges
-  assert.deepEqual(quizData.judges, currentQuizData.judges);
+  // Accounts match
+  assert.deepEqual(convertedQuizData.accounts, currentQuizData.accounts);
 
-  // 6. Accounts
-  assert.deepEqual(quizData.accounts, currentQuizData.accounts);
-
-  // 7. Config
-  assert.deepEqual(quizData.config, currentQuizData.config);
+  // Config matches
+  assert.deepEqual(convertedQuizData.config, currentQuizData.config);
 });
 
 test("validation accepts valid content from sample data", () => {
@@ -91,12 +93,13 @@ test("validation accepts valid content from sample data", () => {
 
 test("validation rejects duplicate team ids and returns Vietnamese error message", () => {
   const content = csvToContent({ teamsCsv, judgesCsv });
-  content.teams.push({ id: "doi-01", name: "Đội Trùng ID" });
+  content.teams.push({ id: content.teams[0].id, name: "Đội trùng id", color: "#ffffff" });
 
   const result = validateContent(content);
   assert.equal(result.valid, false);
+  assert.ok(result.errors.length > 0);
   assert.ok(
-    result.errors.some((msg) => msg.includes("trùng lặp") && msg.includes("doi-01")),
+    result.errors.some((msg) => msg.includes("trùng lặp") && msg.includes(content.teams[0].id)),
     `Expected Vietnamese duplicate team id message, got: ${JSON.stringify(result.errors)}`
   );
 });
@@ -338,4 +341,57 @@ test("validation rejects data: URLs for team and question images with Vietnamese
   const resValid = validateContent(validContent);
   assert.equal(resValid.valid, true);
   assert.equal(resValid.errors.length, 0);
+});
+
+test("validation checks round_order for unknown team IDs and duplicates", () => {
+  const content = csvToContent({ teamsCsv, judgesCsv });
+
+  // Duplicate team ID in round_order.round1
+  const dupContent = JSON.parse(JSON.stringify(content));
+  dupContent.round_order = {
+    round1: ["doi-01", "doi-02", "doi-01"]
+  };
+  const resDup = validateContent(dupContent);
+  assert.equal(resDup.valid, false);
+  assert.ok(resDup.errors.some((e) => e.includes("trùng lặp") && e.includes("Vòng 1")));
+
+  // Unknown team ID in round_order.round2
+  const unkContent = JSON.parse(JSON.stringify(content));
+  unkContent.round_order = {
+    round2: ["doi-01", "doi-unknown-999"]
+  };
+  const resUnk = validateContent(unkContent);
+  assert.equal(resUnk.valid, false);
+  assert.ok(resUnk.errors.some((e) => e.includes("không tồn tại") && e.includes("doi-unknown-999")));
+});
+
+test("getRoundTeams and isTeamInRound filter and order teams correctly", () => {
+  const allTeams = [
+    { id: "doi-01", name: "Đội 1" },
+    { id: "doi-02", name: "Đội 2" },
+    { id: "doi-03", name: "Đội 3" }
+  ];
+
+  // When round_order is empty/undefined -> all teams in default order
+  const defaultR1 = getRoundTeams(allTeams, {}, "round1");
+  assert.equal(defaultR1.length, 3);
+  assert.equal(defaultR1[0].id, "doi-01");
+  assert.equal(defaultR1[0].orderNumber, 1);
+  assert.equal(isTeamInRound("doi-01", allTeams, {}, "round1"), true);
+  assert.equal(isTeamInRound("doi-unknown", allTeams, {}, "round1"), false);
+
+  // When round_order specifies custom order and subset
+  const roundOrder = {
+    round1: ["doi-03", "doi-01"] // only doi-03 and doi-01, in that order
+  };
+  const customR1 = getRoundTeams(allTeams, roundOrder, "round1");
+  assert.equal(customR1.length, 2);
+  assert.equal(customR1[0].id, "doi-03");
+  assert.equal(customR1[0].orderNumber, 1);
+  assert.equal(customR1[1].id, "doi-01");
+  assert.equal(customR1[1].orderNumber, 2);
+
+  assert.equal(isTeamInRound("doi-03", allTeams, roundOrder, "round1"), true);
+  assert.equal(isTeamInRound("doi-01", allTeams, roundOrder, "round1"), true);
+  assert.equal(isTeamInRound("doi-02", allTeams, roundOrder, "round1"), false);
 });

@@ -1,18 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  PORTALS,
-  PORTAL_URLS,
   DEFAULT_PASSWORD,
+  PORTALS,
+  authenticate,
+  clearActiveSession,
+  generateDefaultAccounts,
+  getActiveSession,
   getPortalUrl,
   normaliseAccounts,
-  generateDefaultAccounts,
   resolveAccounts,
-  authenticate,
-  validateSession,
-  getActiveSession,
   saveActiveSession,
-  clearActiveSession
+  validateSession
 } from "../js/auth.js";
 
 const sampleJudges = [
@@ -24,7 +23,7 @@ const sampleJudges = [
 const sampleTeams = [
   { id: "doi-01", name: "Đội Sao Vàng" },
   { id: "doi-02", name: "Đội Hồng Hà" },
-  { id: "doi-03", name: "Đội Cửu Long" }
+  { id: "doi-03", name: "Đội Ba Đình" }
 ];
 
 test("Role to portal URL mapping", () => {
@@ -33,6 +32,7 @@ test("Role to portal URL mapping", () => {
   assert.equal(getPortalUrl(PORTALS.HOST), "./host.html");
   assert.equal(getPortalUrl("judge"), "./judge.html");
   assert.equal(getPortalUrl("JUDGE"), "./judge.html");
+  assert.equal(getPortalUrl("head_judge"), "./judge.html");
   assert.equal(getPortalUrl(PORTALS.JUDGE), "./judge.html");
   assert.equal(getPortalUrl("team"), "./team.html");
   assert.equal(getPortalUrl("TEAM"), "./team.html");
@@ -42,8 +42,8 @@ test("Role to portal URL mapping", () => {
 
 test("Default accounts generated from judges and teams when accounts tab is missing or empty", () => {
   const defaults = generateDefaultAccounts({ judges: sampleJudges, teams: sampleTeams });
-  // 1 host + 3 judges + 3 teams = 7 accounts
-  assert.equal(defaults.length, 7);
+  // 1 host + 3 judges + 1 head_judge + 3 teams = 8 accounts
+  assert.equal(defaults.length, 8);
 
   // Host default
   assert.deepEqual(defaults[0], {
@@ -69,21 +69,44 @@ test("Default accounts generated from judges and teams when accounts tab is miss
     ref_id: "gk-02",
     display_name: "Ban Giám khảo 2"
   });
+  assert.deepEqual(defaults[3], {
+    username: "gk3",
+    password: DEFAULT_PASSWORD,
+    role: "judge",
+    ref_id: "gk-03",
+    display_name: "Ban Giám khảo 3"
+  });
+
+  // Head judge default
+  assert.deepEqual(defaults[4], {
+    username: "gktong",
+    password: DEFAULT_PASSWORD,
+    role: "head_judge",
+    ref_id: "",
+    display_name: "Giám khảo tổng"
+  });
 
   // Team defaults: doi01, doi02, doi03 with ref_id and display_name
-  assert.deepEqual(defaults[4], {
+  assert.deepEqual(defaults[5], {
     username: "doi01",
     password: DEFAULT_PASSWORD,
     role: "team",
     ref_id: "doi-01",
     display_name: "Đội Sao Vàng"
   });
-  assert.deepEqual(defaults[5], {
+  assert.deepEqual(defaults[6], {
     username: "doi02",
     password: DEFAULT_PASSWORD,
     role: "team",
     ref_id: "doi-02",
     display_name: "Đội Hồng Hà"
+  });
+  assert.deepEqual(defaults[7], {
+    username: "doi03",
+    password: DEFAULT_PASSWORD,
+    role: "team",
+    ref_id: "doi-03",
+    display_name: "Đội Ba Đình"
   });
 
   // resolveAccounts returns defaults when input is empty
@@ -97,6 +120,8 @@ test("Accounts normalisation: role validation, ref_id must exist for judge/team,
     { username: " admin ", password: " secret123 ", role: " host ", ref_id: "", display_name: "Quản trị" },
     // Duplicate username with different case: first wins
     { username: "ADMIN", password: "other-password", role: "host", ref_id: "", display_name: "Khác" },
+    // Valid head_judge account (does not require ref_id)
+    { username: "gktong", password: "passhead", role: "head_judge", ref_id: "", display_name: "Giám khảo tổng" },
     // Valid judge account with matching ref_id
     { username: "gk_truong", password: "pass1", role: "judge", ref_id: "gk-01", display_name: "Trưởng ban GK" },
     // Judge account with invalid ref_id: skipped
@@ -118,7 +143,7 @@ test("Accounts normalisation: role validation, ref_id must exist for judge/team,
   ];
 
   const normalised = normaliseAccounts(rawRows, { judges: sampleJudges, teams: sampleTeams });
-  assert.equal(normalised.length, 3);
+  assert.equal(normalised.length, 4);
 
   // 1. Host
   assert.deepEqual(normalised[0], {
@@ -129,8 +154,17 @@ test("Accounts normalisation: role validation, ref_id must exist for judge/team,
     display_name: "Quản trị"
   });
 
-  // 2. Judge
+  // 2. Head Judge
   assert.deepEqual(normalised[1], {
+    username: "gktong",
+    password: "passhead",
+    role: "head_judge",
+    ref_id: "",
+    display_name: "Giám khảo tổng"
+  });
+
+  // 3. Judge
+  assert.deepEqual(normalised[2], {
     username: "gk_truong",
     password: "pass1",
     role: "judge",
@@ -138,8 +172,8 @@ test("Accounts normalisation: role validation, ref_id must exist for judge/team,
     display_name: "Trưởng ban GK"
   });
 
-  // 3. Team (display_name defaulted to team name)
-  assert.deepEqual(normalised[2], {
+  // 4. Team (display_name defaulted to team name)
+  assert.deepEqual(normalised[3], {
     username: "doi_saovang",
     password: "pass4",
     role: "team",
@@ -151,6 +185,7 @@ test("Accounts normalisation: role validation, ref_id must exist for judge/team,
 test("Login check: right/wrong password, case-insensitive username, trimmed input", () => {
   const accounts = [
     { username: "mc", password: "password123", role: "host", ref_id: "", display_name: "Dẫn chương trình" },
+    { username: "gktong", password: "headpass", role: "head_judge", ref_id: "", display_name: "Giám khảo tổng" },
     { username: "gk1", password: "judgepass", role: "judge", ref_id: "gk-01", display_name: "GK 1" },
     { username: "doi01", password: "teampass", role: "team", ref_id: "doi-01", display_name: "Đội 1" }
   ];
@@ -160,6 +195,11 @@ test("Login check: right/wrong password, case-insensitive username, trimmed inpu
   assert.equal(res1.ok, true);
   assert.equal(res1.account.username, "mc");
   assert.equal(res1.portalUrl, "./host.html");
+
+  // Head judge login -> routes to ./judge.html
+  const resHead = authenticate("gktong", "headpass", accounts);
+  assert.equal(resHead.ok, true);
+  assert.equal(resHead.portalUrl, "./judge.html");
 
   // Correct login: case-insensitive username & trimmed spaces
   const res2 = authenticate("  MC  ", "  password123  ", accounts);
@@ -193,6 +233,7 @@ test("Login check: right/wrong password, case-insensitive username, trimmed inpu
 test("Stored login invalidated when account disappears or password changes", () => {
   const initialAccounts = [
     { username: "mc", password: "pass-host", role: "host", ref_id: "", display_name: "MC" },
+    { username: "gktong", password: "pass-head", role: "head_judge", ref_id: "", display_name: "GKTong" },
     { username: "gk1", password: "pass-judge", role: "judge", ref_id: "gk-01", display_name: "GK1" }
   ];
 
@@ -207,6 +248,16 @@ test("Stored login invalidated when account disappears or password changes", () 
   // Valid session matches
   assert.ok(validateSession(validSession, initialAccounts, "host"));
   assert.ok(validateSession(validSession, initialAccounts)); // without role check
+
+  // Head judge session validates for judge portal
+  const headSession = {
+    username: "gktong",
+    password: "pass-head",
+    role: "head_judge",
+    ref_id: "",
+    display_name: "GKTong"
+  };
+  assert.ok(validateSession(headSession, initialAccounts, "judge"));
 
   // Role mismatch rejected
   assert.equal(validateSession(validSession, initialAccounts, "judge"), null);

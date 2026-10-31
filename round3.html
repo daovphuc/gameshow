@@ -27,6 +27,7 @@
       wireStageLayout
     } from "./js/app.js";
     import { resolveImageUrl } from "./js/data.js";
+    import { getRoundTeams } from "./js/content.js";
     import {
       isTileOpened,
       openRound3Tile,
@@ -127,22 +128,27 @@
     }
 
     function setSelectedTeam(teamId) {
-      selectedTeamId = teamId || "";
-      sessionStorage.setItem(SELECTED_TEAM_KEY, selectedTeamId);
-      if (gameState?.round3?.activeTile) {
-        gameState = updateRound3TileSession(gameState, { selectedTeamId });
+      selectedTeamId = teamId;
+      if (teamId) {
+        sessionStorage.setItem(SELECTED_TEAM_KEY, teamId);
+      } else {
+        sessionStorage.removeItem(SELECTED_TEAM_KEY);
+      }
+
+      if (gameState.round3.activeTile) {
+        gameState = updateRound3TileSession(gameState, teamId);
         saveAppState(gameState);
       }
       syncLiveState();
     }
 
     function syncLiveState() {
-      update("live", {
-        currentRound: "round3",
-        stageTeamId: gameState.round3.activeTile ? (gameState.round3.activeTile.selectedTeamId || selectedTeamId || null) : null,
-        "round3/openedTiles": gameState.round3.openedTiles || [],
-        "round3/activeTile": gameState.round3.activeTile || null
+      set("live/round3", {
+        openedTiles: gameState.round3.openedTiles || [],
+        activeTile: gameState.round3.activeTile || null
       });
+      set("live/currentRound", "round3");
+      set("live/stageTeamId", gameState.round3.activeTile?.selectedTeamId || selectedTeamId || null);
     }
 
     function handleBack() {
@@ -172,10 +178,11 @@
     }
 
     function renderTeamSelectOptionsHtml(currentTeamId) {
-      return quizData.teams
+      const roundTeams = getRoundTeams(quizData.teams, quizData.round_order, "round3");
+      return roundTeams
         .map((team) => {
           const isSelected = team.id === currentTeamId ? "selected" : "";
-          return `<option value="${escapeHtml(team.id)}" ${isSelected}>${escapeHtml(team.name)}</option>`;
+          return `<option value="${escapeHtml(team.id)}" ${isSelected}>#${team.orderNumber} - ${escapeHtml(team.name)}</option>`;
         })
         .join("");
     }
@@ -184,8 +191,9 @@
       stopTimerLoop();
       activeTimerKey = null;
 
-      if (!selectedTeamId && quizData.teams.length > 0) {
-        selectedTeamId = quizData.teams[0].id;
+      const roundTeams = getRoundTeams(quizData.teams, quizData.round_order, "round3");
+      if (!selectedTeamId && roundTeams.length > 0) {
+        selectedTeamId = roundTeams[0].id;
       }
 
       const tilesHtml = quizData.round3Questions
@@ -210,7 +218,7 @@
           <div>
             <h1 class="section-title">${escapeHtml(quizData.config.round3_name)}</h1>
             <p class="section-subtitle">
-              Chọn đội đang trả lời từ danh sách thả xuống, sau đó bấm mở ô câu hỏi tình huống trên bảng.
+              Chọn đội đang trả lời từ danh sách thứ tự thi đấu, sau đó bấm mở ô câu hỏi tình huống trên bảng.
             </p>
           </div>
         </div>
@@ -237,7 +245,7 @@
         btn.addEventListener("click", () => {
           const num = Number(btn.dataset.tileNumber);
           const tile = quizData.round3Questions.find((q) => q.number === num);
-          gameState = openRound3Tile(gameState, num, selectedTeamId || quizData.teams[0]?.id || null);
+          gameState = openRound3Tile(gameState, num, selectedTeamId || roundTeams[0]?.id || null);
           if (tile && gameState.round3.activeTile) {
             gameState.round3.activeTile.question = tile.question;
           }
@@ -250,6 +258,7 @@
 
     function renderActiveTileStage(container, activeTile) {
       const tile = quizData.round3Questions.find((q) => q.number === Number(activeTile.number));
+      const roundTeams = getRoundTeams(quizData.teams, quizData.round_order, "round3");
       if (!tile) {
         gameState = closeRound3Tile(gameState);
         saveAppState(gameState);
@@ -258,7 +267,7 @@
         return;
       }
 
-      const currentTeamId = activeTile.selectedTeamId || selectedTeamId || quizData.teams[0]?.id || "";
+      const currentTeamId = activeTile.selectedTeamId || selectedTeamId || roundTeams[0]?.id || "";
       ensureTileTimer(tile.number, tile.time_seconds);
 
       container.innerHTML = `
