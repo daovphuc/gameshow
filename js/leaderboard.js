@@ -25,9 +25,21 @@ export function getTeamInitials(name) {
     return "?";
   }
 
+  // Police teams are named "Công an TP. X" / "Công an tỉnh X": use the place name.
+  const place = cleaned
+    .replace(/^công an\s+(thành phố|tp\.?|tỉnh)\s+/i, "")
+    .trim();
+  if (place !== cleaned && place) {
+    const placeWords = place.split(" ").filter(Boolean);
+    if (placeWords.length === 1) {
+      return placeWords[0].slice(0, 2).toUpperCase();
+    }
+    return placeWords.slice(0, 3).map((w) => w[0]).join("").toUpperCase();
+  }
+
   const words = cleaned.split(" ").filter(Boolean);
   if (words.length === 1) {
-    return words[0].slice(0, 2).toUpperCase();
+    return (words[0].length <= 3 ? words[0] : words[0].slice(0, 2)).toUpperCase();
   }
 
   const prefixes = new Set(["đội", "doi", "team", "nhóm", "nhom"]);

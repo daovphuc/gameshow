@@ -23,6 +23,7 @@
       logoutUser
     } from "./js/app.js";
     import { resolveImageUrl } from "./js/data.js";
+    import { isTeamInRound } from "./js/content.js";
     import { formatTimer } from "./js/timer.js";
     import { set, listen, getServerTime, serverTimestamp, onStatusChange } from "./js/backend.js";
     import { getActiveSession } from "./js/auth.js";
@@ -124,6 +125,11 @@
 
     async function handleChoice(letter) {
       if (!selectedTeamId || !letter) return;
+      if (!isTeamInRound(selectedTeamId, quizData.teams, quizData.round_order, "round2")) {
+        showToast("Đội không tham gia thi vòng này!");
+        return;
+      }
+
       const r2 = liveState.round2;
       if (r2.status !== "open" || !r2.questionKey) return;
 
@@ -169,6 +175,34 @@
       }
     }
 
+    function renderNonParticipatingScreen(root, roundKey) {
+      stopTimerLoop();
+      const roundName = roundKey === "round1"
+        ? quizData.config.round1_name
+        : roundKey === "round2"
+          ? quizData.config.round2_name
+          : quizData.config.round3_name;
+
+      root.innerHTML = `
+        ${renderTeamHeader()}
+
+        <main class="tablet-stage-card" style="text-align: center; padding: 4.5rem 1.5rem;">
+          <div style="margin-bottom: 1rem;">
+            <span class="meta-pill accent">${escapeHtml(roundName)}</span>
+          </div>
+          <div style="font-size: 3.5rem; margin-bottom: 1rem;">ℹ️</div>
+          <h2 style="font-family: var(--font-serif); font-size: 1.7rem; margin: 0 0 0.6rem;">
+            Đội không tham gia vòng này
+          </h2>
+          <p style="color: var(--text-muted); font-size: 1.1rem; max-width: 520px; margin: 0 auto;">
+            Theo danh sách và thứ tự thi đấu, đội của bạn không tham gia thi vòng này. Vui lòng chú ý theo dõi phần thi của các đội bạn!
+          </p>
+        </main>
+      `;
+
+      wireHeaderControls();
+    }
+
     function renderRound1Or3WaitingScreen(root, roundKey) {
       stopTimerLoop();
       const isR1 = roundKey === "round1";
@@ -179,21 +213,21 @@
       let topicText = "";
 
       if (isR1) {
-        const stageTeamId = liveState.round1?.activeSession?.teamId || liveState.stageTeamId;
-        isMyTurn = Boolean(stageTeamId && stageTeamId === selectedTeamId);
-        stageTeam = stageTeamId ? quizData.teams.find((t) => t.id === stageTeamId) : null;
-        if (liveState.round1?.activeSession?.packageId) {
-          const pkg = quizData.round1Packages.find((p) => p.id === liveState.round1.activeSession.packageId);
-          if (pkg) topicText = `${pkg.package}: ${pkg.question}`;
+        const activeSession = liveState.round1?.activeSession;
+        if (activeSession) {
+          isMyTurn = activeSession.teamId === selectedTeamId;
+          stageTeam = quizData.teams.find((t) => t.id === activeSession.teamId);
+          topicText = activeSession.packageQuestion || "";
+        } else if (liveState.stageTeamId) {
+          isMyTurn = liveState.stageTeamId === selectedTeamId;
+          stageTeam = quizData.teams.find((t) => t.id === liveState.stageTeamId);
         }
       } else {
         const activeTile = liveState.round3?.activeTile;
-        const activeTeamId = activeTile?.selectedTeamId || (activeTile ? liveState.stageTeamId : null);
-        isMyTurn = Boolean(activeTeamId && activeTeamId === selectedTeamId);
-        stageTeam = activeTeamId ? quizData.teams.find((t) => t.id === activeTeamId) : null;
-        if (activeTile?.number) {
-          const tile = quizData.round3Questions.find((q) => q.number === activeTile.number);
-          if (tile) topicText = `Ô số #${tile.number}: ${tile.question}`;
+        if (activeTile) {
+          isMyTurn = activeTile.selectedTeamId === selectedTeamId;
+          stageTeam = quizData.teams.find((t) => t.id === activeTile.selectedTeamId);
+          topicText = activeTile.question || "";
         }
       }
 
@@ -201,27 +235,28 @@
         ${renderTeamHeader()}
 
         <main class="tablet-stage-card" style="text-align: center; padding: 3.5rem 1.5rem;">
-          <div style="margin-bottom: 1rem;">
+          <div style="margin-bottom: 1.25rem;">
             <span class="meta-pill accent">${escapeHtml(roundName)}</span>
           </div>
 
           ${
             isMyTurn
               ? `
-                <div style="font-size: 3.8rem; margin-bottom: 1rem; animation: pulse 1.5s infinite;">★</div>
-                <h2 style="font-family: var(--font-serif); font-size: clamp(1.6rem, 3.2vw, 2.2rem); color: var(--accent); margin: 0 0 0.8rem;">
+                <div style="font-size: 3.5rem; margin-bottom: 0.8rem;">🔔</div>
+                <h2 style="font-family: var(--font-serif); font-size: clamp(1.6rem, 3.2vw, 2.2rem); margin: 0 0 0.8rem; color: var(--accent);">
                   ĐẾN LƯỢT ĐỘI CỦA BẠN LÊN SÂN KHẤU!
                 </h2>
-                <p style="font-size: 1.15rem; font-weight: 600; color: var(--text); max-width: 600px; margin: 0 auto 1.5rem;">
-                  Đội của bạn đang thực hiện phần thi trên sân khấu. Hãy chuẩn bị và theo dõi chỉ dẫn của MC.
+                <p style="font-size: 1.15rem; color: var(--text-muted); max-width: 550px; margin: 0 auto 1.5rem;">
+                  Đội của bạn đang thực hiện phần thi trên sân khấu. Hãy chuẩn bị và tự tin trả lời!
                 </p>
+
                 ${
                   topicText
-                    ? `<div style="background-color: var(--surface); border: 2px solid var(--accent); border-radius: var(--radius-md); padding: 1.25rem 1.5rem; max-width: 650px; margin: 0 auto; text-align: left;">
-                        <div style="font-size: 0.82rem; font-weight: 700; color: var(--accent); text-transform: uppercase; margin-bottom: 0.35rem;">
-                          ${isR1 ? "Gói chủ đề của đội bạn" : "Tình huống bốc thăm"}
-                        </div>
-                        <div style="font-size: 1.15rem; font-weight: 700; line-height: 1.45;">
+                    ? `<div style="text-align: left; max-width: 600px; margin: 1.5rem auto 0; padding: 1.2rem; border-radius: var(--radius-md); background-color: var(--surface-elevated); border: 1px solid var(--border);">
+                        <strong style="display: block; font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.4rem;">
+                          ${isR1 ? "Gói câu hỏi bốc thăm:" : "Tình huống truyền thông:"}
+                        </strong>
+                        <div style="font-size: 1.15rem; font-weight: 600; line-height: 1.4;">
                           ${escapeHtml(topicText)}
                         </div>
                       </div>`
@@ -413,6 +448,12 @@
       if (!root || !quizData) return;
 
       const curRound = liveState.currentRound || "round1";
+
+      if (selectedTeamId && !isTeamInRound(selectedTeamId, quizData.teams, quizData.round_order, curRound)) {
+        renderNonParticipatingScreen(root, curRound);
+        return;
+      }
+
       if (curRound === "round2") {
         const r2 = liveState.round2;
         if (r2?.status === "open" || r2?.status === "locked" || r2?.status === "revealed") {
@@ -449,8 +490,6 @@
       // Listen for live round and question broadcasts
       listen("live", (data) => {
         if (!data) return;
-        // Replace (not merge) so fields the host removed, e.g. after a reset, disappear here too;
-        // keep answers that arrive on their own listener for the same question.
         const prevRound2 = liveState.round2 || {};
         liveState = { ...initialLiveState(), ...data };
         if (prevRound2.answers && liveState.round2 && liveState.round2.questionKey === prevRound2.questionKey && !liveState.round2.answers) {

@@ -17,36 +17,44 @@ import {
   recomputeRound2FromAnswers
 } from "../js/round2.js";
 
-test("Round-2 scoring: correct at 0 s = 1000; at deadline = 500; linear in between (e.g. 15 s of 30 = 750); wrong/missing/late = 0; total ÷ 500 rounded to 2 decimals (e.g. 9,876 → 19.75)", () => {
+test("Round-2 scoring: flat points per correct answer (default 2); wrong/missing/late = 0; total score is sum of points", () => {
   const shownAt = 10000;
   const duration = 30; // 30 seconds
 
-  // Correct at 0 s = 1000
+  // Correct within deadline = 2 (default)
   const scoreAt0 = calculateRound2QuestionScore({
     isCorrect: true,
     answeredAt: 10000,
     shownAt,
     durationSeconds: duration
   });
-  assert.equal(scoreAt0, 1000);
+  assert.equal(scoreAt0, 2);
 
-  // Correct at deadline (30 s) = 500
   const scoreAt30 = calculateRound2QuestionScore({
     isCorrect: true,
     answeredAt: 40000,
     shownAt,
     durationSeconds: duration
   });
-  assert.equal(scoreAt30, 500);
+  assert.equal(scoreAt30, 2);
 
-  // Correct at 15 s of 30 s = 750
   const scoreAt15 = calculateRound2QuestionScore({
     isCorrect: true,
     answeredAt: 25000,
     shownAt,
     durationSeconds: duration
   });
-  assert.equal(scoreAt15, 750);
+  assert.equal(scoreAt15, 2);
+
+  // Custom pointsPerCorrect
+  const scoreCustom = calculateRound2QuestionScore({
+    isCorrect: true,
+    answeredAt: 25000,
+    shownAt,
+    durationSeconds: duration,
+    pointsPerCorrect: 5
+  });
+  assert.equal(scoreCustom, 5);
 
   // Wrong answer = 0
   const scoreWrong = calculateRound2QuestionScore({
@@ -75,11 +83,9 @@ test("Round-2 scoring: correct at 0 s = 1000; at deadline = 500; linear in betwe
   });
   assert.equal(scoreMissing, 0);
 
-  // Total ÷ 500 rounded to 2 decimals (e.g. 9,876 → 19.75)
-  assert.equal(calculateRound2Score(9876, 500), 19.75);
-  assert.equal(calculateRound2Score(10000, 500), 20.0);
-  assert.equal(calculateRound2Score(0, 500), 0);
-  assert.equal(calculateRound2Score(500, 500), 1.0);
+  // Total score is sum of points
+  assert.equal(calculateRound2Score(16), 16);
+  assert.equal(calculateRound2Score(0), 0);
 });
 
 test("Round-2 timing uses server timestamps: given question shownAt and answer at values, response time and late check come out right regardless of client clock offset", () => {
@@ -97,12 +103,9 @@ test("Round-2 timing uses server timestamps: given question shownAt and answer a
     isCorrect: true,
     answeredAt: serverAnsweredAt,
     shownAt: serverShownAt,
-    durationSeconds: duration,
-    maxPoints: 1000,
-    minPoints: 500
+    durationSeconds: duration
   });
-  // 8s / 20s = 0.4. 1000 - (500 * 0.4) = 800 (independent of tabletClockSkewed)
-  assert.equal(score, 800);
+  assert.equal(score, 2);
 
   // Server recorded answer 21 seconds after shownAt -> rejected as late
   const serverLateAnsweredAt = serverShownAt + 21000;
@@ -137,12 +140,12 @@ test("recomputeRound2FromAnswers restores per-team totals, question history, and
 
   const allAnswers = {
     "set_1__q_0": {
-      "doi-01": { answer: "A", answeredAt: shownAtQ0 + 15000 }, // Correct at 15s -> 750 pts
+      "doi-01": { answer: "A", answeredAt: shownAtQ0 + 15000 }, // Correct at 15s -> 2 pts
       "doi-02": { answer: "B", answeredAt: shownAtQ0 + 5000 }   // Wrong -> 0 pts
     },
     "set_1__q_1": {
-      "doi-01": { answer: "B", answeredAt: shownAtQ1 + 0 },     // Correct at 0s -> 1000 pts
-      "doi-02": { answer: "B", answeredAt: shownAtQ1 + 30000 }  // Correct at 30s -> 500 pts
+      "doi-01": { answer: "B", answeredAt: shownAtQ1 + 0 },     // Correct at 0s -> 2 pts
+      "doi-02": { answer: "B", answeredAt: shownAtQ1 + 30000 }  // Correct at 30s -> 2 pts
     }
   };
 
@@ -151,20 +154,20 @@ test("recomputeRound2FromAnswers restores per-team totals, question history, and
     allAnswers,
     questionsMeta,
     teams,
-    divisor: 500
+    pointsPerCorrect: 2
   });
 
-  // Doi 01: 750 + 1000 = 1750 pts -> 1750 / 500 = 3.5 score, 2 correct
-  assert.equal(recomputed.teamStats["doi-01"].softwarePoints, 1750);
+  // Doi 01: 2 + 2 = 4 pts, 2 correct
+  assert.equal(recomputed.teamStats["doi-01"].points, 4);
   assert.equal(recomputed.teamStats["doi-01"].correctCount, 2);
   assert.equal(recomputed.teamStats["doi-01"].totalCorrectTimeMs, 15000);
-  assert.equal(recomputed.scores["doi-01"], 3.5);
+  assert.equal(recomputed.scores["doi-01"], 4);
 
-  // Doi 02: 0 + 500 = 500 pts -> 500 / 500 = 1.0 score, 1 correct
-  assert.equal(recomputed.teamStats["doi-02"].softwarePoints, 500);
+  // Doi 02: 0 + 2 = 2 pts, 1 correct
+  assert.equal(recomputed.teamStats["doi-02"].points, 2);
   assert.equal(recomputed.teamStats["doi-02"].correctCount, 1);
   assert.equal(recomputed.teamStats["doi-02"].totalCorrectTimeMs, 30000);
-  assert.equal(recomputed.scores["doi-02"], 1.0);
+  assert.equal(recomputed.scores["doi-02"], 2);
 
   // Current position: Q0 and Q1 done -> next index is 2
   assert.equal(recomputed.currentQuestionIndex, 2);
@@ -180,12 +183,12 @@ test("recomputeRound2FromAnswers restores per-team totals, question history, and
     allAnswers,
     questionsMeta,
     teams,
-    divisor: 500
+    pointsPerCorrect: 2
   });
   assert.deepEqual(recomputed, secondRun);
 });
 
-test("Round-2 ranking: tie on raw points broken by more correct, then shorter total correct time", () => {
+test("Round-2 ranking: tie on points broken by shorter total correct time, then team order", () => {
   const teams = [
     { id: "doi-A", name: "Đội A" },
     { id: "doi-B", name: "Đội B" },
@@ -193,24 +196,24 @@ test("Round-2 ranking: tie on raw points broken by more correct, then shorter to
     { id: "doi-D", name: "Đội D" }
   ];
 
-  // Doi A: 2500 pts, 3 correct, 30000 ms total time
-  // Doi B: 2500 pts, 4 correct, 45000 ms total time (better: more correct answers)
-  // Doi C: 2500 pts, 3 correct, 25000 ms total time (better than A: shorter time)
-  // Doi D: 2800 pts, 3 correct, 40000 ms total time (highest points)
+  // Doi A: 6 pts, 3 correct, 30000 ms total time
+  // Doi B: 8 pts, 4 correct, 45000 ms total time
+  // Doi C: 6 pts, 3 correct, 25000 ms total time (better than A: shorter time)
+  // Doi D: 10 pts, 5 correct, 40000 ms total time (highest points)
   const teamStats = {
-    "doi-A": { softwarePoints: 2500, correctCount: 3, totalCorrectTimeMs: 30000 },
-    "doi-B": { softwarePoints: 2500, correctCount: 4, totalCorrectTimeMs: 45000 },
-    "doi-C": { softwarePoints: 2500, correctCount: 3, totalCorrectTimeMs: 25000 },
-    "doi-D": { softwarePoints: 2800, correctCount: 3, totalCorrectTimeMs: 40000 }
+    "doi-A": { points: 6, correctCount: 3, totalCorrectTimeMs: 30000 },
+    "doi-B": { points: 8, correctCount: 4, totalCorrectTimeMs: 45000 },
+    "doi-C": { points: 6, correctCount: 3, totalCorrectTimeMs: 25000 },
+    "doi-D": { points: 10, correctCount: 5, totalCorrectTimeMs: 40000 }
   };
 
   const ranked = computeRound2Ranking(teams, teamStats);
 
   // Expected order:
-  // 1: doi-D (2800 pts)
-  // 2: doi-B (2500 pts, 4 correct)
-  // 3: doi-C (2500 pts, 3 correct, 25000ms)
-  // 4: doi-A (2500 pts, 3 correct, 30000ms)
+  // 1: doi-D (10 pts)
+  // 2: doi-B (8 pts)
+  // 3: doi-C (6 pts, 25000ms)
+  // 4: doi-A (6 pts, 30000ms)
   assert.equal(ranked[0].id, "doi-D");
   assert.equal(ranked[0].rank, 1);
 
@@ -408,7 +411,7 @@ test("Live-state reducer/commands (pure): show question → answers accepted →
   state = revealRound2Question(state, question);
   assert.equal(state.status, "revealed");
   assert.equal(state.results["doi-01"].isCorrect, true);
-  assert.ok(state.results["doi-01"].points > 900);
+  assert.equal(state.results["doi-01"].points, 2);
   assert.equal(state.results["doi-02"].isCorrect, false);
   assert.equal(state.results["doi-02"].points, 0);
 
@@ -429,7 +432,7 @@ test("Reveal derives response time from server answeredAt when tablets store onl
   };
   const revealed = revealRound2Question(state, question);
   assert.equal(revealed.results.t1.responseTimeMs, 6000);
-  assert.equal(revealed.results.t1.points, 900);
+  assert.equal(revealed.results.t1.points, 2);
   assert.equal(revealed.results.t2.responseTimeMs, 2000);
   assert.equal(revealed.results.t2.points, 0);
 });

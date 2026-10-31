@@ -3,7 +3,7 @@
 
 import { calculateTeamRoundScore } from "./judges.js";
 import { computeLeaderboard } from "./leaderboard.js";
-import { buildQuestionKey, calculateRound2QuestionScore } from "./round2.js";
+import { buildQuestionKey, calculateRound2QuestionScore, computeRound2Ranking } from "./round2.js";
 
 function escapeCsvField(val) {
   if (val === undefined || val === null) {
@@ -115,6 +115,7 @@ export function buildReportCsv({
       const meta = questionsMeta[qKey] || {};
       const shownAt = meta.shownAt ?? q.shownAt ?? 0;
       const durationSeconds = Number(q.time_seconds) || 30;
+      const ptsPerCorrect = Number(config?.round2_points_per_correct) || 2;
 
       if (Object.keys(answersForQ).length === 0 && !meta.shownAt) {
         continue;
@@ -130,7 +131,8 @@ export function buildReportCsv({
           isCorrect,
           answeredAt,
           shownAt,
-          durationSeconds
+          durationSeconds,
+          pointsPerCorrect: ptsPerCorrect
         });
 
         actualR2Details.push({
@@ -197,10 +199,68 @@ export function buildReportCsv({
     );
   }
 
+  // SECTION 2: Thống kê Vòng 2
+  let contestTeams = teams;
+  if ((!contestTeams || contestTeams.length === 0) && actualRanked && actualRanked.length > 0) {
+    contestTeams = actualRanked.map((e) => ({ id: e.id, name: e.name }));
+  }
+
+  if (contestTeams && contestTeams.length > 0) {
+    const r2StatsMap = {};
+    for (const t of contestTeams) {
+      r2StatsMap[t.id] = {
+        points: gameState?.round2Stats?.[t.id]?.points ?? 0,
+        correctCount: gameState?.round2Stats?.[t.id]?.correctCount ?? 0,
+        totalCorrectTimeMs: gameState?.round2Stats?.[t.id]?.totalCorrectTimeMs ?? 0
+      };
+    }
+
+    const hasLiveStats = Object.values(r2StatsMap).some((s) => s.points > 0 || s.correctCount > 0);
+    if (!hasLiveStats && actualR2Details && actualR2Details.length > 0) {
+      for (const item of actualR2Details) {
+        if (!r2StatsMap[item.teamId]) {
+          r2StatsMap[item.teamId] = { points: 0, correctCount: 0, totalCorrectTimeMs: 0 };
+        }
+        if (item.isCorrect) {
+          r2StatsMap[item.teamId].points += Number(item.points) || 0;
+          r2StatsMap[item.teamId].correctCount += 1;
+          r2StatsMap[item.teamId].totalCorrectTimeMs += Math.round((Number(item.timeSeconds) || 0) * 1000);
+        }
+      }
+    }
+
+    const r2Ranking = computeRound2Ranking(contestTeams, r2StatsMap);
+    lines.push("");
+    lines.push("");
+    lines.push(formatRow(["THỐNG KÊ VÒNG 2 (TRẮC NGHIỆM)"]));
+    lines.push(
+      formatRow([
+        "Thứ hạng",
+        "Mã đội",
+        "Tên đội",
+        "Điểm số",
+        "Số câu đúng",
+        "Tổng thời gian đúng (s)"
+      ])
+    );
+    for (const r of r2Ranking) {
+      lines.push(
+        formatRow([
+          r.rank ?? "",
+          r.id ?? "",
+          r.name ?? "",
+          r.points ?? 0,
+          r.correctCount ?? 0,
+          (Number(r.totalCorrectTimeSeconds) || 0).toFixed(2)
+        ])
+      );
+    }
+  }
+
   lines.push("");
   lines.push("");
 
-  // SECTION 2: Round 2 Details (Điều 15.5d)
+  // SECTION 3: Round 2 Details (Điều 15.5d)
   lines.push(formatRow(["CHI TIẾT ĐÁP ÁN VÒNG 2 (TRẮC NGHIỆM)"]));
   lines.push(
     formatRow([

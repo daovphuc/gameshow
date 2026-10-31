@@ -29,6 +29,7 @@
       wireStageLayout
     } from "./js/app.js";
     import { resolveImageUrl } from "./js/data.js";
+    import { getRoundTeams } from "./js/content.js";
     import {
       isTeamLocked,
       getAvailableRound1Packages,
@@ -214,7 +215,9 @@
       stopTimerLoop();
       activeTimerKey = null;
 
-      const cardsHtml = quizData.teams
+      const roundTeams = getRoundTeams(quizData.teams, quizData.round_order, "round1");
+
+      const cardsHtml = roundTeams
         .map((team) => {
           const locked = isTeamLocked(gameState, team.id);
           const pickedPkgId = gameState.round1.teamPackages?.[team.id] || "";
@@ -227,6 +230,7 @@
               data-team-id="${escapeHtml(team.id)}"
               ${locked ? "disabled" : ""}
             >
+              <div style="font-weight: 800; font-size: 0.85rem; color: var(--accent); margin-bottom: 0.25rem;">#${team.orderNumber}</div>
               ${renderAvatarHtml(team, "team-avatar-lg")}
               <div class="team-card-name">${escapeHtml(team.name)}</div>
               <div class="team-card-status">
@@ -241,6 +245,9 @@
         <div class="section-header">
           <div>
             <h1 class="section-title">${escapeHtml(quizData.config.round1_name)}</h1>
+            <p class="section-subtitle">
+              Danh sách ${roundTeams.length} đội tham gia Vòng 1 theo thứ tự bốc thăm. Bấm vào đội để bắt đầu chọn gói câu hỏi.
+            </p>
           </div>
         </div>
         <div class="teams-grid">

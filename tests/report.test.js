@@ -86,6 +86,9 @@ test("Report CSV builder: header, UTF-8 BOM, one row per team, round-2 detail ro
   assert.equal(csv.includes("Đội Hồng Hà"), true);
   assert.equal(csv.includes("93"), true);
 
+  // Contains Round 2 stats ranking table
+  assert.equal(csv.includes("THỐNG KÊ VÒNG 2 (TRẮC NGHIỆM)"), true);
+
   // Contains Round 2 detail section
   assert.equal(csv.includes("CHI TIẾT ĐÁP ÁN VÒNG 2"), true);
   assert.equal(csv.includes("4.25"), true);
@@ -94,7 +97,7 @@ test("Report CSV builder: header, UTF-8 BOM, one row per team, round-2 detail ro
   assert.equal(csv.includes("Sai"), true);
 });
 
-test("Report CSV builder rebuilds round-2 detail section from stored answers snapshot", () => {
+test("Report CSV builder rebuilds round-2 detail section and round-2 stats from stored answers snapshot", () => {
   const teams = [
     { id: "doi-01", name: "Đội Sao Vàng" },
     { id: "doi-02", name: "Đội Hồng Hà" }
@@ -119,7 +122,7 @@ test("Report CSV builder rebuilds round-2 detail section from stored answers sna
       }
     },
     scores: {
-      "doi-01": { round1: 40, round2: 1.8, round3: 20 },
+      "doi-01": { round1: 40, round2: 2, round3: 20 },
       "doi-02": { round1: 30, round2: 0, round3: 20 }
     }
   };
@@ -136,6 +139,7 @@ test("Report CSV builder rebuilds round-2 detail section from stored answers sna
   assert.equal(csv.includes("BÁO CÁO TỰ ĐỘNG"), true);
   assert.equal(csv.includes("Đội Sao Vàng"), true);
   assert.equal(csv.includes("Đội Hồng Hà"), true);
+  assert.equal(csv.includes("THỐNG KÊ VÒNG 2 (TRẮC NGHIỆM)"), true);
   assert.equal(csv.includes("CHI TIẾT ĐÁP ÁN VÒNG 2"), true);
   assert.equal(csv.includes("6.00"), true);
   assert.equal(csv.includes("12.00"), true);

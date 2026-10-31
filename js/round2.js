@@ -21,8 +21,8 @@ function parsePositiveNumber(value, fallback) {
 }
 
 /**
- * Calculates software points for a single Round 2 question based on speed and correctness.
- * - Linear from maxPoints at 0 s down to minPoints at deadline.
+ * Calculates points for a single Round 2 question.
+ * - Flat points (default 2) for correct answer within time limit.
  * - Wrong, missing, or late (> deadline) = 0.
  *
  * @param {{
@@ -30,8 +30,8 @@ function parsePositiveNumber(value, fallback) {
  *   answeredAt: number|null,
  *   shownAt: number|null,
  *   durationSeconds: number,
- *   maxPoints?: number,
- *   minPoints?: number
+ *   pointsPerCorrect?: number,
+ *   points?: number
  * }} params
  * @returns {number}
  */
@@ -40,8 +40,8 @@ export function calculateRound2QuestionScore({
   answeredAt,
   shownAt,
   durationSeconds,
-  maxPoints = 1000,
-  minPoints = 500
+  pointsPerCorrect = 2,
+  points
 }) {
   if (!isCorrect) {
     return 0;
@@ -66,67 +66,58 @@ export function calculateRound2QuestionScore({
     return 0;
   }
 
-  const ratio = durationSec > 0 ? Math.min(1, Math.max(0, elapsedSec / durationSec)) : 1;
-  const rawPoints = maxPoints - (maxPoints - minPoints) * ratio;
-  return Math.round(rawPoints);
+  const targetPoints = points !== undefined ? Number(points) : Number(pointsPerCorrect);
+  return Number.isFinite(targetPoints) ? targetPoints : 2;
 }
 
 /**
  * Converts total software points into a Round 2 score.
- * Formula: total ÷ divisor, rounded to 2 decimals (max 20).
+ * Formula: sum of points earned across all questions.
  *
- * @param {number} totalSoftwarePoints
- * @param {number} [divisor]
+ * @param {number} totalPoints
  * @returns {number}
  */
-export function calculateRound2Score(totalSoftwarePoints, divisor = 500) {
-  const points = Number(totalSoftwarePoints) || 0;
-  const div = Number(divisor) || 500;
-  if (div <= 0 || points <= 0) {
-    return 0;
-  }
-  const score = points / div;
-  return Math.round(score * 100) / 100;
+export function calculateRound2Score(totalPoints) {
+  const pts = Number(totalPoints) || 0;
+  return Math.round(pts * 100) / 100;
 }
 
 /**
  * Computes Round 2 ranking:
- * 1. Higher total software points
- * 2. More correct answers
- * 3. Shorter total correct time (faster)
- * Ties share the same rank.
+ * 1. Higher total points
+ * 2. Shorter total correct time (faster wins)
+ * 3. Tie broken by team order
  *
  * @param {Array<{id: string, name: string}>} teams
- * @param {Record<string, {softwarePoints?: number, correctCount?: number, totalCorrectTimeMs?: number}>} teamStats
- * @param {number} [divisor]
+ * @param {Record<string, {points?: number, softwarePoints?: number, correctCount?: number, totalCorrectTimeMs?: number}>} teamStats
  * @returns {Array<any>}
  */
-export function computeRound2Ranking(teams = [], teamStats = {}, divisor = 500) {
+export function computeRound2Ranking(teams = [], teamStats = {}) {
   const entries = teams.map((team, index) => {
     const stats = teamStats[team.id] || {};
-    const softwarePoints = Number(stats.softwarePoints) || 0;
+    const points = Number(stats.points !== undefined ? stats.points : stats.softwarePoints) || 0;
     const correctCount = Number(stats.correctCount) || 0;
     const totalCorrectTimeMs = Number(stats.totalCorrectTimeMs) || 0;
-    const round2Score = calculateRound2Score(softwarePoints, divisor);
+    const totalCorrectTimeSeconds = Math.round((totalCorrectTimeMs / 1000) * 100) / 100;
+    const round2Score = calculateRound2Score(points);
 
     return {
       id: team.id,
       name: team.name,
-      softwarePoints,
+      points,
+      softwarePoints: points, // For backwards compatibility
+      round2Score,
       correctCount,
       totalCorrectTimeMs,
-      round2Score,
+      totalCorrectTimeSeconds,
       rank: 1,
       _originalIndex: index
     };
   });
 
   entries.sort((a, b) => {
-    if (b.softwarePoints !== a.softwarePoints) {
-      return b.softwarePoints - a.softwarePoints;
-    }
-    if (b.correctCount !== a.correctCount) {
-      return b.correctCount - a.correctCount;
+    if (b.points !== a.points) {
+      return b.points - a.points;
     }
     if (a.totalCorrectTimeMs !== b.totalCorrectTimeMs) {
       return a.totalCorrectTimeMs - b.totalCorrectTimeMs;
@@ -135,16 +126,7 @@ export function computeRound2Ranking(teams = [], teamStats = {}, divisor = 500) 
   });
 
   for (let i = 0; i < entries.length; i++) {
-    if (
-      i > 0 &&
-      entries[i].softwarePoints === entries[i - 1].softwarePoints &&
-      entries[i].correctCount === entries[i - 1].correctCount &&
-      entries[i].totalCorrectTimeMs === entries[i - 1].totalCorrectTimeMs
-    ) {
-      entries[i].rank = entries[i - 1].rank;
-    } else {
-      entries[i].rank = i + 1;
-    }
+    entries[i].rank = i + 1;
     delete entries[i]._originalIndex;
   }
 
@@ -346,7 +328,7 @@ export function lockRound2Question(state) {
 export function revealRound2Question(
   state,
   fullQuestion,
-  { maxPoints = 1000, minPoints = 500 } = {}
+  { pointsPerCorrect = 2 } = {}
 ) {
   const durationSec = Number(fullQuestion.time_seconds) || 30;
   const correctLetter = String(fullQuestion.correct || "").trim().toUpperCase();
@@ -360,8 +342,7 @@ export function revealRound2Question(
       answeredAt: record.answeredAt,
       shownAt: state.shownAt,
       durationSeconds: durationSec,
-      maxPoints,
-      minPoints
+      pointsPerCorrect
     });
 
     results[teamId] = {
@@ -432,10 +413,11 @@ export function buildQuestionKey(setId, questionIndex) {
  *   allAnswers?: Record<string, Record<string, {answer?: string, answeredAt?: number}>>,
  *   questionsMeta?: Record<string, {shownAt?: number, deadline?: number}>,
  *   teams?: Array<{id: string, name?: string}>,
- *   divisor?: number
+ *   pointsPerCorrect?: number,
+ *   config?: Record<string, any>
  * }} params
  * @returns {{
- *   teamStats: Record<string, {softwarePoints: number, correctCount: number, totalCorrectTimeMs: number}>,
+ *   teamStats: Record<string, {points: number, softwarePoints: number, correctCount: number, totalCorrectTimeMs: number}>,
  *   scores: Record<string, number>,
  *   currentQuestionIndex: number,
  *   history: Array<Record<string, any>>
@@ -446,12 +428,14 @@ export function recomputeRound2FromAnswers({
   allAnswers = {},
   questionsMeta = {},
   teams = [],
-  divisor = 500
+  pointsPerCorrect = 2,
+  config = {}
 } = {}) {
+  const ptsPerCorrect = Number(config?.round2_points_per_correct) || Number(pointsPerCorrect) || 2;
   const teamStats = {};
   for (const t of teams) {
     if (t?.id) {
-      teamStats[t.id] = { softwarePoints: 0, correctCount: 0, totalCorrectTimeMs: 0 };
+      teamStats[t.id] = { points: 0, softwarePoints: 0, correctCount: 0, totalCorrectTimeMs: 0 };
     }
   }
 
@@ -477,7 +461,7 @@ export function recomputeRound2FromAnswers({
 
     for (const [teamId, ansRecord] of Object.entries(answersForQ)) {
       if (!teamStats[teamId]) {
-        teamStats[teamId] = { softwarePoints: 0, correctCount: 0, totalCorrectTimeMs: 0 };
+        teamStats[teamId] = { points: 0, softwarePoints: 0, correctCount: 0, totalCorrectTimeMs: 0 };
       }
       const rawAns = String(ansRecord?.answer || "").trim().toUpperCase();
       const isCorrect = rawAns === String(q.correct || "").trim().toUpperCase();
@@ -486,7 +470,8 @@ export function recomputeRound2FromAnswers({
         isCorrect,
         answeredAt,
         shownAt,
-        durationSeconds
+        durationSeconds,
+        pointsPerCorrect: ptsPerCorrect
       });
 
       const responseTimeMs = Math.max(0, answeredAt - shownAt);
@@ -502,6 +487,7 @@ export function recomputeRound2FromAnswers({
       if (isCorrect) {
         correctCount += 1;
         teamStats[teamId].correctCount += 1;
+        teamStats[teamId].points += points;
         teamStats[teamId].softwarePoints += points;
         teamStats[teamId].totalCorrectTimeMs += responseTimeMs;
       }
@@ -525,7 +511,7 @@ export function recomputeRound2FromAnswers({
 
   const scores = {};
   for (const [teamId, stats] of Object.entries(teamStats)) {
-    scores[teamId] = calculateRound2Score(stats.softwarePoints, divisor);
+    scores[teamId] = calculateRound2Score(stats.points);
   }
 
   const currentQuestionIndex = highestFinishedIdx >= 0 ? highestFinishedIdx + 1 : 0;

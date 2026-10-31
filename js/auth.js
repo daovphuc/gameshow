@@ -5,22 +5,24 @@ export const DEFAULT_PASSWORD = "122345678910";
 export const PORTALS = {
   HOST: "host",
   JUDGE: "judge",
-  TEAM: "team"
+  TEAM: "team",
+  HEAD_JUDGE: "head_judge"
 };
 
-export const VALID_ROLES = new Set(["host", "judge", "team"]);
+export const VALID_ROLES = new Set(["host", "judge", "team", "head_judge"]);
 
 export const PORTAL_URLS = {
   host: "./host.html",
   judge: "./judge.html",
-  team: "./team.html"
+  team: "./team.html",
+  head_judge: "./judge.html"
 };
 
 export const AUTH_STORAGE_KEY = "gameshow_auth_session";
 
 /**
  * Maps an account role to its corresponding portal entry URL.
- * @param {"host"|"judge"|"team"|string} role
+ * @param {"host"|"judge"|"team"|"head_judge"|string} role
  * @returns {string}
  */
 export function getPortalUrl(role) {
@@ -30,16 +32,17 @@ export function getPortalUrl(role) {
 
 /**
  * Normalises raw accounts from sheet rows or parsed CSV.
- * - Role must be "host", "judge", or "team".
+ * - Role must be "host", "judge", "team", or "head_judge".
  * - If role is "judge", ref_id must exist in judges list.
  * - If role is "team", ref_id must exist in teams list.
+ * - If role is "head_judge", ref_id is not required (empty).
  * - Blank/empty rows or rows missing username or password are skipped.
  * - Duplicate usernames (case-insensitive): first valid row wins.
  * - Trims strings.
  * - display_name defaults if empty.
  * @param {Array<Record<string, any>>} rows
  * @param {{ judges?: Array<any>, teams?: Array<any> }} [context]
- * @returns {Array<{username: string, password: string, role: "host"|"judge"|"team", ref_id: string, display_name: string}>}
+ * @returns {Array<{username: string, password: string, role: "host"|"judge"|"team"|"head_judge", ref_id: string, display_name: string}>}
  */
 export function normaliseAccounts(rows = [], { judges = [], teams = [] } = {}) {
   const validJudges = new Set((judges || []).map((j) => String(j?.id || "").trim()).filter(Boolean));
@@ -92,6 +95,8 @@ export function normaliseAccounts(rows = [], { judges = [], teams = [] } = {}) {
         displayName = "Dẫn chương trình";
       } else if (rawRole === "judge") {
         displayName = judgeNames.get(rawRefId) || "Ban Giám khảo";
+      } else if (rawRole === "head_judge") {
+        displayName = "Giám khảo tổng";
       } else if (rawRole === "team") {
         displayName = teamNames.get(rawRefId) || "Đội thi";
       }
@@ -101,7 +106,7 @@ export function normaliseAccounts(rows = [], { judges = [], teams = [] } = {}) {
       username: rawUsername,
       password: rawPassword,
       role: rawRole,
-      ref_id: rawRole === "host" ? "" : rawRefId,
+      ref_id: (rawRole === "host" || rawRole === "head_judge") ? "" : rawRefId,
       display_name: displayName
     });
   }
@@ -114,6 +119,7 @@ export function normaliseAccounts(rows = [], { judges = [], teams = [] } = {}) {
  * Defaults:
  * - mc (host, ref_id: "")
  * - gk1, gk2, ... per judge (ref_id: judge.id)
+ * - gktong (head_judge, ref_id: "")
  * - doi01, doi02, ... per team (ref_id: team.id)
  * All with password: 122345678910
  * @param {{ judges?: Array<any>, teams?: Array<any> }} [context]
@@ -142,6 +148,15 @@ export function generateDefaultAccounts({ judges = [], teams = [] } = {}) {
     });
   });
 
+  // Head judge account
+  accounts.push({
+    username: "gktong",
+    password: DEFAULT_PASSWORD,
+    role: "head_judge",
+    ref_id: "",
+    display_name: "Giám khảo tổng"
+  });
+
   (teams || []).forEach((t, idx) => {
     if (!t || !t.id) return;
     const num = String(idx + 1).padStart(2, "0");
@@ -156,6 +171,8 @@ export function generateDefaultAccounts({ judges = [], teams = [] } = {}) {
 
   return accounts;
 }
+
+export const createDefaultAccounts = generateDefaultAccounts;
 
 /**
  * Resolves accounts: normalises input; if empty or null, falls back to default accounts.
@@ -227,7 +244,7 @@ export function authenticate(username, password, accounts = []) {
  * Returns the matching account if valid, or null if invalid.
  * @param {any} session
  * @param {Array<any>} accounts
- * @param {"host"|"judge"|"team"|string} [requiredRole]
+ * @param {"host"|"judge"|"team"|"head_judge"|string} [requiredRole]
  * @returns {any|null}
  */
 export function validateSession(session, accounts = [], requiredRole = null) {
@@ -260,9 +277,16 @@ export function validateSession(session, accounts = [], requiredRole = null) {
     return null;
   }
 
-  // Required role mismatch
-  if (requiredRole && match.role !== String(requiredRole).toLowerCase().trim()) {
-    return null;
+  // Required role check: head_judge is allowed when accessing judge portal
+  if (requiredRole) {
+    const req = String(requiredRole).toLowerCase().trim();
+    if (req === "judge") {
+      if (match.role !== "judge" && match.role !== "head_judge") {
+        return null;
+      }
+    } else if (match.role !== req) {
+      return null;
+    }
   }
 
   // ref_id changed for judge or team
@@ -290,8 +314,13 @@ export function getActiveSession(storage = globalThis.localStorage, role = null)
   if (!storage) return null;
   try {
     const raw = storage.getItem(sessionKey(role));
-    if (!raw) return null;
-    return JSON.parse(raw);
+    if (raw) return JSON.parse(raw);
+    // If looking for judge role and not found, check head_judge slot
+    if (role && String(role).toLowerCase().trim() === "judge") {
+      const headRaw = storage.getItem(sessionKey("head_judge"));
+      if (headRaw) return JSON.parse(headRaw);
+    }
+    return null;
   } catch {
     return null;
   }
@@ -307,7 +336,12 @@ export function saveActiveSession(session, storage = globalThis.localStorage) {
   try {
     const raw = JSON.stringify(session);
     storage.setItem(AUTH_STORAGE_KEY, raw);
-    if (session?.role) storage.setItem(sessionKey(session.role), raw);
+    if (session?.role) {
+      storage.setItem(sessionKey(session.role), raw);
+      if (session.role === "head_judge") {
+        storage.setItem(sessionKey("judge"), raw);
+      }
+    }
   } catch {
     // Ignore storage quota error
   }
@@ -323,7 +357,12 @@ export function clearActiveSession(storage = globalThis.localStorage, role = nul
   try {
     const latest = getActiveSession(storage);
     const target = role || latest?.role || null;
-    if (target) storage.removeItem(sessionKey(target));
+    if (target) {
+      storage.removeItem(sessionKey(target));
+      if (String(target).toLowerCase().trim() === "judge") {
+        storage.removeItem(sessionKey("head_judge"));
+      }
+    }
     if (!role || latest?.role === target) storage.removeItem(AUTH_STORAGE_KEY);
   } catch {
     // Ignore storage error

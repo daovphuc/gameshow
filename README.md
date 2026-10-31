@@ -15,27 +15,28 @@ Hệ thống được thiết kế tối ưu cho 3 vai trò sử dụng tại h�
    - Vận hành trên máy tính của người dẫn chương trình kết nối máy chiếu hoặc màn hình LED lớn.
    - Bao gồm các màn hình chuyên biệt:
      - `host.html`: Tổng quan 3 vòng thi và thông tin hội thi.
-     - `round1.html`: Vòng 1 — Tuyên truyền PCCC (mỗi đội chọn 1 gói câu hỏi riêng).
-     - `round2.html`: Vòng 2 — Trắc nghiệm kiến thức (chọn bộ đề, mở câu hỏi, đếm ngược đồng bộ tới tất cả iPad, tự động khóa khi hết giờ, công bố đáp án và thống kê số đội trả lời).
+     - `round1.html`: Vòng 1 — Tuyên truyền PCCC (chọn đội theo số thứ tự thi, mỗi đội chọn 1 gói câu hỏi riêng).
+     - `round2.html`: Vòng 2 — Trắc nghiệm kiến thức (chọn bộ đề, mở câu hỏi, đếm ngược đồng bộ tới tất cả iPad, tự động khóa khi hết giờ, công bố đáp án và thống kê bảng xếp hạng Vòng 2).
      - `round3.html`: Vòng 3 — Xử lý tình huống truyền thông (bảng ô số tương tác).
      - `leaderboard.html`: Bảng xếp hạng vinh danh Top 5 trên bục cúp chiến thắng với hoạt họa ánh kim sang trọng.
-     - `scores.html`: Quản lý điểm số chi tiết từng giám khảo, trừ điểm vi phạm/quá giờ, ghi đè điểm sự cố và xuất báo cáo Excel CSV.
+     - `scores.html`: Quản lý điểm số chi tiết từng giám khảo, bảng thống kê Vòng 2, trừ điểm vi phạm/quá giờ, ghi đè điểm sự cố và xuất báo cáo Excel CSV.
      - `content.html`: Trình soạn thảo và quản trị nội dung trực tiếp dành cho MC.
    - **Thanh bảng điểm trực tiếp (Live Leaderboard Drawer)**: Xuất hiện ở cạnh phải của mọi màn hình MC, hỗ trợ mở/đóng nhanh bằng nút `★ Bảng điểm`, tích hợp hiệu ứng chuyển động mượt mà (FLIP animation) tự động tráo đổi vị trí các đội khi điểm số thay đổi.
 
 2. **Cổng Ban Giám khảo (`judge.html`)**:
-   - Vận hành trên iPad của các thành viên Ban Giám khảo.
-   - Đăng nhập bằng tài khoản giám khảo (vd: `gk1`) sẽ vào thẳng danh tính của giám khảo đó, không cần chọn thủ công.
+   - Vận hành trên iPad của các thành viên Ban Giám khảo và Giám khảo tổng.
+   - Đăng nhập bằng tài khoản giám khảo (vd: `gk1`..`gk3`) sẽ vào thẳng danh tính của giám khảo đó, không cần chọn thủ công.
+   - **Giám khảo tổng (`gktong`)**: Có quyền xem và nhập đồng thời điểm số cho toàn bộ các giám khảo đối với từng đội thi, lưu điểm hàng loạt với 1 nút bấm (chỉ chỉnh sửa khi đội chưa bị khóa).
    - Giao diện chấm điểm Vòng 1 & Vòng 3 thân thiện cho iPad cảm ứng: hiển thị đội đang thi và chủ đề/tình huống nổi bật ở trên, các nút tăng/giảm to `+0.5`, `-0.5`, `+1`, `-1`, `+5`, `-5` và thanh trượt để chấm riêng phần **Nội dung** (tối đa 45đ ở V1 / 25đ ở V3) và **Hình thức** (tối đa 5đ), hiển thị tổng điểm trực tiếp và trạng thái đã lưu rõ ràng.
-   - Phía dưới có bảng tổng quan tiến độ chấm tất cả các đội trong vòng thi; giám khảo có thể chạm vào đội bất kỳ để xem lại hoặc điều chỉnh điểm trước khi MC khóa phần thi.
+   - Phía dưới có bảng tổng quan tiến độ chấm tất cả các đội trong vòng thi theo đúng thứ tự thi đã cấu hình; giám khảo có thể chạm vào đội bất kỳ để xem lại hoặc điều chỉnh điểm trước khi MC khóa phần thi.
    - Ở Vòng 2: Màn hình tự động cập nhật câu hỏi đang thi và hiển thị bảng theo dõi tiến độ trả lời trực tiếp của các đội thi.
 
 3. **Cổng Đội thi (`team.html`)**:
    - Vận hành trên iPad đặt tại bàn của từng đội thi.
-   - Đăng nhập bằng tài khoản đội (vd: `doi01`) sẽ vào thẳng danh tính đội của mình, không cần chọn thủ công.
-   - Ở Vòng 1 & Vòng 3: Màn hình chờ thông minh hiển thị rõ tên vòng thi, báo hiệu khi đến lượt đội mình bước lên sân khấu và hiển thị nội dung gói câu hỏi / tình huống bốc thăm.
+   - Đăng nhập bằng tài khoản đội (vd: `doi01`..`doi35`) sẽ vào thẳng danh tính đội của mình, không cần chọn thủ công.
+   - Ở Vòng 1 & Vòng 3: Màn hình chờ thông minh hiển thị rõ tên vòng thi, báo hiệu khi đến lượt đội mình bước lên sân khấu và hiển thị nội dung gói câu hỏi / tình huống bốc thăm. Nếu đội không tham gia vòng thi (do cấu hình thứ tự thi), màn hình thông báo rõ đội không tham gia.
    - Ở Vòng 2: Khi MC phát lệnh tính giờ trên sân khấu, iPad của đội lập tức hiển thị nội dung câu hỏi và 4 nút chọn đáp án **A, B, C, D** cỡ lớn.
-   - Tự động ghi nhận thời gian trả lời theo mili-giây chuẩn từ máy chủ và khóa nút sau khi chạm để đảm bảo mỗi đội chỉ được gửi một đáp án duy nhất.
+   - Tự động ghi nhận thời gian trả lời theo mili-giây chuẩn từ máy chủ và khóa nút sau khi chạm để đảm bảo mỗi đội chỉ được gửi một đáp án duy nhất. Đội không tham gia vòng 2 sẽ không thể gửi đáp án.
 
 ---
 
@@ -128,16 +129,17 @@ Hệ thống tích hợp sẵn trình soạn thảo nội dung trực quan cho M
 
 Toàn bộ dữ liệu được lưu trữ tại nút `content/` trên Firebase Realtime Database (hoặc bộ nhớ nội bộ ở chế độ Local Mode) và tự động đồng bộ tức thì tới tất cả các màn hình:
 
-1. **Đội thi**: Thêm, sửa tên, xóa đội thi, chọn màu sắc đại diện và ảnh đại diện của đội. Ảnh không tải lên database: chép file ảnh vào thư mục `images/` của dự án rồi commit, sau đó nhập tên file (ví dụ `doi01.png`) hoặc một link https vào ô ảnh; trang hiển thị ảnh xem trước. Ảnh câu hỏi các vòng dùng cùng cách này.
-2. **Vòng 1**: Chỉnh sửa các gói câu hỏi (tên gói, đội sở hữu, nội dung câu hỏi, thời gian và điểm số).
-3. **Vòng 2**: Chỉnh sửa ngân hàng câu hỏi trắc nghiệm chia theo từng bộ đề (nội dung câu hỏi, 4 phương án lựa chọn A/B/C/D, đáp án đúng, thời gian làm bài).
-4. **Vòng 3**: Quản lý danh sách các ô tình huống truyền thông (số thứ tự ô, nội dung tình huống, thời gian suy nghĩ và điểm số).
-5. **Ban Giám khảo**: Thêm, sửa họ tên và mã định danh của các thành viên Ban Giám khảo.
-6. **Tài khoản**: Thêm, sửa tài khoản đăng nhập (tên đăng nhập, mật khẩu, vai trò và đối tượng liên kết) hoặc bấm **"⚡ Tạo lại tài khoản mặc định"** để tự động tạo tài khoản cho MC, từng giám khảo và từng đội thi.
-7. **Cài đặt chung**: Điều chỉnh tên hội thi, tiêu đề phụ, thời gian đếm ngược và thang điểm từng vòng thi.
+1. **Đội thi**: Thêm, sửa tên, xóa đội thi, chọn màu sắc đại diện và ảnh đại diện của đội (hỗ trợ gợi ý danh sách 35 đội thi có sẵn). Ảnh không tải lên database: chép file ảnh vào thư mục `images/` của dự án rồi commit, sau đó nhập tên file (ví dụ `doi01.png`) hoặc một link https vào ô ảnh; trang hiển thị ảnh xem trước. Ảnh câu hỏi các vòng dùng cùng cách này.
+2. **Thứ tự thi (Phân vòng & Xếp lượt)**: Cấu hình danh sách đội tham gia và số thứ tự thi riêng biệt cho từng Vòng 1, Vòng 2 và Vòng 3. Hỗ trợ chọn/bỏ chọn đội tham gia, đổi vị trí lên/xuống (Move Up/Down), và đặt lại thứ tự mặc định.
+3. **Vòng 1**: Chỉnh sửa các gói câu hỏi (tên gói, đội sở hữu, nội dung câu hỏi, thời gian và điểm số).
+4. **Vòng 2**: Chỉnh sửa ngân hàng câu hỏi trắc nghiệm chia theo từng bộ đề (nội dung câu hỏi, 4 phương án lựa chọn A/B/C/D, đáp án đúng, thời gian làm bài).
+5. **Vòng 3**: Quản lý danh sách các ô tình huống truyền thông (số thứ tự ô, nội dung tình huống, thời gian suy nghĩ và điểm số).
+6. **Ban Giám khảo**: Thêm, sửa họ tên và mã định danh của các thành viên Ban Giám khảo.
+7. **Tài khoản**: Thêm, sửa tài khoản đăng nhập (tên đăng nhập, mật khẩu, vai trò và đối tượng liên kết; hỗ trợ vai trò `head_judge` cho Giám khảo tổng) hoặc bấm **"⚡ Tạo lại tài khoản mặc định"** để tự động tạo tài khoản cho MC, các giám khảo, giám khảo tổng và các đội thi.
+8. **Cài đặt chung**: Điều chỉnh tên hội thi, tiêu đề phụ, thời gian đếm ngược, điểm trắc nghiệm mỗi câu đúng Vòng 2 và thang điểm từng vòng thi.
 
 ### Các nút chức năng tiện ích:
-- **💾 Lưu vào hệ thống**: Kiểm tra tính hợp lệ của toàn bộ dữ liệu (chống trùng ID, chống thiếu đáp án hoặc liên kết sai) rồi lưu vào cơ sở dữ liệu, đồng bộ ngay lập tức tới máy chiếu và tất cả iPad.
+- **💾 Lưu vào hệ thống**: Kiểm tra tính hợp lệ của toàn bộ dữ liệu (chống trùng ID, chống thiếu đáp án, kiểm tra thứ tự thi hoặc liên kết sai) rồi lưu vào cơ sở dữ liệu, đồng bộ ngay lập tức tới máy chiếu và tất cả iPad.
 - **↻ Nạp dữ liệu mẫu**: Tải lại dữ liệu mẫu chuẩn từ các file `data/sample/*.csv` vào trình soạn thảo (kèm hộp thoại xác nhận).
 - **⬇ Xuất / ⬆ Nhập file sao lưu (JSON)**: Cho phép sao lưu toàn bộ nội dung hội thi ra file JSON về máy tính và khôi phục lại bất kỳ lúc nào mà không cần kết nối mạng.
 
@@ -149,8 +151,8 @@ Hệ thống sử dụng cơ chế tài khoản riêng biệt để phân quyề
 
 - `username`: Tên đăng nhập (không phân biệt chữ hoa, chữ thường).
 - `password`: Mật khẩu đăng nhập dạng văn bản thuần (plain-text).
-- `role`: Vai trò người dùng, gồm 3 giá trị: `host` (Dẫn chương trình), `judge` (Ban Giám khảo), `team` (Đội thi).
-- `ref_id`: Mã giám khảo (vd: `gk-01`) hoặc mã đội (vd: `doi-01`); để trống đối với vai trò `host`.
+- `role`: Vai trò người dùng, gồm 4 giá trị: `host` (Dẫn chương trình), `judge` (Ban Giám khảo), `head_judge` (Giám khảo tổng), `team` (Đội thi).
+- `ref_id`: Mã giám khảo (vd: `gk-01`) hoặc mã đội (vd: `doi-01`); để trống đối với vai trò `host` và `head_judge`.
 - `display_name`: Tên hiển thị người dùng (tùy chọn, tự động lấy theo tên giám khảo/đội thi nếu để trống).
 
 > ⚠️ **Cảnh báo bảo mật:**
@@ -160,11 +162,12 @@ Hệ thống sử dụng cơ chế tài khoản riêng biệt để phân quyề
 Hệ thống tự động khởi tạo các tài khoản mặc định sau với mật khẩu chung là `122345678910`:
 - **Dẫn chương trình:** `mc`
 - **Ban Giám khảo:** `gk1`, `gk2`, `gk3`... (tự động liên kết tương ứng từng giám khảo)
-- **Đội thi đấu:** `doi01`, `doi02`, `doi03`... (tự động liên kết tương ứng từng đội)
+- **Giám khảo tổng:** `gktong` (vai trò `head_judge`)
+- **Đội thi đấu:** `doi01`..`doi35` (tự động liên kết tương ứng từng đội)
 
 ### Cơ chế ghi nhớ phiên và đồng bộ
 - Người dùng chỉ cần đăng nhập một lần trên thiết bị; thông tin đăng nhập được lưu an toàn trên máy cho đến khi bấm **"Đăng xuất"** (nút đăng xuất hiển thị rõ tên tài khoản hiện tại).
-- Giám khảo và đội thi khi đăng nhập sẽ vào thẳng danh tính của mình, loại bỏ hoàn toàn bước chọn danh tính thủ công.
+- Giám khảo, giám khảo tổng và đội thi khi đăng nhập sẽ vào thẳng giao diện của mình, loại bỏ hoàn toàn bước chọn danh tính thủ công.
 - Bất kỳ ai truy cập trực tiếp vào trang của cổng thi mà chưa đăng nhập đúng vai trò sẽ tự động được chuyển hướng về trang chủ `index.html`.
 - Khi Ban tổ chức chỉnh sửa tài khoản hoặc đổi mật khẩu trong trang cấu hình nội dung, thay đổi sẽ có hiệu lực ngay lập tức.
 
@@ -180,10 +183,14 @@ Hệ thống tự động thực hiện đầy đủ các quy định theo Thể
    - Khi có các đội bằng điểm nhau ở Vòng 1 hoặc Vòng 3: Đội có điểm trung bình phần **Nội dung** cao hơn sẽ được xếp trên.
 
 2. **Vòng 2 (Trắc nghiệm tương tác - Điều 15)**:
-   - Đội trả lời đúng tại thời điểm 0 giây được tối đa 1.000 điểm; điểm số giảm tuyến tính theo thời gian trả lời và đạt tối thiểu 500 điểm khi chạm mốc thời gian quy định.
-   - Trả lời sai hoặc quá giờ nhận 0 điểm.
-   - Tổng điểm phần mềm được chia cho hệ số quy đổi (mặc định 500) để tính ra điểm vòng thi (làm tròn 2 chữ số thập phân, tối đa 20 điểm).
-   - Xếp hạng Vòng 2: Ưu tiên điểm phần mềm cao hơn → số câu đúng nhiều hơn → tổng thời gian trả lời câu đúng nhanh hơn.
+   - Mỗi câu trả lời đúng trong thời gian quy định (mặc định 30 giây) nhận điểm cố định (mặc định 2 điểm/câu, cấu hình qua `round2_points_per_correct`).
+   - Trả lời sai, quá thời gian quy định hoặc không trả lời nhận 0 điểm.
+   - Tổng điểm Vòng 2 là tổng điểm của các câu trả lời đúng (tối đa 20 điểm với bộ đề 10 câu).
+   - **Thống kê & Xếp hạng Vòng 2**: Bảng thống kê xếp hạng Vòng 2 được sắp xếp theo các tiêu chí ưu tiên:
+     1. Điểm số Vòng 2 cao hơn (nhiều điểm hơn xếp trên).
+     2. Tổng thời gian trả lời của các câu trả lời đúng ngắn hơn (trả lời đúng nhanh hơn xếp trên).
+     3. Thứ tự đội thi / bốc thăm ban đầu.
+   - Bảng thống kê hiển thị sau khi MC công bố đáp án và có thể mở lại bất cứ lúc nào qua nút "📊 Thống kê Vòng 2" trên màn hình `round2.html`, đồng thời xuất hiện trên trang "Điểm số" (`scores.html`) và trong file báo cáo CSV xuất ra.
 
 3. **Bảng tổng sắp toàn đoàn (Điều 22)**:
    - Tổng điểm = Điểm Vòng 1 + Điểm Vòng 2 + Điểm Vòng 3.
@@ -194,7 +201,10 @@ Hệ thống tự động thực hiện đầy đủ các quy định theo Thể
 
 4. **Xuất báo cáo kết quả cuộc thi**:
    - Trong trang **Điểm số (`scores.html`)**, bấm **"⬇ Tải báo cáo (Excel CSV)"** để tải về file báo cáo đầy đủ chuẩn UTF-8 BOM, mở trực tiếp bằng Microsoft Excel hiển thị tiếng Việt hoàn hảo không lỗi font.
-   - Báo cáo gồm: Bảng tổng kết thứ hạng toàn đoàn và Bảng chi tiết câu trả lời từng câu của Vòng 2.
+   - Báo cáo gồm:
+     1. **Bảng tổng hợp kết quả điểm các vòng thi**: Thứ hạng, Mã đội, Tên đội, Điểm từng vòng (chi tiết nội dung, hình thức, điểm phạt) và Tổng điểm.
+     2. **Bảng thống kê Vòng 2 (Trắc nghiệm)**: Thứ hạng, Mã đội, Tên đội, Điểm số, Số câu đúng, Tổng thời gian câu đúng (giây).
+     3. **Chi tiết đáp án Vòng 2**: Từng lượt chọn, kết quả đúng/sai, thời gian trả lời chi tiết từng câu của từng đội.
 
 ---
 

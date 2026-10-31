@@ -22,13 +22,15 @@
       showToast,
       logoutUser
     } from "./js/app.js";
-    import { clampScore } from "./js/judges.js";
+    import { clampScore, buildPerJudgeScoreWrites, calculateTeamRoundScore } from "./js/judges.js";
+    import { getRoundTeams } from "./js/content.js";
     import { set, listen, onStatusChange } from "./js/backend.js";
     import { getActiveSession } from "./js/auth.js";
 
     let quizData = null;
     let selectedJudgeId = "";
     let judgeDisplayName = "";
+    let isHeadJudge = false;
 
     // Track active team selected for scoring (either from host or tapped by judge)
     let manuallySelectedTeamId = null;
@@ -56,7 +58,7 @@
             <span style="font-size: 1.6rem;" aria-hidden="true">📋</span>
             <div>
               <div style="font-size: 0.78rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
-                Ban Giám Khảo
+                ${isHeadJudge ? "Giám Khảo Tổng" : "Ban Giám Khảo"}
               </div>
               <div class="tablet-identity-name">${escapeHtml(judgeDisplayName)}</div>
             </div>
@@ -98,56 +100,62 @@
       // Lock status for the active team
       const isLocked = isR1
         ? Boolean(liveState.round1?.lockedTeams?.includes(activeTeamId))
-        : false;
+        : Boolean(liveState.round3?.openedTiles?.includes(liveState.round3?.activeTile?.number) && liveState.round3?.activeTile?.selectedTeamId === activeTeamId);
 
-      // Existing saved score from live database
-      const savedScore = liveState.judgeScores?.[roundKey]?.[activeTeamId]?.[selectedJudgeId];
-      const hasSavedScore = Boolean(savedScore && (savedScore.content !== undefined || savedScore.manner !== undefined));
-
-      let contentVal = hasSavedScore ? clampScore(savedScore.content, maxContent) : maxContent;
-      let mannerVal = hasSavedScore ? clampScore(savedScore.manner, maxManner) : maxManner;
-
-      // Topic or question text
+      // Topic / Question text
       let topicText = "";
       if (isR1) {
-        if (liveState.round1?.activeSession && liveState.round1.activeSession.teamId === activeTeamId) {
-          const pkg = quizData.round1Packages.find((p) => p.id === liveState.round1.activeSession.packageId);
-          topicText = pkg ? `${pkg.package}: ${pkg.question}` : "";
-        } else if (liveState.round1?.teamPackages?.[activeTeamId]) {
-          const pkgId = liveState.round1.teamPackages[activeTeamId];
-          const pkg = quizData.round1Packages.find((p) => p.id === pkgId);
-          topicText = pkg ? `${pkg.package}: ${pkg.question}` : "";
-        }
+        topicText = liveState.round1?.activeSession?.packageQuestion || "";
       } else {
-        if (liveState.round3?.activeTile && (!liveState.round3.activeTile.selectedTeamId || liveState.round3.activeTile.selectedTeamId === activeTeamId)) {
-          const tile = quizData.round3Questions.find((q) => q.number === liveState.round3.activeTile.number);
-          topicText = tile ? `Ô số #${tile.number}: ${tile.question}` : "";
-        }
+        topicText = liveState.round3?.activeTile?.question || "";
       }
 
-      // Overview teams list items
-      const overviewTeams = quizData.teams.map((t) => {
-        const tScore = liveState.judgeScores?.[roundKey]?.[t.id]?.[selectedJudgeId];
-        const tHasScore = Boolean(tScore && (tScore.content !== undefined || tScore.manner !== undefined));
-        const tLocked = isR1 ? Boolean(liveState.round1?.lockedTeams?.includes(t.id)) : false;
-        const isCurrent = t.id === activeTeamId;
-        const isStage = t.id === stageTeamId;
-        const totalScore = tHasScore ? (Number(tScore.content || 0) + Number(tScore.manner || 0)).toFixed(1) : null;
+      // Existing scores for active team
+      const existingScores = liveState.judgeScores?.[roundKey]?.[activeTeamId] || {};
+      const myExistingScore = existingScores[selectedJudgeId] || null;
+
+      let contentVal = myExistingScore?.content !== undefined ? Number(myExistingScore.content) : 0;
+      let mannerVal = myExistingScore?.manner !== undefined ? Number(myExistingScore.manner) : 0;
+      const hasSavedScore = Boolean(myExistingScore);
+      const lastSavedTime = lastSavedTimestamps[activeTeamId] || (hasSavedScore ? "trước đó" : "");
+
+      // Teams list ordered by round order
+      const roundTeams = getRoundTeams(quizData.teams, quizData.round_order, roundKey);
+      const totalTeams = roundTeams.length;
+      let scoredCount = 0;
+
+      const overviewTeams = roundTeams.map((t) => {
+        let hasScore = false;
+        let score = 0;
+        if (isHeadJudge) {
+          const teamScores = liveState.judgeScores?.[roundKey]?.[t.id] || {};
+          const calc = calculateTeamRoundScore({ judgeScores: teamScores, maxContent, maxManner });
+          if (calc.judgeCount > 0) {
+            hasScore = true;
+            score = calc.avgTotal;
+            scoredCount++;
+          }
+        } else {
+          const scoreRecord = liveState.judgeScores?.[roundKey]?.[t.id]?.[selectedJudgeId];
+          if (scoreRecord && (scoreRecord.content !== undefined || scoreRecord.manner !== undefined)) {
+            hasScore = true;
+            score = scoreRecord.score ?? (Number(scoreRecord.content || 0) + Number(scoreRecord.manner || 0));
+            scoredCount++;
+          }
+        }
+        const locked = isR1
+          ? Boolean(liveState.round1?.lockedTeams?.includes(t.id))
+          : false;
 
         return {
           ...t,
-          hasScore: tHasScore,
-          score: totalScore,
-          locked: tLocked,
-          isCurrent,
-          isStage
+          isStage: t.id === stageTeamId,
+          isCurrent: t.id === activeTeamId,
+          hasScore,
+          score,
+          locked
         };
       });
-
-      const scoredCount = overviewTeams.filter((t) => t.hasScore).length;
-      const totalTeams = overviewTeams.length;
-
-      const lastSavedTime = lastSavedTimestamps[activeTeamId] || (hasSavedScore ? "trước đó" : "");
 
       root.innerHTML = `
         ${renderJudgeHeader()}
@@ -179,7 +187,7 @@
                     ${isR1 ? "Đang chờ MC mời đội lên sân khấu" : "Đang chờ MC mở ô tình huống"}
                   </h2>
                   <p style="font-size: 1rem; margin: 0 0 1.5rem;">
-                    Phiếu chấm điểm sẽ tự động mở khi MC bắt đầu. Bạn cũng có thể chọn đội bên dưới để xem lại điểm.
+                    Phiếu chấm điểm sẽ tự động mở khi MC bắt đầu. Bạn cũng có thể chọn đội bên danh sách để xem lại điểm.
                   </p>
                 </div>`
               : `
@@ -210,119 +218,183 @@
                     </div>`
               }
 
-              <!-- Touch-first Score Controls -->
-              <div class="judge-score-section">
-                <!-- Content Score -->
-                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.2rem;">
-                  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-                    <div>
-                      <div style="font-weight: 800; font-size: 1.1rem; color: var(--text);">1. Điểm Nội dung</div>
-                      <div style="font-size: 0.85rem; color: var(--text-muted);">Tối đa ${maxContent} điểm (bước 0.5đ)</div>
+              ${
+                isHeadJudge
+                  ? `
+                    <!-- Head Judge Multi-Judge Scoring Table -->
+                    <div class="judge-score-section">
+                      <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.2rem;">
+                        <div style="font-weight: 800; font-size: 1.15rem; color: var(--text); margin-bottom: 0.35rem;">
+                          Phiếu chấm điểm toàn bộ Ban Giám khảo
+                        </div>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0 0 1rem;">
+                          Nhập điểm Nội dung (tối đa ${maxContent}đ) và Hình thức (tối đa ${maxManner}đ) của từng giám khảo theo phiếu giấy.
+                        </p>
+
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                          ${quizData.judges
+                            .map((j) => {
+                              const existing = existingScores[j.id] || {};
+                              const cVal = existing.content !== undefined ? existing.content : "";
+                              const mVal = existing.manner !== undefined ? existing.manner : "";
+                              const totalVal = (Number(cVal || 0) + Number(mVal || 0)).toFixed(1);
+                              return `
+                                <div class="editor-card" style="margin-bottom: 0; padding: 0.85rem 1rem;">
+                                  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                    <strong style="font-size: 1rem; color: var(--text);">${escapeHtml(j.name)} (${escapeHtml(j.id)})</strong>
+                                    <div style="font-family: var(--font-mono); font-weight: 800; font-size: 1.05rem; color: var(--accent);">
+                                      Tổng: <span id="head-judge-total-${j.id}">${totalVal}</span>đ
+                                    </div>
+                                  </div>
+                                  <div class="editor-grid-2">
+                                    <div class="editor-field">
+                                      <label class="editor-label">Điểm Nội dung (max ${maxContent})</label>
+                                      <input type="number" class="editor-input head-judge-score-input" data-judge-id="${escapeHtml(j.id)}" data-score-type="content" value="${cVal}" min="0" max="${maxContent}" step="0.5" placeholder="0" ${isLocked ? "disabled" : ""} />
+                                    </div>
+                                    <div class="editor-field">
+                                      <label class="editor-label">Điểm Hình thức (max ${maxManner})</label>
+                                      <input type="number" class="editor-input head-judge-score-input" data-judge-id="${escapeHtml(j.id)}" data-score-type="manner" value="${mVal}" min="0" max="${maxManner}" step="0.5" placeholder="0" ${isLocked ? "disabled" : ""} />
+                                    </div>
+                                  </div>
+                                </div>
+                              `;
+                            })
+                            .join("")}
+                        </div>
+                      </div>
                     </div>
-                    <div style="display: flex; align-items: baseline; gap: 0.25rem;">
-                      <span id="judge-display-content" class="judge-score-value-display">${contentVal.toFixed(1)}</span>
-                      <span style="font-size: 1.1rem; font-weight: 700; color: var(--text-muted);">/ ${maxContent}đ</span>
+
+                    <div class="judge-save-row" style="margin-top: 1.25rem;">
+                      <button
+                        type="button"
+                        id="btn-save-all-judges"
+                        class="btn btn-primary btn-lg"
+                        style="width: 100%; justify-content: center; font-size: 1.2rem; padding: 1.1rem;"
+                        ${isLocked ? "disabled" : ""}
+                      >
+                        ✓ Lưu điểm tất cả giám khảo
+                      </button>
+                      <div id="judge-saved-status" class="judge-saved-status ${lastSavedTimestamps[activeTeamId] ? 'saved' : ''}">
+                        ${lastSavedTimestamps[activeTeamId] ? `✓ Đã lưu lúc ${escapeHtml(lastSavedTimestamps[activeTeamId])}` : `<span style="color: var(--text-muted);">Chưa lưu điểm đợt này</span>`}
+                      </div>
                     </div>
-                  </div>
+                  `
+                  : `
+                    <!-- Touch-first Score Controls for Individual Judge -->
+                    <div class="judge-score-section">
+                      <!-- Content Score -->
+                      <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.2rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                          <div>
+                            <div style="font-weight: 800; font-size: 1.1rem; color: var(--text);">1. Điểm Nội dung</div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">Tối đa ${maxContent} điểm (bước 0.5đ)</div>
+                          </div>
+                          <div style="display: flex; align-items: baseline; gap: 0.25rem;">
+                            <span id="judge-display-content" class="judge-score-value-display">${contentVal.toFixed(1)}</span>
+                            <span style="font-size: 1.1rem; font-weight: 700; color: var(--text-muted);">/ ${maxContent}đ</span>
+                          </div>
+                        </div>
 
-                  <!-- Quick Steppers -->
-                  <div class="judge-touch-steppers" style="margin-top: 1rem;">
-                    <button type="button" class="judge-btn-step" data-step-content="-5" ${isLocked ? "disabled" : ""}>-5</button>
-                    <button type="button" class="judge-btn-step" data-step-content="-1" ${isLocked ? "disabled" : ""}>-1</button>
-                    <button type="button" class="judge-btn-step" data-step-content="-0.5" ${isLocked ? "disabled" : ""}>-0.5</button>
-                    <button type="button" class="judge-btn-step" data-step-content="+0.5" ${isLocked ? "disabled" : ""}>+0.5</button>
-                    <button type="button" class="judge-btn-step" data-step-content="+1" ${isLocked ? "disabled" : ""}>+1</button>
-                    <button type="button" class="judge-btn-step" data-step-content="+5" ${isLocked ? "disabled" : ""}>+5</button>
-                  </div>
+                        <!-- Quick Steppers -->
+                        <div class="judge-touch-steppers" style="margin-top: 1rem;">
+                          <button type="button" class="judge-btn-step" data-step-content="-5" ${isLocked ? "disabled" : ""}>-5</button>
+                          <button type="button" class="judge-btn-step" data-step-content="-1" ${isLocked ? "disabled" : ""}>-1</button>
+                          <button type="button" class="judge-btn-step" data-step-content="-0.5" ${isLocked ? "disabled" : ""}>-0.5</button>
+                          <button type="button" class="judge-btn-step" data-step-content="+0.5" ${isLocked ? "disabled" : ""}>+0.5</button>
+                          <button type="button" class="judge-btn-step" data-step-content="+1" ${isLocked ? "disabled" : ""}>+1</button>
+                          <button type="button" class="judge-btn-step" data-step-content="+5" ${isLocked ? "disabled" : ""}>+5</button>
+                        </div>
 
-                  <input
-                    type="range"
-                    id="slider-content"
-                    class="judge-range-slider"
-                    min="0"
-                    max="${maxContent}"
-                    step="0.5"
-                    value="${contentVal}"
-                    ${isLocked ? "disabled" : ""}
-                  />
-                </div>
+                        <input
+                          type="range"
+                          id="slider-content"
+                          class="judge-range-slider"
+                          min="0"
+                          max="${maxContent}"
+                          step="0.5"
+                          value="${contentVal}"
+                          ${isLocked ? "disabled" : ""}
+                        />
+                      </div>
 
-                <!-- Manner Score -->
-                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.2rem;">
-                  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-                    <div>
-                      <div style="font-weight: 800; font-size: 1.1rem; color: var(--text);">2. Điểm Hình thức &amp; Tác phong</div>
-                      <div style="font-size: 0.85rem; color: var(--text-muted);">Tối đa ${maxManner} điểm (bước 0.5đ)</div>
+                      <!-- Manner Score -->
+                      <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 1.2rem;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                          <div>
+                            <div style="font-weight: 800; font-size: 1.1rem; color: var(--text);">2. Điểm Hình thức &amp; Tác phong</div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">Tối đa ${maxManner} điểm (bước 0.5đ)</div>
+                          </div>
+                          <div style="display: flex; align-items: baseline; gap: 0.25rem;">
+                            <span id="judge-display-manner" class="judge-score-value-display">${mannerVal.toFixed(1)}</span>
+                            <span style="font-size: 1.1rem; font-weight: 700; color: var(--text-muted);">/ ${maxManner}đ</span>
+                          </div>
+                        </div>
+
+                        <!-- Quick Steppers for Manner -->
+                        <div class="judge-touch-steppers" style="margin-top: 1rem;">
+                          <button type="button" class="judge-btn-step" data-step-manner="-1" ${isLocked ? "disabled" : ""}>-1</button>
+                          <button type="button" class="judge-btn-step" data-step-manner="-0.5" ${isLocked ? "disabled" : ""}>-0.5</button>
+                          <button type="button" class="judge-btn-step" data-step-manner="+0.5" ${isLocked ? "disabled" : ""}>+0.5</button>
+                          <button type="button" class="judge-btn-step" data-step-manner="+1" ${isLocked ? "disabled" : ""}>+1</button>
+                          <div style="display: flex; gap: 0.35rem; margin-left: auto;">
+                            <button type="button" class="judge-btn-step" data-set-manner="3" ${isLocked ? "disabled" : ""}>3đ</button>
+                            <button type="button" class="judge-btn-step" data-set-manner="4" ${isLocked ? "disabled" : ""}>4đ</button>
+                            <button type="button" class="judge-btn-step" data-set-manner="4.5" ${isLocked ? "disabled" : ""}>4.5đ</button>
+                            <button type="button" class="judge-btn-step" data-set-manner="5" ${isLocked ? "disabled" : ""}>5đ</button>
+                          </div>
+                        </div>
+
+                        <input
+                          type="range"
+                          id="slider-manner"
+                          class="judge-range-slider"
+                          min="0"
+                          max="${maxManner}"
+                          step="0.5"
+                          value="${mannerVal}"
+                          ${isLocked ? "disabled" : ""}
+                        />
+                      </div>
                     </div>
-                    <div style="display: flex; align-items: baseline; gap: 0.25rem;">
-                      <span id="judge-display-manner" class="judge-score-value-display">${mannerVal.toFixed(1)}</span>
-                      <span style="font-size: 1.1rem; font-weight: 700; color: var(--text-muted);">/ ${maxManner}đ</span>
+
+                    <!-- Live Total Banner -->
+                    <div class="judge-total-banner">
+                      <div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
+                          Tổng điểm của bạn
+                        </div>
+                        <div style="font-size: 0.95rem; color: var(--text-muted);">Nội dung (${contentVal.toFixed(1)}) + Hình thức (${mannerVal.toFixed(1)})</div>
+                      </div>
+                      <div style="display: flex; align-items: baseline; gap: 0.35rem;">
+                        <span id="judge-live-total" style="font-family: var(--font-mono); font-size: clamp(2rem, 4vw, 2.6rem); font-weight: 900; color: var(--accent);">
+                          ${(contentVal + mannerVal).toFixed(1)}
+                        </span>
+                        <span style="font-size: 1.25rem; font-weight: 800; color: var(--accent);">/ ${(maxContent + maxManner)}đ</span>
+                      </div>
                     </div>
-                  </div>
 
-                  <!-- Quick Steppers for Manner -->
-                  <div class="judge-touch-steppers" style="margin-top: 1rem;">
-                    <button type="button" class="judge-btn-step" data-step-manner="-1" ${isLocked ? "disabled" : ""}>-1</button>
-                    <button type="button" class="judge-btn-step" data-step-manner="-0.5" ${isLocked ? "disabled" : ""}>-0.5</button>
-                    <button type="button" class="judge-btn-step" data-step-manner="+0.5" ${isLocked ? "disabled" : ""}>+0.5</button>
-                    <button type="button" class="judge-btn-step" data-step-manner="+1" ${isLocked ? "disabled" : ""}>+1</button>
-                    <div style="display: flex; gap: 0.35rem; margin-left: auto;">
-                      <button type="button" class="judge-btn-step" data-set-manner="3" ${isLocked ? "disabled" : ""}>3đ</button>
-                      <button type="button" class="judge-btn-step" data-set-manner="4" ${isLocked ? "disabled" : ""}>4đ</button>
-                      <button type="button" class="judge-btn-step" data-set-manner="4.5" ${isLocked ? "disabled" : ""}>4.5đ</button>
-                      <button type="button" class="judge-btn-step" data-set-manner="5" ${isLocked ? "disabled" : ""}>5đ</button>
+                    <!-- Save button and saved status -->
+                    <div class="judge-save-row">
+                      <button
+                        type="button"
+                        id="btn-save-score"
+                        class="btn btn-primary btn-lg"
+                        style="width: 100%; justify-content: center; font-size: 1.2rem; padding: 1.1rem;"
+                        ${isLocked ? "disabled" : ""}
+                      >
+                        ✓ Lưu điểm cho ${escapeHtml(activeTeam.name)}
+                      </button>
+
+                      <div id="judge-saved-status" class="judge-saved-status ${hasSavedScore ? 'saved' : ''}">
+                        ${
+                          hasSavedScore
+                            ? `✓ Đã lưu ${lastSavedTime ? `lúc ${escapeHtml(lastSavedTime)}` : ""} (${(contentVal + mannerVal).toFixed(1)}đ)`
+                            : `<span style="color: var(--text-muted);">Chưa lưu điểm cho đội này</span>`
+                        }
+                      </div>
                     </div>
-                  </div>
-
-                  <input
-                    type="range"
-                    id="slider-manner"
-                    class="judge-range-slider"
-                    min="0"
-                    max="${maxManner}"
-                    step="0.5"
-                    value="${mannerVal}"
-                    ${isLocked ? "disabled" : ""}
-                  />
-                </div>
-              </div>
-
-              <!-- Live Total Banner -->
-              <div class="judge-total-banner">
-                <div>
-                  <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
-                    Tổng điểm của bạn
-                  </div>
-                  <div style="font-size: 0.95rem; color: var(--text-muted);">Nội dung (${contentVal.toFixed(1)}) + Hình thức (${mannerVal.toFixed(1)})</div>
-                </div>
-                <div style="display: flex; align-items: baseline; gap: 0.35rem;">
-                  <span id="judge-live-total" style="font-family: var(--font-mono); font-size: clamp(2rem, 4vw, 2.6rem); font-weight: 900; color: var(--accent);">
-                    ${(contentVal + mannerVal).toFixed(1)}
-                  </span>
-                  <span style="font-size: 1.25rem; font-weight: 800; color: var(--accent);">/ ${(maxContent + maxManner)}đ</span>
-                </div>
-              </div>
-
-              <!-- Save button and saved status -->
-              <div class="judge-save-row">
-                <button
-                  type="button"
-                  id="btn-save-score"
-                  class="btn btn-primary btn-lg"
-                  style="width: 100%; justify-content: center; font-size: 1.2rem; padding: 1.1rem;"
-                  ${isLocked ? "disabled" : ""}
-                >
-                  ✓ Lưu điểm cho ${escapeHtml(activeTeam.name)}
-                </button>
-
-                <div id="judge-saved-status" class="judge-saved-status ${hasSavedScore ? 'saved' : ''}">
-                  ${
-                    hasSavedScore
-                      ? `✓ Đã lưu ${lastSavedTime ? `lúc ${escapeHtml(lastSavedTime)}` : ""} (${(contentVal + mannerVal).toFixed(1)}đ)`
-                      : `<span style="color: var(--text-muted);">Chưa lưu điểm cho đội này</span>`
-                  }
-                </div>
-              </div>
+                  `
+              }
             `
           }
         </main>
@@ -405,85 +477,141 @@
 
       if (!activeTeam || isLocked) return;
 
-      const sliderContent = document.getElementById("slider-content");
-      const sliderManner = document.getElementById("slider-manner");
-      const displayContent = document.getElementById("judge-display-content");
-      const displayManner = document.getElementById("judge-display-manner");
-      const totalDisplay = document.getElementById("judge-live-total");
-      const statusEl = document.getElementById("judge-saved-status");
+      if (isHeadJudge) {
+        // Wire events for Head Judge multi-judge inputs
+        root.querySelectorAll(".head-judge-score-input").forEach((inp) => {
+          inp.addEventListener("input", () => {
+            const jId = inp.dataset.judgeId;
+            const cInp = root.querySelector(`.head-judge-score-input[data-judge-id="${jId}"][data-score-type="content"]`);
+            const mInp = root.querySelector(`.head-judge-score-input[data-judge-id="${jId}"][data-score-type="manner"]`);
+            const c = clampScore(cInp?.value, maxContent);
+            const m = clampScore(mInp?.value, maxManner);
+            const totSpan = document.getElementById(`head-judge-total-${jId}`);
+            if (totSpan) totSpan.textContent = (c + m).toFixed(1);
+          });
+        });
 
-      function syncDomScores() {
-        const c = clampScore(contentVal, maxContent);
-        const m = clampScore(mannerVal, maxManner);
-        contentVal = c;
-        mannerVal = m;
+        document.getElementById("btn-save-all-judges")?.addEventListener("click", async () => {
+          const scoresByJudge = {};
+          for (const j of quizData.judges) {
+            const cInp = root.querySelector(`.head-judge-score-input[data-judge-id="${j.id}"][data-score-type="content"]`);
+            const mInp = root.querySelector(`.head-judge-score-input[data-judge-id="${j.id}"][data-score-type="manner"]`);
+            scoresByJudge[j.id] = {
+              content: cInp?.value !== "" ? cInp.value : 0,
+              manner: mInp?.value !== "" ? mInp.value : 0
+            };
+          }
 
-        if (displayContent) displayContent.textContent = c.toFixed(1);
-        if (sliderContent) sliderContent.value = c;
-        if (displayManner) displayManner.textContent = m.toFixed(1);
-        if (sliderManner) sliderManner.value = m;
-        if (totalDisplay) totalDisplay.textContent = (c + m).toFixed(1);
+          const writes = buildPerJudgeScoreWrites({
+            roundKey,
+            teamId: activeTeamId,
+            judges: quizData.judges,
+            scoresByJudge,
+            maxContent,
+            maxManner
+          });
 
-        if (statusEl) {
-          statusEl.className = "judge-saved-status dirty";
-          statusEl.innerHTML = `⚠ Điểm chưa được lưu (${(c + m).toFixed(1)}đ)`;
+          for (const w of writes) {
+            await set(`live/judgeScores/${roundKey}/${activeTeamId}/${w.judgeId}`, {
+              content: w.content,
+              manner: w.manner,
+              score: w.score
+            });
+          }
+
+          const timeStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+          lastSavedTimestamps[activeTeamId] = timeStr;
+
+          const statusEl = document.getElementById("judge-saved-status");
+          if (statusEl) {
+            statusEl.className = "judge-saved-status saved";
+            statusEl.innerHTML = `✓ Đã lưu lúc ${timeStr}`;
+          }
+
+          showToast(`✓ Đã lưu điểm tất cả giám khảo cho ${activeTeam.name}!`);
+        });
+      } else {
+        // Individual judge controls
+        const sliderContent = document.getElementById("slider-content");
+        const sliderManner = document.getElementById("slider-manner");
+        const displayContent = document.getElementById("judge-display-content");
+        const displayManner = document.getElementById("judge-display-manner");
+        const totalDisplay = document.getElementById("judge-live-total");
+        const statusEl = document.getElementById("judge-saved-status");
+
+        function syncDomScores() {
+          const c = clampScore(contentVal, maxContent);
+          const m = clampScore(mannerVal, maxManner);
+          contentVal = c;
+          mannerVal = m;
+
+          if (displayContent) displayContent.textContent = c.toFixed(1);
+          if (sliderContent) sliderContent.value = c;
+          if (displayManner) displayManner.textContent = m.toFixed(1);
+          if (sliderManner) sliderManner.value = m;
+          if (totalDisplay) totalDisplay.textContent = (c + m).toFixed(1);
+
+          if (statusEl) {
+            statusEl.className = "judge-saved-status dirty";
+            statusEl.innerHTML = `⚠ Điểm chưa được lưu (${(c + m).toFixed(1)}đ)`;
+          }
         }
+
+        // Content steppers
+        root.querySelectorAll("[data-step-content]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const delta = Number(btn.dataset.stepContent) || 0;
+            contentVal = clampScore(contentVal + delta, maxContent);
+            syncDomScores();
+          });
+        });
+
+        sliderContent?.addEventListener("input", (e) => {
+          contentVal = Number(e.target.value) || 0;
+          syncDomScores();
+        });
+
+        // Manner steppers
+        root.querySelectorAll("[data-step-manner]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const delta = Number(btn.dataset.stepManner) || 0;
+            mannerVal = clampScore(mannerVal + delta, maxManner);
+            syncDomScores();
+          });
+        });
+
+        root.querySelectorAll("[data-set-manner]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            mannerVal = Number(btn.dataset.setManner) || 0;
+            syncDomScores();
+          });
+        });
+
+        sliderManner?.addEventListener("input", (e) => {
+          mannerVal = Number(e.target.value) || 0;
+          syncDomScores();
+        });
+
+        // Save score
+        document.getElementById("btn-save-score")?.addEventListener("click", async () => {
+          const c = clampScore(contentVal, maxContent);
+          const m = clampScore(mannerVal, maxManner);
+          const total = (c + m).toFixed(1);
+
+          const timeStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+          lastSavedTimestamps[activeTeamId] = timeStr;
+
+          const path = `live/judgeScores/${roundKey}/${activeTeamId}/${selectedJudgeId}`;
+          await set(path, { content: c, manner: m, score: Math.round((c + m) * 100) / 100 });
+
+          if (statusEl) {
+            statusEl.className = "judge-saved-status saved";
+            statusEl.innerHTML = `✓ Đã lưu lúc ${timeStr} (${total}đ)`;
+          }
+
+          showToast(`Đã lưu điểm cho ${activeTeam.name}: ${total}đ!`);
+        });
       }
-
-      // Content steppers
-      root.querySelectorAll("[data-step-content]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const delta = Number(btn.dataset.stepContent) || 0;
-          contentVal = clampScore(contentVal + delta, maxContent);
-          syncDomScores();
-        });
-      });
-
-      sliderContent?.addEventListener("input", (e) => {
-        contentVal = Number(e.target.value) || 0;
-        syncDomScores();
-      });
-
-      // Manner steppers
-      root.querySelectorAll("[data-step-manner]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const delta = Number(btn.dataset.stepManner) || 0;
-          mannerVal = clampScore(mannerVal + delta, maxManner);
-          syncDomScores();
-        });
-      });
-
-      root.querySelectorAll("[data-set-manner]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          mannerVal = Number(btn.dataset.setManner) || 0;
-          syncDomScores();
-        });
-      });
-
-      sliderManner?.addEventListener("input", (e) => {
-        mannerVal = Number(e.target.value) || 0;
-        syncDomScores();
-      });
-
-      // Save score
-      document.getElementById("btn-save-score")?.addEventListener("click", async () => {
-        const c = clampScore(contentVal, maxContent);
-        const m = clampScore(mannerVal, maxManner);
-        const total = (c + m).toFixed(1);
-
-        const timeStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-        lastSavedTimestamps[activeTeamId] = timeStr;
-
-        const path = `live/judgeScores/${roundKey}/${activeTeamId}/${selectedJudgeId}`;
-        await set(path, { content: c, manner: m });
-
-        if (statusEl) {
-          statusEl.className = "judge-saved-status saved";
-          statusEl.innerHTML = `✓ Đã lưu lúc ${timeStr} (${total}đ)`;
-        }
-
-        showToast(`Đã lưu điểm cho ${activeTeam.name}: ${total}đ!`);
-      });
     }
 
     function renderRound2View(root) {
@@ -492,7 +620,9 @@
       const answers = liveState.round2?.answers || {};
       const results = liveState.round2?.results || {};
 
-      const teamsListHtml = quizData.teams
+      const round2Teams = getRoundTeams(quizData.teams, quizData.round_order, "round2");
+
+      const teamsListHtml = round2Teams
         .map((team) => {
           const ansRecord = answers[team.id];
           const resRecord = results[team.id];
@@ -553,7 +683,7 @@
 
     function wireHeaderControls() {
       document.getElementById("btn-judge-logout")?.addEventListener("click", () => {
-        logoutUser("judge");
+        logoutUser(isHeadJudge ? "head_judge" : "judge");
       });
     }
 
@@ -572,12 +702,18 @@
     async function initJudge() {
       quizData = await fetchQuizData({ portal: "judge" });
 
-      const session = getActiveSession(undefined, "judge");
+      const session = getActiveSession(undefined, "judge") || getActiveSession(undefined, "head_judge");
+      isHeadJudge = session?.role === "head_judge";
       selectedJudgeId = session?.ref_id || "";
-      const matchedJudge = quizData.judges.find((j) => j.id === selectedJudgeId);
-      judgeDisplayName = matchedJudge ? matchedJudge.name : (session?.display_name || "Ban Giám khảo");
 
-      document.title = `Ban Giám Khảo (${judgeDisplayName}) - ${quizData.config.show_title}`;
+      if (isHeadJudge) {
+        judgeDisplayName = session?.display_name || "Giám khảo tổng";
+      } else {
+        const matchedJudge = quizData.judges.find((j) => j.id === selectedJudgeId);
+        judgeDisplayName = matchedJudge ? matchedJudge.name : (session?.display_name || "Ban Giám khảo");
+      }
+
+      document.title = `${isHeadJudge ? "Giám Khảo Tổng" : "Ban Giám Khảo"} (${judgeDisplayName}) - ${quizData.config.show_title}`;
 
       onStatusChange((st) => {
         connStatus = st;
@@ -596,8 +732,6 @@
       // Subscribe to live state updates
       listen("live", (data) => {
         if (!data) return;
-        // Replace (not merge) so fields the host removed, e.g. after a reset, disappear here too;
-        // keep answers that arrive on their own listener for the same question.
         const prevRound2 = liveState.round2 || {};
         liveState = { ...initialLiveState(), ...data };
         if (prevRound2.answers && liveState.round2 && liveState.round2.questionKey === prevRound2.questionKey && !liveState.round2.answers) {
