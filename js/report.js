@@ -4,6 +4,7 @@
 import { calculateTeamRoundScore } from "./judges.js";
 import { computeLeaderboard } from "./leaderboard.js";
 import { buildQuestionKey, calculateRound2QuestionScore, computeRound2Ranking } from "./round2.js";
+import { getContestTeams } from "./content.js";
 
 function escapeCsvField(val) {
   if (val === undefined || val === null) {
@@ -50,9 +51,12 @@ export function buildReportCsv({
   let actualRanked = rankedEntries;
   let actualR2Details = round2Details;
 
-  if ((!actualRanked || actualRanked.length === 0) && teams && teams.length > 0) {
+  const contestTeams = getContestTeams(teams, gameState?.round_order);
+  const effectiveTeams = contestTeams.length > 0 ? contestTeams : teams;
+
+  if ((!actualRanked || actualRanked.length === 0) && effectiveTeams && effectiveTeams.length > 0) {
     const cfg = config || {};
-    const leaderboard = computeLeaderboard(teams, gameState, "total", { tieBreak: true });
+    const leaderboard = computeLeaderboard(effectiveTeams, gameState, "total", { tieBreak: true });
 
     actualRanked = leaderboard.map((entry) => {
       const tId = entry.id;
@@ -121,7 +125,7 @@ export function buildReportCsv({
         continue;
       }
 
-      for (const t of teams) {
+      for (const t of effectiveTeams) {
         const record = answersForQ[t.id];
         const rawAns = record?.answer ? String(record.answer).trim().toUpperCase() : "";
         const isCorrect = rawAns && rawAns === String(q.correct || "").trim().toUpperCase();
@@ -200,14 +204,14 @@ export function buildReportCsv({
   }
 
   // SECTION 2: Thống kê Vòng 2
-  let contestTeams = teams;
-  if ((!contestTeams || contestTeams.length === 0) && actualRanked && actualRanked.length > 0) {
-    contestTeams = actualRanked.map((e) => ({ id: e.id, name: e.name }));
+  let r2Teams = effectiveTeams;
+  if ((!r2Teams || r2Teams.length === 0) && actualRanked && actualRanked.length > 0) {
+    r2Teams = actualRanked.map((e) => ({ id: e.id, name: e.name }));
   }
 
-  if (contestTeams && contestTeams.length > 0) {
+  if (r2Teams && r2Teams.length > 0) {
     const r2StatsMap = {};
-    for (const t of contestTeams) {
+    for (const t of r2Teams) {
       r2StatsMap[t.id] = {
         points: gameState?.round2Stats?.[t.id]?.points ?? 0,
         correctCount: gameState?.round2Stats?.[t.id]?.correctCount ?? 0,

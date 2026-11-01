@@ -18,17 +18,20 @@
         <div>
           <h1 class="section-title">⚙ Cấu Hình Nội Dung Hội Thi</h1>
           <p class="section-subtitle" style="margin-top: 0.25rem; font-size: 0.95rem; color: var(--text-muted);">
-            Quản trị danh sách đội thi, thứ tự thi đấu, gói câu hỏi 3 vòng, ban giám khảo, tài khoản đăng nhập và cài đặt hội thi
+            Quản trị danh sách đội thi, đội tham gia hội thi, thứ tự thi đấu, ngân hàng câu hỏi 3 vòng, ban giám khảo và cài đặt
           </p>
         </div>
       </div>
 
-      <!-- Action Bar -->
+      <!-- Action Bar with Unsaved Changes Indicator -->
       <div class="editor-action-bar">
-        <div class="editor-action-group">
+        <div class="editor-action-group" style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
           <button type="button" id="btn-save-content" class="btn btn-primary">
             💾 Lưu vào hệ thống
           </button>
+          <span id="unsaved-changes-indicator" class="unsaved-badge" style="display: none;">
+            ● Có thay đổi chưa lưu
+          </span>
           <button type="button" id="btn-load-sample" class="btn">
             ↻ Nạp dữ liệu mẫu
           </button>
@@ -78,6 +81,10 @@
 
       <!-- Panel: Teams -->
       <section id="panel-teams" class="editor-panel active">
+        <div class="tab-explanation">
+          <strong>👥 Đội thi:</strong> Quản lý danh sách các đội thi đấu trong hệ thống; hiển thị trên màn hình MC, máy tính bảng Ban Giám khảo, máy đội và màn hình lớn.
+        </div>
+
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
           <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0;">Danh sách Đội thi đấu</h2>
           <button type="button" id="btn-add-team" class="btn btn-primary btn-sm">+ Thêm đội thi</button>
@@ -87,13 +94,54 @@
 
       <!-- Panel: Round Order -->
       <section id="panel-round_order" class="editor-panel">
+        <div class="tab-explanation">
+          <strong>📋 Thứ tự thi:</strong> Chọn danh sách đội tham gia hội thi và thiết lập thứ tự bốc thăm thi đấu từng vòng; các đội không chọn sẽ được ẩn trên toàn hệ thống.
+        </div>
+
+        <!-- Section 1: Contest-level Team Selection -->
+        <div class="editor-card" style="margin-bottom: 1.5rem; border-color: var(--accent);">
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
+            <div>
+              <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0; color: var(--accent);">
+                1. Đội tham gia hội thi
+              </h2>
+              <div style="font-size: 0.88rem; color: var(--text-muted); margin-top: 0.2rem;">
+                Tích chọn các đội sẽ tham gia tranh tài trong hội thi này. Đội bị bỏ chọn sẽ tự động bị loại khỏi danh sách thi đấu của tất cả các vòng và ẩn trên toàn hệ thống.
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+              <span style="font-weight: 700; font-size: 0.95rem;">
+                Đã chọn <strong id="contest-selected-count" style="color: var(--accent); font-size: 1.15rem;">0</strong> / <span id="contest-total-count">0</span> đội
+              </span>
+              <button type="button" id="btn-contest-select-all" class="btn btn-sm">Chọn tất cả</button>
+              <button type="button" id="btn-contest-deselect-all" class="btn btn-sm">Bỏ chọn tất cả</button>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <input
+              type="text"
+              id="contest-teams-search"
+              class="scores-search-input"
+              style="width: 100%; max-width: 400px;"
+              placeholder="🔍 Tìm nhanh đội thi theo tên hoặc mã..."
+            />
+          </div>
+
+          <div id="contest-teams-checklist" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.65rem; max-height: 380px; overflow-y: auto; padding: 0.25rem;"></div>
+        </div>
+
+        <!-- Section 2: Round Order -->
         <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
           <div>
-            <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0;">Thứ tự thi &amp; Đội thi đấu từng vòng</h2>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.2rem 0 0;">Thiết lập danh sách các đội tham gia và thứ tự thi đấu cho từng vòng thi (Vòng 1, Vòng 2, Vòng 3).</p>
+            <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0;">2. Thứ tự thi đấu từng vòng</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.2rem 0 0;">
+              Thứ tự lên sân khấu của các đội tham gia hội thi trong từng vòng thi đấu.
+            </p>
           </div>
           <div style="display: flex; gap: 0.5rem;">
-            <button type="button" id="btn-reset-round-order" class="btn btn-sm">↻ Đặt lại theo danh sách đội</button>
+            <button type="button" id="btn-reset-round-order" class="btn btn-sm">↻ Đặt lại theo danh sách đội tham gia</button>
           </div>
         </div>
 
@@ -108,45 +156,85 @@
 
       <!-- Panel: Round 1 -->
       <section id="panel-round1" class="editor-panel">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-          <div>
-            <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0;">Vòng 1: Gói câu hỏi theo từng đội</h2>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.2rem 0 0;">Mỗi đội có 2 gói câu hỏi (ví dụ Gói A, Gói B) để bốc thăm hoặc chọn gói.</p>
-          </div>
-          <button type="button" id="btn-add-round1" class="btn btn-primary btn-sm">+ Thêm gói câu hỏi</button>
+        <div class="tab-explanation">
+          <strong>① Vòng 1:</strong> Gói câu hỏi tuyên truyền theo từng đội; MC chọn gói khi đội lên sân khấu và đáp án/chủ đề hiển thị trên màn hình chính.
         </div>
+
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;">
+            <select id="r1-filter-team" class="editor-select" style="min-width: 220px; font-weight: 600;">
+              <option value="">Tất cả đội</option>
+            </select>
+            <input
+              type="text"
+              id="r1-filter-search"
+              class="scores-search-input"
+              placeholder="🔍 Tìm gói câu hỏi, nội dung..."
+              style="min-width: 240px;"
+            />
+          </div>
+          <button type="button" id="btn-add-round1" class="btn btn-primary btn-sm">+ Thêm gói câu hỏi mới</button>
+        </div>
+
         <div id="round1-list"></div>
       </section>
 
       <!-- Panel: Round 2 -->
       <section id="panel-round2" class="editor-panel">
-        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
-          <div>
-            <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0;">Vòng 2: Ngân hàng câu hỏi trắc nghiệm</h2>
-            <div id="r2-set-selector" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;"></div>
+        <div class="tab-explanation">
+          <strong>② Vòng 2:</strong> Ngân hàng câu hỏi trắc nghiệm, chia theo bộ đề; MC chọn 1 bộ đề khi thi, đáp án đúng không gửi xuống iPad đội.
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;">
+            <select id="r2-filter-set" class="editor-select" style="min-width: 170px; font-weight: 600;">
+              <option value="">Tất cả bộ đề</option>
+            </select>
+            <input
+              type="text"
+              id="r2-filter-search"
+              class="scores-search-input"
+              placeholder="🔍 Tìm nội dung câu hỏi, phương án..."
+              style="min-width: 240px;"
+            />
           </div>
           <div style="display: flex; gap: 0.5rem;">
-            <button type="button" id="btn-add-r2-set" class="btn btn-sm">+ Thêm bộ đề</button>
+            <button type="button" id="btn-add-r2-set" class="btn btn-sm">+ Thêm bộ đề mới</button>
             <button type="button" id="btn-add-round2" class="btn btn-primary btn-sm">+ Thêm câu hỏi</button>
           </div>
         </div>
+
         <div id="round2-list"></div>
       </section>
 
       <!-- Panel: Round 3 -->
       <section id="panel-round3" class="editor-panel">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div class="tab-explanation">
+          <strong>③ Vòng 3:</strong> Ngân hàng các ô tình huống truyền thông thực tế; hiển thị trên ma trận ô số của MC và mở tình huống khi đội chọn ô.
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
           <div>
-            <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0;">Vòng 3: Ô câu hỏi tình huống</h2>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.2rem 0 0;">Danh sách các ô tình huống truyền thông thực tế (thường từ 15 đến 50 ô).</p>
+            <input
+              type="text"
+              id="r3-filter-search"
+              class="scores-search-input"
+              placeholder="🔍 Tìm theo số ô hoặc nội dung tình huống..."
+              style="min-width: 280px;"
+            />
           </div>
           <button type="button" id="btn-add-round3" class="btn btn-primary btn-sm">+ Thêm ô tình huống</button>
         </div>
+
         <div id="round3-list"></div>
       </section>
 
       <!-- Panel: Judges -->
       <section id="panel-judges" class="editor-panel">
+        <div class="tab-explanation">
+          <strong>⚖ Ban Giám khảo:</strong> Danh sách thành viên Ban Giám khảo chấm điểm; hiển thị trong danh sách tài khoản đăng nhập và bảng tổng hợp kết quả.
+        </div>
+
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
           <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0;">Danh sách Ban Giám khảo</h2>
           <button type="button" id="btn-add-judge" class="btn btn-primary btn-sm">+ Thêm giám khảo</button>
@@ -156,13 +244,17 @@
 
       <!-- Panel: Accounts -->
       <section id="panel-accounts" class="editor-panel">
+        <div class="tab-explanation">
+          <strong>🔑 Tài khoản:</strong> Quản lý tài khoản đăng nhập cho MC, Giám khảo tổng, các Giám khảo và các Đội thi trên máy tính bảng hoặc laptop.
+        </div>
+
         <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
           <div>
             <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0;">Tài khoản đăng nhập</h2>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.2rem 0 0;">Quản lý tên đăng nhập, mật khẩu và liên kết tương ứng với Dẫn chương trình, Giám khảo, Giám khảo tổng hoặc Đội thi.</p>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.2rem 0 0;">Phân quyền truy cập các cổng: Host (Dẫn chương trình), Judge (Giám khảo), Team (Đội thi).</p>
           </div>
           <div style="display: flex; gap: 0.5rem;">
-            <button type="button" id="btn-gen-default-accounts" class="btn btn-sm" title="Tạo tự động tài khoản cho MC, từng giám khảo và từng đội thi">⚡ Tạo lại tài khoản mặc định</button>
+            <button type="button" id="btn-gen-default-accounts" class="btn btn-sm">⚡ Tạo lại tài khoản mặc định</button>
             <button type="button" id="btn-add-account" class="btn btn-primary btn-sm">+ Thêm tài khoản</button>
           </div>
         </div>
@@ -171,8 +263,13 @@
 
       <!-- Panel: Config -->
       <section id="panel-config" class="editor-panel">
+        <div class="tab-explanation">
+          <strong>⚙ Cài đặt chung:</strong> Tiêu đề hội thi, tên và mô tả các vòng, cơ cấu điểm số, thang điểm nội dung/hình thức và thời gian quy định cho từng phần thi.
+        </div>
+
         <div style="margin-bottom: 1rem;">
-          <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0;">Cài đặt chung của hội thi</h2>
+          <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0;">Cài đặt chung hội thi</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.2rem 0 0;">Tiêu đề, luật thi và thời gian mặc định cho các vòng.</p>
         </div>
         <div id="config-form"></div>
       </section>
@@ -187,22 +284,23 @@
       fetchSampleQuizData,
       escapeHtml,
       showToast,
-      wireStageLayout,
-      ensurePortalSession
+      wireStageLayout
     } from "./js/app.js";
     import { TEAM_PALETTE, PRESET_TEAM_NAMES } from "./js/config.js";
-    import { set, get } from "./js/backend.js";
     import {
       validateContent,
-      csvToContent,
       exportContentToJson,
       importContentFromJson,
       contentToQuizData,
+      getContestTeams,
       getRoundTeams,
       isTeamInRound
     } from "./js/content.js";
+    import { matchesSearch } from "./js/scores-filter.js";
+    import { getTeamInitials } from "./js/leaderboard.js";
     import { generateDefaultAccounts } from "./js/auth.js";
     import { resolveImageUrl } from "./js/data.js";
+    import { set, get } from "./js/backend.js";
 
     // Populate preset team names datalist
     const datalistEl = document.getElementById("preset-team-names");
@@ -213,7 +311,7 @@
     // Working copy of content in editor
     let content = {
       teams: [],
-      round_order: { round1: [], round2: [], round3: [] },
+      round_order: { contest: [], round1: [], round2: [], round3: [] },
       round1: [],
       round2: [],
       round3: [],
@@ -223,14 +321,46 @@
     };
 
     let activeTab = "teams";
-    let activeR2Set = "1";
     let activeOrderRound = "round1";
+
+    // Filter states
+    let contestSearchQuery = "";
+    let r1FilterTeamId = "";
+    let r1SearchQuery = "";
+    let r2FilterSet = "";
+    let r2SearchQuery = "";
+    let r3SearchQuery = "";
+
+    // Track unsaved changes
+    let hasUnsavedChanges = false;
+
+    function markUnsaved() {
+      hasUnsavedChanges = true;
+      updateUnsavedIndicator();
+    }
+
+    function markSaved() {
+      hasUnsavedChanges = false;
+      updateUnsavedIndicator();
+    }
+
+    function updateUnsavedIndicator() {
+      const el = document.getElementById("unsaved-changes-indicator");
+      if (el) {
+        el.style.display = hasUnsavedChanges ? "inline-flex" : "none";
+      }
+    }
+
+    window.addEventListener("beforeunload", (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "";
+        return "";
+      }
+    });
 
     /**
      * Renders an image preview component with "Không tìm thấy ảnh" error state.
-     * @param {string} rawUrl
-     * @param {string} [defaultHtml]
-     * @returns {string}
      */
     function renderImagePreviewHtml(rawUrl, defaultHtml = "") {
       const trimmed = String(rawUrl || "").trim();
@@ -279,7 +409,7 @@
     }
 
     // -------------------------------------------------------------------------
-    // Renderers for Each Section
+    // 1. Teams Section
     // -------------------------------------------------------------------------
 
     function renderTeams() {
@@ -292,7 +422,7 @@
 
       container.innerHTML = content.teams
         .map((team, idx) => {
-          const defaultAvatar = `<div class="editor-preview-thumb" style="background-color: ${escapeHtml(team.color || '#D97757')}; display: flex; align-items: center; justify-content: center; color: #FFF; font-weight: 700; font-size: 1.1rem;">${escapeHtml((team.name || '?').substring(0, 2).toUpperCase())}</div>`;
+          const defaultAvatar = `<div class="editor-preview-thumb" style="background-color: ${escapeHtml(team.color || '#D97757')}; display: flex; align-items: center; justify-content: center; color: #FFF; font-weight: 700; font-size: 1.1rem;">${escapeHtml(getTeamInitials(team.name || '?'))}</div>`;
 
           return `
             <div class="editor-card" data-team-index="${idx}">
@@ -313,7 +443,7 @@
 
                 <div class="editor-field">
                   <label class="editor-label">Tên đội thi</label>
-                  <input type="text" class="editor-input" data-team-field="name" data-index="${idx}" value="${escapeHtml(team.name || '')}" list="preset-team-names" placeholder="vd: Đội 01 - Cục Cảnh sát PCCC và CNCH" required />
+                  <input type="text" class="editor-input" data-team-field="name" data-index="${idx}" value="${escapeHtml(team.name || '')}" list="preset-team-names" placeholder="vd: Công an TP. Hà Nội" required />
                 </div>
 
                 <div class="editor-field">
@@ -345,7 +475,7 @@
       function updateTeamThumb(idx) {
         const team = content.teams[idx];
         if (!team) return;
-        const defaultAvatar = `<div class="editor-preview-thumb" style="background-color: ${escapeHtml(team.color || '#D97757')}; display: flex; align-items: center; justify-content: center; color: #FFF; font-weight: 700; font-size: 1.1rem;">${escapeHtml((team.name || '?').substring(0, 2).toUpperCase())}</div>`;
+        const defaultAvatar = `<div class="editor-preview-thumb" style="background-color: ${escapeHtml(team.color || '#D97757')}; display: flex; align-items: center; justify-content: center; color: #FFF; font-weight: 700; font-size: 1.1rem;">${escapeHtml(getTeamInitials(team.name || '?'))}</div>`;
         const previewHtml = renderImagePreviewHtml(team.image_url, defaultAvatar);
         const box = document.getElementById(`team-preview-box-${idx}`);
         if (box) box.innerHTML = previewHtml;
@@ -353,32 +483,26 @@
         if (headerBox) headerBox.innerHTML = previewHtml;
       }
 
-      // Wire events for teams
       container.querySelectorAll("[data-team-field]").forEach((input) => {
         input.addEventListener("input", (e) => {
+          markUnsaved();
           const idx = Number(e.target.dataset.index);
           const field = e.target.dataset.teamField;
           if (field === "color-text") {
             content.teams[idx].color = e.target.value;
             const picker = container.querySelector(`[data-team-field="color"][data-index="${idx}"]`);
             if (picker && /^#[0-9A-Fa-f]{6}$/.test(e.target.value)) picker.value = e.target.value;
-            if (!content.teams[idx].image_url) {
-              updateTeamThumb(idx);
-            }
+            if (!content.teams[idx].image_url) updateTeamThumb(idx);
           } else if (field === "color") {
             content.teams[idx].color = e.target.value;
             const textInput = container.querySelector(`[data-team-field="color-text"][data-index="${idx}"]`);
             if (textInput) textInput.value = e.target.value;
-            if (!content.teams[idx].image_url) {
-              updateTeamThumb(idx);
-            }
+            if (!content.teams[idx].image_url) updateTeamThumb(idx);
           } else if (field === "name") {
             content.teams[idx].name = e.target.value;
             const cardTitle = container.querySelector(`[data-team-index="${idx}"] .editor-card-title`);
             if (cardTitle) cardTitle.textContent = e.target.value || `Đội ${idx + 1}`;
-            if (!content.teams[idx].image_url) {
-              updateTeamThumb(idx);
-            }
+            if (!content.teams[idx].image_url) updateTeamThumb(idx);
           } else if (field === "image_url") {
             content.teams[idx].image_url = e.target.value;
             updateTeamThumb(idx);
@@ -391,8 +515,20 @@
       container.querySelectorAll("[data-remove-team]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const idx = Number(btn.dataset.removeTeam);
+          const teamId = content.teams[idx]?.id;
           if (confirm(`Bạn có chắc muốn xóa đội "${content.teams[idx]?.name || 'này'}"?`)) {
             content.teams.splice(idx, 1);
+            if (teamId && content.round_order) {
+              if (Array.isArray(content.round_order.contest)) {
+                content.round_order.contest = content.round_order.contest.filter((id) => id !== teamId);
+              }
+              ["round1", "round2", "round3"].forEach((r) => {
+                if (Array.isArray(content.round_order[r])) {
+                  content.round_order[r] = content.round_order[r].filter((id) => id !== teamId);
+                }
+              });
+            }
+            markUnsaved();
             renderTeams();
             renderRoundOrder();
             updateBadgeCounts();
@@ -401,61 +537,141 @@
       });
     }
 
+    // -------------------------------------------------------------------------
+    // 2. Round Order & Contest Selection Section
+    // -------------------------------------------------------------------------
+
+    function ensureRoundOrderStructure() {
+      if (!content.round_order || typeof content.round_order !== "object") {
+        content.round_order = {};
+      }
+      if (!Array.isArray(content.round_order.contest)) {
+        content.round_order.contest = content.teams.map((t) => t.id);
+      }
+      ["round1", "round2", "round3"].forEach((r) => {
+        if (!Array.isArray(content.round_order[r])) {
+          content.round_order[r] = content.round_order.contest.slice();
+        } else {
+          // Intersect with contest teams
+          const contestSet = new Set(content.round_order.contest);
+          content.round_order[r] = content.round_order[r].filter((id) => contestSet.has(id));
+        }
+      });
+    }
+
     function renderRoundOrder() {
+      ensureRoundOrderStructure();
+
+      const contestChecklistEl = document.getElementById("contest-teams-checklist");
+      const contestCountEl = document.getElementById("contest-selected-count");
+      const contestTotalEl = document.getElementById("contest-total-count");
+
+      if (contestTotalEl) contestTotalEl.textContent = content.teams.length;
+      if (contestCountEl) contestCountEl.textContent = content.round_order.contest.length;
+
+      // Render Section 1: Contest Checklist
+      if (contestChecklistEl) {
+        const contestSelectedSet = new Set(content.round_order.contest);
+        const filteredTeams = content.teams.filter((team) => {
+          if (!contestSearchQuery) return true;
+          return matchesSearch(team.name, contestSearchQuery) || matchesSearch(team.id, contestSearchQuery);
+        });
+
+        if (filteredTeams.length === 0) {
+          contestChecklistEl.innerHTML = `<div style="grid-column: 1 / -1; padding: 1rem; color: var(--text-muted); text-align: center;">Không tìm thấy đội nào phù hợp với từ khóa "${escapeHtml(contestSearchQuery)}".</div>`;
+        } else {
+          contestChecklistEl.innerHTML = filteredTeams
+            .map((team) => {
+              const isChecked = contestSelectedSet.has(team.id);
+              return `
+                <label class="editor-card" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.85rem; margin-bottom: 0; cursor: pointer; user-select: none; border-color: ${isChecked ? 'var(--accent)' : 'var(--border)'}; background-color: ${isChecked ? 'var(--surface-elevated)' : 'var(--surface)'};">
+                  <input type="checkbox" class="contest-team-checkbox" data-contest-team-id="${escapeHtml(team.id)}" ${isChecked ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;" />
+                  <div style="width: 26px; height: 26px; border-radius: 50%; background-color: ${escapeHtml(team.color || '#D97757')}; display: inline-flex; align-items: center; justify-content: center; color: #FFF; font-weight: 700; font-size: 0.75rem;">
+                    ${escapeHtml(getTeamInitials(team.name || '?'))}
+                  </div>
+                  <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    <strong style="font-size: 0.92rem;">${escapeHtml(team.name)}</strong>
+                    <span style="font-size: 0.78rem; color: var(--text-muted); display: block;">${escapeHtml(team.id)}</span>
+                  </div>
+                </label>
+              `;
+            })
+            .join("");
+
+          contestChecklistEl.querySelectorAll(".contest-team-checkbox").forEach((chk) => {
+            chk.addEventListener("change", (e) => {
+              const tId = e.target.dataset.contestTeamId;
+              const isChecked = e.target.checked;
+              if (isChecked) {
+                if (!content.round_order.contest.includes(tId)) {
+                  content.round_order.contest.push(tId);
+                }
+              } else {
+                content.round_order.contest = content.round_order.contest.filter((id) => id !== tId);
+                // Removing a team from the contest removes it from every round list
+                content.round_order.round1 = (content.round_order.round1 || []).filter((id) => id !== tId);
+                content.round_order.round2 = (content.round_order.round2 || []).filter((id) => id !== tId);
+                content.round_order.round3 = (content.round_order.round3 || []).filter((id) => id !== tId);
+              }
+              markUnsaved();
+              renderRoundOrder();
+            });
+          });
+        }
+      }
+
+      // Render Section 2: Per-round Order
       const container = document.getElementById("round-order-list");
       if (!container) return;
 
-      if (!content.round_order) {
-        content.round_order = { round1: [], round2: [], round3: [] };
-      }
+      const contestTeams = getContestTeams(content.teams, content.round_order);
+      const contestTeamMap = new Map(contestTeams.map((t) => [t.id, t]));
 
-      // Ensure this round has an array; default to all teams if empty or undefined
-      if (!Array.isArray(content.round_order[activeOrderRound]) || content.round_order[activeOrderRound].length === 0) {
-        content.round_order[activeOrderRound] = content.teams.map((t) => t.id);
-      }
+      // Intersect current round order with contest teams
+      let currentRoundList = content.round_order[activeOrderRound] || [];
+      currentRoundList = currentRoundList.filter((id) => contestTeamMap.has(id));
+      content.round_order[activeOrderRound] = currentRoundList;
 
-      const currentOrderedIds = content.round_order[activeOrderRound];
-      const teamsMap = new Map(content.teams.map((t) => [t.id, t]));
-
-      const participating = currentOrderedIds
-        .map((id) => teamsMap.get(id))
-        .filter(Boolean);
-
+      const participating = currentRoundList.map((id) => contestTeamMap.get(id)).filter(Boolean);
       const participatingIdSet = new Set(participating.map((t) => t.id));
-      const nonParticipating = content.teams.filter((t) => !participatingIdSet.has(t.id));
+      const nonParticipating = contestTeams.filter((t) => !participatingIdSet.has(t.id));
 
       const roundLabel = activeOrderRound === "round1" ? "Vòng 1" : activeOrderRound === "round2" ? "Vòng 2" : "Vòng 3";
 
       container.innerHTML = `
         <div style="margin-bottom: 0.85rem; font-weight: 700; color: var(--text-muted); font-size: 0.95rem;">
-          Số đội tham gia ${roundLabel}: <span style="color: var(--accent); font-weight: 800; font-size: 1.1rem;">${participating.length}</span> / ${content.teams.length} đội
+          Số đội thi đấu ${roundLabel}: <span style="color: var(--accent); font-weight: 800; font-size: 1.15rem;">${participating.length}</span> / ${contestTeams.length} đội tham gia hội thi
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-          ${participating
-            .map((team, idx) => {
-              return `
-                <div class="editor-card" style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; margin-bottom: 0;">
-                  <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    <input type="checkbox" class="order-team-check" data-team-id="${escapeHtml(team.id)}" checked style="width: 18px; height: 18px; cursor: pointer;" title="Bỏ chọn để không tham gia vòng này" />
-                    <span style="font-weight: 800; font-size: 1rem; min-width: 2.2rem; color: var(--accent);">#${idx + 1}</span>
-                    <div style="width: 28px; height: 28px; border-radius: 50%; background-color: ${escapeHtml(team.color || '#D97757')}; display: inline-flex; align-items: center; justify-content: center; color: #FFF; font-weight: 700; font-size: 0.8rem;">
-                      ${escapeHtml((team.name || '?').substring(0, 2).toUpperCase())}
-                    </div>
-                    <div>
-                      <strong style="font-size: 1rem;">${escapeHtml(team.name)}</strong>
-                      <span style="font-size: 0.82rem; color: var(--text-muted); margin-left: 0.5rem;">(${escapeHtml(team.id)})</span>
-                    </div>
-                  </div>
+          ${
+            participating.length === 0
+              ? `<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Chưa có đội nào tham gia ${roundLabel}. Tích chọn đội bên dưới để thêm vào vòng này.</div>`
+              : participating
+                  .map((team, idx) => {
+                    return `
+                      <div class="editor-card" style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; margin-bottom: 0;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                          <input type="checkbox" class="order-team-check" data-team-id="${escapeHtml(team.id)}" checked style="width: 18px; height: 18px; cursor: pointer;" title="Bỏ chọn để không tham gia vòng này" />
+                          <span style="font-weight: 800; font-size: 1rem; min-width: 2.2rem; color: var(--accent);">#${idx + 1}</span>
+                          <div style="width: 28px; height: 28px; border-radius: 50%; background-color: ${escapeHtml(team.color || '#D97757')}; display: inline-flex; align-items: center; justify-content: center; color: #FFF; font-weight: 700; font-size: 0.8rem;">
+                            ${escapeHtml(getTeamInitials(team.name || '?'))}
+                          </div>
+                          <div>
+                            <strong style="font-size: 1rem;">${escapeHtml(team.name)}</strong>
+                            <span style="font-size: 0.82rem; color: var(--text-muted); margin-left: 0.5rem;">(${escapeHtml(team.id)})</span>
+                          </div>
+                        </div>
 
-                  <div style="display: flex; gap: 0.35rem;">
-                    <button type="button" class="btn btn-sm btn-order-move" data-move-dir="-1" data-index="${idx}" ${idx === 0 ? "disabled" : ""} title="Chuyển lên">▲</button>
-                    <button type="button" class="btn btn-sm btn-order-move" data-move-dir="1" data-index="${idx}" ${idx === participating.length - 1 ? "disabled" : ""} title="Chuyển xuống">▼</button>
-                  </div>
-                </div>
-              `;
-            })
-            .join("")}
+                        <div style="display: flex; gap: 0.35rem;">
+                          <button type="button" class="btn btn-sm btn-order-move" data-move-dir="-1" data-index="${idx}" ${idx === 0 ? "disabled" : ""} title="Chuyển lên">▲</button>
+                          <button type="button" class="btn btn-sm btn-order-move" data-move-dir="1" data-index="${idx}" ${idx === participating.length - 1 ? "disabled" : ""} title="Chuyển xuống">▼</button>
+                        </div>
+                      </div>
+                    `;
+                  })
+                  .join("")
+          }
 
           ${
             nonParticipating.length > 0
@@ -466,11 +682,11 @@
                     ${nonParticipating
                       .map(
                         (team) => `
-                        <div class="editor-card" style="display: flex; align-items: center; padding: 0.6rem 1rem; opacity: 0.65; margin-bottom: 0;">
+                        <div class="editor-card" style="display: flex; align-items: center; padding: 0.6rem 1rem; opacity: 0.7; margin-bottom: 0;">
                           <div style="display: flex; align-items: center; gap: 0.75rem;">
                             <input type="checkbox" class="order-team-check" data-team-id="${escapeHtml(team.id)}" style="width: 18px; height: 18px; cursor: pointer;" title="Tích chọn để tham gia vòng này" />
                             <div style="width: 24px; height: 24px; border-radius: 50%; background-color: ${escapeHtml(team.color || '#D97757')}; display: inline-flex; align-items: center; justify-content: center; color: #FFF; font-weight: 700; font-size: 0.75rem;">
-                              ${escapeHtml((team.name || '?').substring(0, 2).toUpperCase())}
+                              ${escapeHtml(getTeamInitials(team.name || '?'))}
                             </div>
                             <div>
                               <span>${escapeHtml(team.name)}</span>
@@ -500,6 +716,7 @@
             list = list.filter((id) => id !== tId);
           }
           content.round_order[activeOrderRound] = list;
+          markUnsaved();
           renderRoundOrder();
         });
       });
@@ -514,89 +731,190 @@
             const temp = list[idx];
             list[idx] = list[targetIdx];
             list[targetIdx] = temp;
+            markUnsaved();
             renderRoundOrder();
           }
         });
       });
     }
 
+    // -------------------------------------------------------------------------
+    // 3. Round 1 Section: Grouped by team + filters
+    // -------------------------------------------------------------------------
+
     function renderRound1() {
       const container = document.getElementById("round1-list");
+      const teamFilterSelect = document.getElementById("r1-filter-team");
       if (!container) return;
+
+      // Populate filter dropdown
+      if (teamFilterSelect) {
+        teamFilterSelect.innerHTML = `<option value="">Tất cả đội (${content.teams.length} đội)</option>` +
+          content.teams
+            .map((t) => `<option value="${escapeHtml(t.id)}" ${r1FilterTeamId === t.id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`)
+            .join("");
+      }
+
       if (!content.round1 || content.round1.length === 0) {
-        container.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Chưa có gói câu hỏi nào. Bấm "+ Thêm gói câu hỏi" để tạo mới.</div>`;
+        container.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Chưa có gói câu hỏi nào. Bấm "+ Thêm gói câu hỏi mới" để tạo mới.</div>`;
         return;
       }
 
-      container.innerHTML = content.round1
-        .map((pkg, idx) => {
-          const teamOptions = content.teams
-            .map(
-              (t) =>
-                `<option value="${escapeHtml(t.id)}" ${pkg.team_id === t.id ? 'selected' : ''}>${escapeHtml(t.name)} (${escapeHtml(t.id)})</option>`
-            )
-            .join("");
+      const teamMap = new Map(content.teams.map((t) => [t.id, t]));
 
-          return `
-            <div class="editor-card" data-r1-index="${idx}">
-              <div class="editor-card-header">
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                  <span class="meta-pill accent">Gói #${idx + 1}</span>
-                  <h3 class="editor-card-title">${escapeHtml(pkg.package || 'Gói câu hỏi')}</h3>
-                </div>
-                <button type="button" class="btn btn-sm btn-danger" data-remove-r1="${idx}">Xóa gói</button>
-              </div>
+      // Determine which teams to group
+      let teamsToDisplay = content.teams.slice();
+      if (r1FilterTeamId) {
+        teamsToDisplay = teamsToDisplay.filter((t) => t.id === r1FilterTeamId);
+      }
 
-              <div class="editor-grid-3">
-                <div class="editor-field">
-                  <label class="editor-label">Đội thi sở hữu</label>
-                  <select class="editor-select" data-r1-field="team_id" data-index="${idx}">
-                    <option value="">-- Chọn đội thi --</option>
-                    ${teamOptions}
-                  </select>
-                </div>
+      // Group packages with their original index preserved for data binding
+      let groupsHtml = "";
+      let totalMatching = 0;
 
-                <div class="editor-field">
-                  <label class="editor-label">Tên gói câu hỏi</label>
-                  <input type="text" class="editor-input" data-r1-field="package" data-index="${idx}" value="${escapeHtml(pkg.package || '')}" placeholder="vd: Gói A hoặc Gói B" />
-                </div>
+      teamsToDisplay.forEach((team) => {
+        const teamPkgsWithIndex = [];
+        content.round1.forEach((pkg, originalIdx) => {
+          if (pkg.team_id === team.id) {
+            if (!r1SearchQuery || matchesSearch(pkg.package, r1SearchQuery) || matchesSearch(pkg.question, r1SearchQuery)) {
+              teamPkgsWithIndex.push({ pkg, idx: originalIdx });
+            }
+          }
+        });
 
-                <div class="editor-grid-2">
-                  <div class="editor-field">
-                    <label class="editor-label">Thời gian (giây)</label>
-                    <input type="number" class="editor-input" data-r1-field="time_seconds" data-index="${idx}" value="${pkg.time_seconds || 900}" min="1" />
-                  </div>
-                  <div class="editor-field">
-                    <label class="editor-label">Điểm số</label>
-                    <input type="number" class="editor-input" data-r1-field="points" data-index="${idx}" value="${pkg.points || 50}" min="0" />
-                  </div>
-                </div>
-              </div>
-
-              <div class="editor-field">
-                <label class="editor-label">Nội dung câu hỏi tuyên truyền</label>
-                <textarea class="editor-textarea" data-r1-field="question" data-index="${idx}" rows="2" placeholder="Nhập chủ đề hoặc câu hỏi tuyên truyền...">${escapeHtml(pkg.question || '')}</textarea>
-              </div>
-
-              <div class="editor-field" style="margin-top: 0.5rem;">
-                <label class="editor-label">Ảnh đính kèm gói câu hỏi (tùy chọn)</label>
-                <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-                  <div style="flex: 1; min-width: 260px;">
-                    <input type="text" class="editor-input" data-r1-field="image_url" data-index="${idx}" value="${escapeHtml(pkg.image_url || '')}" placeholder="vd: v1-goi-a.jpg hoặc https://..." />
-                    <span style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">Chép ảnh vào thư mục images/ của dự án rồi nhập tên file</span>
-                  </div>
-                  <div id="r1-preview-box-${idx}">
-                    ${renderImagePreviewHtml(pkg.image_url)}
-                  </div>
-                </div>
-              </div>
+        // Only show group if searching matches or if filtering by this team or if team has packages
+        if (teamPkgsWithIndex.length > 0 || r1FilterTeamId === team.id) {
+          totalMatching += teamPkgsWithIndex.length;
+          groupsHtml += `
+            <div class="group-header-card">
+              <h3 class="group-header-title">
+                ${escapeHtml(team.name)} — <span style="color: var(--accent);">${teamPkgsWithIndex.length} gói</span>
+              </h3>
+              <button type="button" class="btn btn-sm btn-primary" data-add-r1-for-team="${escapeHtml(team.id)}">
+                + Thêm gói cho đội này
+              </button>
             </div>
           `;
-        })
-        .join("");
 
+          if (teamPkgsWithIndex.length === 0) {
+            groupsHtml += `<div style="padding: 1rem; color: var(--text-muted); font-size: 0.9rem;">Chưa có gói câu hỏi nào cho đội này. Bấm "+ Thêm gói cho đội này" ở trên.</div>`;
+          } else {
+            groupsHtml += teamPkgsWithIndex
+              .map(({ pkg, idx }) => {
+                const teamOptions = content.teams
+                  .map(
+                    (t) =>
+                      `<option value="${escapeHtml(t.id)}" ${pkg.team_id === t.id ? 'selected' : ''}>${escapeHtml(t.name)} (${escapeHtml(t.id)})</option>`
+                  )
+                  .join("");
+
+                return `
+                  <div class="editor-card" data-r1-index="${idx}">
+                    <div class="editor-card-header">
+                      <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <span class="meta-pill accent">Gói #${idx + 1}</span>
+                        <h3 class="editor-card-title">${escapeHtml(pkg.package || 'Gói câu hỏi')}</h3>
+                      </div>
+                      <button type="button" class="btn btn-sm btn-danger" data-remove-r1="${idx}">Xóa gói</button>
+                    </div>
+
+                    <div class="editor-grid-3">
+                      <div class="editor-field">
+                        <label class="editor-label">Đội thi sở hữu</label>
+                        <select class="editor-select" data-r1-field="team_id" data-index="${idx}">
+                          <option value="">-- Chọn đội thi --</option>
+                          ${teamOptions}
+                        </select>
+                      </div>
+
+                      <div class="editor-field">
+                        <label class="editor-label">Tên gói câu hỏi</label>
+                        <input type="text" class="editor-input" data-r1-field="package" data-index="${idx}" value="${escapeHtml(pkg.package || '')}" placeholder="vd: Gói A hoặc Gói B" />
+                      </div>
+
+                      <div class="editor-grid-2">
+                        <div class="editor-field">
+                          <label class="editor-label">Thời gian (giây)</label>
+                          <input type="number" class="editor-input" data-r1-field="time_seconds" data-index="${idx}" value="${pkg.time_seconds || 900}" min="1" />
+                        </div>
+                        <div class="editor-field">
+                          <label class="editor-label">Điểm số</label>
+                          <input type="number" class="editor-input" data-r1-field="points" data-index="${idx}" value="${pkg.points || 50}" min="0" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="editor-field">
+                      <label class="editor-label">Nội dung câu hỏi tuyên truyền</label>
+                      <textarea class="editor-textarea" data-r1-field="question" data-index="${idx}" rows="2" placeholder="Nhập chủ đề hoặc câu hỏi tuyên truyền...">${escapeHtml(pkg.question || '')}</textarea>
+                    </div>
+
+                    <div class="editor-field" style="margin-top: 0.5rem;">
+                      <label class="editor-label">Ảnh đính kèm gói câu hỏi (tùy chọn)</label>
+                      <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 260px;">
+                          <input type="text" class="editor-input" data-r1-field="image_url" data-index="${idx}" value="${escapeHtml(pkg.image_url || '')}" placeholder="vd: v1-goi-a.jpg hoặc https://..." />
+                          <span style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">Chép ảnh vào thư mục images/ của dự án rồi nhập tên file</span>
+                        </div>
+                        <div id="r1-preview-box-${idx}">
+                          ${renderImagePreviewHtml(pkg.image_url)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              })
+              .join("");
+          }
+        }
+      });
+
+      // Handle unassigned packages
+      const unassigned = [];
+      content.round1.forEach((pkg, originalIdx) => {
+        if (!teamMap.has(pkg.team_id)) {
+          if (!r1SearchQuery || matchesSearch(pkg.package, r1SearchQuery) || matchesSearch(pkg.question, r1SearchQuery)) {
+            unassigned.push({ pkg, idx: originalIdx });
+          }
+        }
+      });
+
+      if (unassigned.length > 0 && !r1FilterTeamId) {
+        groupsHtml += `
+          <div class="group-header-card" style="border-color: var(--danger);">
+            <h3 class="group-header-title" style="color: var(--danger);">Gói chưa gán đội hợp lệ — ${unassigned.length} gói</h3>
+          </div>
+        `;
+        groupsHtml += unassigned
+          .map(({ pkg, idx }) => `
+            <div class="editor-card" data-r1-index="${idx}">
+              <div class="editor-card-header">
+                <span class="meta-pill">Gói #${idx + 1}</span>
+                <button type="button" class="btn btn-sm btn-danger" data-remove-r1="${idx}">Xóa gói</button>
+              </div>
+              <div class="editor-field">
+                <label class="editor-label">Chọn lại đội thi sở hữu</label>
+                <select class="editor-select" data-r1-field="team_id" data-index="${idx}">
+                  <option value="">-- Chọn đội thi --</option>
+                  ${content.teams.map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join("")}
+                </select>
+              </div>
+            </div>
+          `)
+          .join("");
+      }
+
+      if (!groupsHtml) {
+        container.innerHTML = `<div style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Không tìm thấy gói câu hỏi nào phù hợp với bộ lọc.</div>`;
+        return;
+      }
+
+      container.innerHTML = groupsHtml;
+
+      // Event handlers
       container.querySelectorAll("[data-r1-field]").forEach((input) => {
         input.addEventListener("input", (e) => {
+          markUnsaved();
           const idx = Number(e.target.dataset.index);
           const field = e.target.dataset.r1Field;
           content.round1[idx][field] = e.target.value;
@@ -606,6 +924,8 @@
           } else if (field === "image_url") {
             const box = document.getElementById(`r1-preview-box-${idx}`);
             if (box) box.innerHTML = renderImagePreviewHtml(e.target.value);
+          } else if (field === "team_id") {
+            renderRound1();
           }
         });
       });
@@ -614,144 +934,213 @@
         btn.addEventListener("click", () => {
           const idx = Number(btn.dataset.removeR1);
           content.round1.splice(idx, 1);
+          markUnsaved();
+          renderRound1();
+          updateBadgeCounts();
+        });
+      });
+
+      container.querySelectorAll("[data-add-r1-for-team]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const teamId = btn.dataset.addR1ForTeam;
+          const currentCount = content.round1.filter((p) => p.team_id === teamId).length;
+          const letter = String.fromCharCode(65 + currentCount); // A, B, C...
+          content.round1.push({
+            package: `Gói ${letter}`,
+            team_id: teamId,
+            question: "",
+            time_seconds: Number(content.config?.round1_time_seconds) || 900,
+            points: Number(content.config?.round1_default_points) || 50,
+            image_url: ""
+          });
+          markUnsaved();
           renderRound1();
           updateBadgeCounts();
         });
       });
     }
 
+    // -------------------------------------------------------------------------
+    // 4. Round 2 Section: Grouped by set + question number + correct highlight
+    // -------------------------------------------------------------------------
+
     function renderRound2() {
       const container = document.getElementById("round2-list");
-      const selector = document.getElementById("r2-set-selector");
-      if (!container || !selector) return;
+      const filterSelect = document.getElementById("r2-filter-set");
+      if (!container) return;
 
       const sets = Array.from(new Set(content.round2.map((q) => String(q.set || '1'))));
       if (sets.length === 0) sets.push("1");
-      if (!sets.includes(activeR2Set)) activeR2Set = sets[0];
 
-      // Render set selector buttons
-      selector.innerHTML = `
-        <span style="font-size: 0.9rem; font-weight: 700; color: var(--text-muted);">Bộ đề:</span>
-        ${sets
-          .map(
-            (s) => `
-            <button type="button" class="btn btn-sm ${s === activeR2Set ? 'btn-primary' : ''}" data-select-r2-set="${escapeHtml(s)}">
-              Bộ #${escapeHtml(s)} (${content.round2.filter((q) => String(q.set || '1') === s).length} câu)
-            </button>
-          `
-          )
-          .join("")}
-      `;
+      if (filterSelect) {
+        filterSelect.innerHTML = `<option value="">Tất cả bộ đề (${sets.length} bộ)</option>` +
+          sets.map((s) => {
+            const count = content.round2.filter((q) => String(q.set || '1') === s).length;
+            return `<option value="${escapeHtml(s)}" ${r2FilterSet === s ? 'selected' : ''}>Bộ đề #${escapeHtml(s)} (${count} câu)</option>`;
+          }).join("");
+      }
 
-      selector.querySelectorAll("[data-select-r2-set]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          activeR2Set = btn.dataset.selectR2Set;
-          renderRound2();
-        });
-      });
-
-      const currentSetQuestions = content.round2
-        .map((q, rawIdx) => ({ ...q, rawIdx }))
-        .filter((q) => String(q.set || "1") === activeR2Set);
-
-      if (currentSetQuestions.length === 0) {
-        container.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Chưa có câu hỏi nào trong Bộ đề #${activeR2Set}. Bấm "+ Thêm câu hỏi" để tạo mới.</div>`;
+      if (!content.round2 || content.round2.length === 0) {
+        container.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Chưa có câu hỏi nào. Bấm "+ Thêm câu hỏi" để tạo mới.</div>`;
         return;
       }
 
-      container.innerHTML = currentSetQuestions
-        .map((q) => {
-          const rawIdx = q.rawIdx;
-          const correctVal = String(q.correct || 'A').toUpperCase();
+      let setsToDisplay = sets;
+      if (r2FilterSet) {
+        setsToDisplay = sets.filter((s) => s === r2FilterSet);
+      }
 
-          return `
-            <div class="editor-card" data-r2-index="${rawIdx}">
-              <div class="editor-card-header">
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                  <span class="meta-pill accent">Bộ #${escapeHtml(q.set || activeR2Set)} • Câu #${q.number || 1}</span>
-                  <h3 class="editor-card-title">${escapeHtml(q.question || 'Câu hỏi trắc nghiệm')}</h3>
-                </div>
-                <button type="button" class="btn btn-sm btn-danger" data-remove-r2="${rawIdx}">Xóa câu</button>
-              </div>
+      let groupsHtml = "";
 
-              <div class="editor-grid-3">
-                <div class="editor-field">
-                  <label class="editor-label">Thuộc Bộ đề</label>
-                  <input type="text" class="editor-input" data-r2-field="set" data-index="${rawIdx}" value="${escapeHtml(q.set || activeR2Set)}" required />
-                </div>
-                <div class="editor-field">
-                  <label class="editor-label">Số thứ tự câu</label>
-                  <input type="number" class="editor-input" data-r2-field="number" data-index="${rawIdx}" value="${q.number || 1}" min="1" required />
-                </div>
-                <div class="editor-grid-2">
-                  <div class="editor-field">
-                    <label class="editor-label">Thời gian (giây)</label>
-                    <input type="number" class="editor-input" data-r2-field="time_seconds" data-index="${rawIdx}" value="${q.time_seconds || 30}" min="5" />
-                  </div>
-                  <div class="editor-field">
-                    <label class="editor-label">Đáp án đúng</label>
-                    <select class="editor-select" data-r2-field="correct" data-index="${rawIdx}" style="font-weight: 700; color: var(--primary);">
-                      <option value="A" ${correctVal === 'A' ? 'selected' : ''}>A</option>
-                      <option value="B" ${correctVal === 'B' ? 'selected' : ''}>B</option>
-                      <option value="C" ${correctVal === 'C' ? 'selected' : ''}>C</option>
-                      <option value="D" ${correctVal === 'D' ? 'selected' : ''}>D</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
+      setsToDisplay.forEach((setVal) => {
+        const setQuestionsWithIndex = [];
+        content.round2.forEach((q, originalIdx) => {
+          if (String(q.set || '1') === setVal) {
+            const matchesText = !r2SearchQuery ||
+              matchesSearch(q.question, r2SearchQuery) ||
+              matchesSearch(q.option_a, r2SearchQuery) ||
+              matchesSearch(q.option_b, r2SearchQuery) ||
+              matchesSearch(q.option_c, r2SearchQuery) ||
+              matchesSearch(q.option_d, r2SearchQuery);
+            if (matchesText) {
+              setQuestionsWithIndex.push({ q, idx: originalIdx });
+            }
+          }
+        });
 
-              <div class="editor-field">
-                <label class="editor-label">Nội dung câu hỏi</label>
-                <textarea class="editor-textarea" data-r2-field="question" data-index="${rawIdx}" rows="2" placeholder="Nhập nội dung câu hỏi...">${escapeHtml(q.question || '')}</textarea>
-              </div>
+        const totalInSet = content.round2.filter((q) => String(q.set || '1') === setVal).length;
 
-              <div class="editor-grid-2" style="margin-top: 0.5rem;">
-                <div class="editor-field">
-                  <label class="editor-label">Phương án A</label>
-                  <input type="text" class="editor-input" data-r2-field="option_a" data-index="${rawIdx}" value="${escapeHtml(q.option_a || '')}" placeholder="Nội dung phương án A" required />
-                </div>
-                <div class="editor-field">
-                  <label class="editor-label">Phương án B</label>
-                  <input type="text" class="editor-input" data-r2-field="option_b" data-index="${rawIdx}" value="${escapeHtml(q.option_b || '')}" placeholder="Nội dung phương án B" required />
-                </div>
-                <div class="editor-field">
-                  <label class="editor-label">Phương án C</label>
-                  <input type="text" class="editor-input" data-r2-field="option_c" data-index="${rawIdx}" value="${escapeHtml(q.option_c || '')}" placeholder="Nội dung phương án C" required />
-                </div>
-                <div class="editor-field">
-                  <label class="editor-label">Phương án D</label>
-                  <input type="text" class="editor-input" data-r2-field="option_d" data-index="${rawIdx}" value="${escapeHtml(q.option_d || '')}" placeholder="Nội dung phương án D" required />
-                </div>
-              </div>
-
-              <div class="editor-field" style="margin-top: 0.5rem;">
-                <label class="editor-label">Ảnh minh họa câu hỏi (tùy chọn)</label>
-                <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-                  <div style="flex: 1; min-width: 260px;">
-                    <input type="text" class="editor-input" data-r2-field="image_url" data-index="${rawIdx}" value="${escapeHtml(q.image_url || '')}" placeholder="vd: r2-q1.png hoặc https://..." />
-                    <span style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">Chép ảnh vào thư mục images/ của dự án rồi nhập tên file</span>
-                  </div>
-                  <div id="r2-preview-box-${rawIdx}">
-                    ${renderImagePreviewHtml(q.image_url)}
-                  </div>
-                </div>
+        if (setQuestionsWithIndex.length > 0 || r2FilterSet === setVal) {
+          groupsHtml += `
+            <div class="group-header-card">
+              <h3 class="group-header-title">
+                Bộ đề #${escapeHtml(setVal)} — <span style="color: var(--accent);">${setQuestionsWithIndex.length}/${totalInSet} câu</span>
+              </h3>
+              <div style="display: flex; gap: 0.5rem;">
+                <button type="button" class="btn btn-sm btn-primary" data-add-r2-for-set="${escapeHtml(setVal)}">
+                  + Thêm câu vào bộ này
+                </button>
               </div>
             </div>
           `;
-        })
-        .join("");
+
+          if (setQuestionsWithIndex.length === 0) {
+            groupsHtml += `<div style="padding: 1rem; color: var(--text-muted); font-size: 0.9rem;">Không có câu hỏi nào khớp với tìm kiếm trong bộ đề này.</div>`;
+          } else {
+            groupsHtml += setQuestionsWithIndex
+              .map(({ q, idx }, qInSetIdx) => {
+                const correctOpt = String(q.correct || "A").trim().toUpperCase();
+
+                return `
+                  <div class="editor-card" data-r2-index="${idx}">
+                    <div class="editor-card-header">
+                      <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <span class="meta-pill accent">Câu ${qInSetIdx + 1} / ${setQuestionsWithIndex.length} (Bộ #${escapeHtml(setVal)})</span>
+                        <h3 class="editor-card-title">Câu số ${escapeHtml(q.number || qInSetIdx + 1)}</h3>
+                      </div>
+                      <button type="button" class="btn btn-sm btn-danger" data-remove-r2="${idx}">Xóa câu</button>
+                    </div>
+
+                    <div class="editor-grid-3">
+                      <div class="editor-field">
+                        <label class="editor-label">Bộ đề</label>
+                        <input type="text" class="editor-input" data-r2-field="set" data-index="${idx}" value="${escapeHtml(q.set || '1')}" />
+                      </div>
+
+                      <div class="editor-field">
+                        <label class="editor-label">Số thứ tự câu trong bộ</label>
+                        <input type="number" class="editor-input" data-r2-field="number" data-index="${idx}" value="${q.number || qInSetIdx + 1}" min="1" />
+                      </div>
+
+                      <div class="editor-field">
+                        <label class="editor-label">Đáp án đúng</label>
+                        <select class="editor-select" data-r2-field="correct" data-index="${idx}" style="font-weight: 800; color: var(--success);">
+                          <option value="A" ${correctOpt === 'A' ? 'selected' : ''}>A</option>
+                          <option value="B" ${correctOpt === 'B' ? 'selected' : ''}>B</option>
+                          <option value="C" ${correctOpt === 'C' ? 'selected' : ''}>C</option>
+                          <option value="D" ${correctOpt === 'D' ? 'selected' : ''}>D</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div class="editor-field">
+                      <label class="editor-label">Nội dung câu hỏi trắc nghiệm</label>
+                      <textarea class="editor-textarea" data-r2-field="question" data-index="${idx}" rows="2" placeholder="Nhập nội dung câu hỏi...">${escapeHtml(q.question || '')}</textarea>
+                    </div>
+
+                    <!-- 4 Options with Correct Highlight -->
+                    <div class="editor-grid-2" style="margin-top: 0.5rem;">
+                      <div class="editor-field ${correctOpt === 'A' ? 'r2-correct-highlight' : ''}" style="padding: 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                        <label class="editor-label">
+                          Phương án A ${correctOpt === 'A' ? '<span class="r2-correct-badge">✓ Đáp án đúng</span>' : ''}
+                        </label>
+                        <input type="text" class="editor-input" data-r2-field="option_a" data-index="${idx}" value="${escapeHtml(q.option_a || '')}" placeholder="Phương án A" />
+                      </div>
+
+                      <div class="editor-field ${correctOpt === 'B' ? 'r2-correct-highlight' : ''}" style="padding: 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                        <label class="editor-label">
+                          Phương án B ${correctOpt === 'B' ? '<span class="r2-correct-badge">✓ Đáp án đúng</span>' : ''}
+                        </label>
+                        <input type="text" class="editor-input" data-r2-field="option_b" data-index="${idx}" value="${escapeHtml(q.option_b || '')}" placeholder="Phương án B" />
+                      </div>
+
+                      <div class="editor-field ${correctOpt === 'C' ? 'r2-correct-highlight' : ''}" style="padding: 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                        <label class="editor-label">
+                          Phương án C ${correctOpt === 'C' ? '<span class="r2-correct-badge">✓ Đáp án đúng</span>' : ''}
+                        </label>
+                        <input type="text" class="editor-input" data-r2-field="option_c" data-index="${idx}" value="${escapeHtml(q.option_c || '')}" placeholder="Phương án C" />
+                      </div>
+
+                      <div class="editor-field ${correctOpt === 'D' ? 'r2-correct-highlight' : ''}" style="padding: 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                        <label class="editor-label">
+                          Phương án D ${correctOpt === 'D' ? '<span class="r2-correct-badge">✓ Đáp án đúng</span>' : ''}
+                        </label>
+                        <input type="text" class="editor-input" data-r2-field="option_d" data-index="${idx}" value="${escapeHtml(q.option_d || '')}" placeholder="Phương án D" />
+                      </div>
+                    </div>
+
+                    <div class="editor-grid-2" style="margin-top: 0.5rem;">
+                      <div class="editor-field">
+                        <label class="editor-label">Thời gian trả lời (giây)</label>
+                        <input type="number" class="editor-input" data-r2-field="time_seconds" data-index="${idx}" value="${q.time_seconds || 30}" min="5" />
+                      </div>
+
+                      <div class="editor-field">
+                        <label class="editor-label">Ảnh minh họa câu hỏi (tùy chọn)</label>
+                        <div style="display: flex; gap: 0.75rem; align-items: center;">
+                          <input type="text" class="editor-input" data-r2-field="image_url" data-index="${idx}" value="${escapeHtml(q.image_url || '')}" placeholder="vd: pccc-cau1.jpg hoặc https://..." />
+                          <div id="r2-preview-box-${idx}">${renderImagePreviewHtml(q.image_url)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              })
+              .join("");
+          }
+        }
+      });
+
+      if (!groupsHtml) {
+        container.innerHTML = `<div style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Không tìm thấy câu hỏi nào phù hợp với bộ lọc.</div>`;
+        return;
+      }
+
+      container.innerHTML = groupsHtml;
 
       container.querySelectorAll("[data-r2-field]").forEach((input) => {
         input.addEventListener("input", (e) => {
+          markUnsaved();
           const idx = Number(e.target.dataset.index);
           const field = e.target.dataset.r2Field;
           content.round2[idx][field] = e.target.value;
-          if (field === "question") {
-            const cardTitle = container.querySelector(`[data-r2-index="${idx}"] .editor-card-title`);
-            if (cardTitle) cardTitle.textContent = e.target.value || 'Câu hỏi trắc nghiệm';
+          if (field === "correct") {
+            renderRound2();
           } else if (field === "image_url") {
             const box = document.getElementById(`r2-preview-box-${idx}`);
             if (box) box.innerHTML = renderImagePreviewHtml(e.target.value);
+          } else if (field === "set") {
+            renderRound2();
           }
         });
       });
@@ -760,11 +1149,38 @@
         btn.addEventListener("click", () => {
           const idx = Number(btn.dataset.removeR2);
           content.round2.splice(idx, 1);
+          markUnsaved();
+          renderRound2();
+          updateBadgeCounts();
+        });
+      });
+
+      container.querySelectorAll("[data-add-r2-for-set]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const setVal = btn.dataset.addR2ForSet;
+          const currentCount = content.round2.filter((q) => String(q.set || "1") === setVal).length;
+          content.round2.push({
+            set: setVal,
+            number: currentCount + 1,
+            question: "",
+            option_a: "",
+            option_b: "",
+            option_c: "",
+            option_d: "",
+            correct: "A",
+            time_seconds: Number(content.config?.round2_time_seconds) || 30,
+            image_url: ""
+          });
+          markUnsaved();
           renderRound2();
           updateBadgeCounts();
         });
       });
     }
+
+    // -------------------------------------------------------------------------
+    // 5. Round 3 Section: Ordered by number + search
+    // -------------------------------------------------------------------------
 
     function renderRound3() {
       const container = document.getElementById("round3-list");
@@ -774,13 +1190,30 @@
         return;
       }
 
-      container.innerHTML = content.round3
-        .map((tile, idx) => {
+      // Sort tiles in number order, preserving original index in content.round3
+      const indexedTiles = content.round3.map((tile, idx) => ({ tile, idx }));
+      indexedTiles.sort((a, b) => (Number(a.tile.number) || 0) - (Number(b.tile.number) || 0));
+
+      const filteredTiles = indexedTiles.filter(({ tile }) => {
+        if (!r3SearchQuery) return true;
+        const matchNum = String(tile.number || "").includes(r3SearchQuery);
+        const matchQuestion = matchesSearch(tile.question, r3SearchQuery);
+        return matchNum || matchQuestion;
+      });
+
+      if (filteredTiles.length === 0) {
+        container.innerHTML = `<div style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Không tìm thấy ô tình huống nào phù hợp với từ khóa "${escapeHtml(r3SearchQuery)}".</div>`;
+        return;
+      }
+
+      container.innerHTML = filteredTiles
+        .map(({ tile, idx }) => {
           return `
             <div class="editor-card" data-r3-index="${idx}">
               <div class="editor-card-header">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
-                  <span class="meta-pill accent">Ô số ${tile.number || idx + 1}</span>
+                  <span class="meta-pill accent">Ô #${tile.number}</span>
+                  <h3 class="editor-card-title">Tình huống số ${tile.number}</h3>
                 </div>
                 <button type="button" class="btn btn-sm btn-danger" data-remove-r3="${idx}">Xóa ô</button>
               </div>
@@ -788,14 +1221,14 @@
               <div class="editor-grid-3">
                 <div class="editor-field">
                   <label class="editor-label">Số thứ tự ô</label>
-                  <input type="number" class="editor-input" data-r3-field="number" data-index="${idx}" value="${tile.number || idx + 1}" min="1" required />
+                  <input type="number" class="editor-input" data-r3-field="number" data-index="${idx}" value="${tile.number || ''}" min="1" required />
                 </div>
                 <div class="editor-field">
-                  <label class="editor-label">Thời gian (giây)</label>
-                  <input type="number" class="editor-input" data-r3-field="time_seconds" data-index="${idx}" value="${tile.time_seconds || 420}" min="10" />
+                  <label class="editor-label">Thời gian trả lời (giây)</label>
+                  <input type="number" class="editor-input" data-r3-field="time_seconds" data-index="${idx}" value="${tile.time_seconds || 420}" min="1" />
                 </div>
                 <div class="editor-field">
-                  <label class="editor-label">Điểm số</label>
+                  <label class="editor-label">Điểm số tối đa</label>
                   <input type="number" class="editor-input" data-r3-field="points" data-index="${idx}" value="${tile.points || 30}" min="0" />
                 </div>
               </div>
@@ -824,12 +1257,16 @@
 
       container.querySelectorAll("[data-r3-field]").forEach((input) => {
         input.addEventListener("input", (e) => {
+          markUnsaved();
           const idx = Number(e.target.dataset.index);
           const field = e.target.dataset.r3Field;
           content.round3[idx][field] = e.target.value;
           if (field === "image_url") {
             const box = document.getElementById(`r3-preview-box-${idx}`);
             if (box) box.innerHTML = renderImagePreviewHtml(e.target.value);
+          } else if (field === "number") {
+            const cardTitle = container.querySelector(`[data-r3-index="${idx}"] .editor-card-title`);
+            if (cardTitle) cardTitle.textContent = `Tình huống số ${e.target.value || idx + 1}`;
           }
         });
       });
@@ -838,11 +1275,16 @@
         btn.addEventListener("click", () => {
           const idx = Number(btn.dataset.removeR3);
           content.round3.splice(idx, 1);
+          markUnsaved();
           renderRound3();
           updateBadgeCounts();
         });
       });
     }
+
+    // -------------------------------------------------------------------------
+    // 6. Judges Section
+    // -------------------------------------------------------------------------
 
     function renderJudges() {
       const container = document.getElementById("judges-list");
@@ -881,6 +1323,7 @@
 
       container.querySelectorAll("[data-judge-field]").forEach((input) => {
         input.addEventListener("input", (e) => {
+          markUnsaved();
           const idx = Number(e.target.dataset.index);
           const field = e.target.dataset.judgeField;
           content.judges[idx][field] = e.target.value;
@@ -891,11 +1334,16 @@
         btn.addEventListener("click", () => {
           const idx = Number(btn.dataset.removeJudge);
           content.judges.splice(idx, 1);
+          markUnsaved();
           renderJudges();
           updateBadgeCounts();
         });
       });
     }
+
+    // -------------------------------------------------------------------------
+    // 7. Accounts Section
+    // -------------------------------------------------------------------------
 
     function renderAccounts() {
       const container = document.getElementById("accounts-list");
@@ -910,7 +1358,6 @@
           const role = String(acc.role || "team").toLowerCase();
           const isRefDisabled = role === "host" || role === "head_judge";
 
-          // Options for ref_id depending on role
           let refOptions = `<option value="">(Không cần liên kết)</option>`;
           if (role === "judge") {
             refOptions = content.judges
@@ -978,6 +1425,7 @@
 
       container.querySelectorAll("[data-acc-field]").forEach((input) => {
         input.addEventListener("input", (e) => {
+          markUnsaved();
           const idx = Number(e.target.dataset.index);
           const field = e.target.dataset.accField;
           content.accounts[idx][field] = e.target.value;
@@ -994,11 +1442,16 @@
         btn.addEventListener("click", () => {
           const idx = Number(btn.dataset.removeAcc);
           content.accounts.splice(idx, 1);
+          markUnsaved();
           renderAccounts();
           updateBadgeCounts();
         });
       });
     }
+
+    // -------------------------------------------------------------------------
+    // 8. Config Section
+    // -------------------------------------------------------------------------
 
     function renderConfig() {
       const container = document.getElementById("config-form");
@@ -1119,6 +1572,7 @@
 
       container.querySelectorAll("[data-cfg-field]").forEach((input) => {
         input.addEventListener("input", (e) => {
+          markUnsaved();
           const field = e.target.dataset.cfgField;
           content.config[field] = e.target.value;
         });
@@ -1145,19 +1599,17 @@
       const quizData = await fetchQuizData({ portal: "host" });
       document.title = `Cấu hình nội dung - ${quizData.config?.show_title || 'Hội thi'}`;
 
-      // Wire sidebar
       wireStageLayout({
         activePage: "content",
         config: quizData.config,
         teams: quizData.teams
       });
 
-      // Try reading content directly from backend
       const remoteContent = await get("content");
       if (remoteContent && typeof remoteContent === "object" && Object.keys(remoteContent).length > 0) {
         content = {
           teams: remoteContent.teams || [],
-          round_order: remoteContent.round_order || { round1: [], round2: [], round3: [] },
+          round_order: remoteContent.round_order || { contest: [], round1: [], round2: [], round3: [] },
           round1: remoteContent.round1 || [],
           round2: remoteContent.round2 || [],
           round3: remoteContent.round3 || [],
@@ -1166,11 +1618,10 @@
           config: remoteContent.config || {}
         };
       } else {
-        // Fallback to sample data initially
         const sampleData = await fetchSampleQuizData();
         content = {
           teams: sampleData.teams || [],
-          round_order: { round1: [], round2: [], round3: [] },
+          round_order: { contest: (sampleData.teams || []).map((t) => t.id), round1: [], round2: [], round3: [] },
           round1: sampleData.round1Packages.map((p) => ({
             package: p.package,
             team_id: p.team_id,
@@ -1204,7 +1655,9 @@
         };
       }
 
+      ensureRoundOrderStructure();
       renderAllPanels();
+      markSaved();
 
       // Tab switching
       document.querySelectorAll(".editor-tab-btn").forEach((btn) => {
@@ -1228,15 +1681,65 @@
         });
       });
 
+      // Contest Section Controls
+      document.getElementById("contest-teams-search")?.addEventListener("input", (e) => {
+        contestSearchQuery = e.target.value;
+        renderRoundOrder();
+      });
+
+      document.getElementById("btn-contest-select-all")?.addEventListener("click", () => {
+        content.round_order.contest = content.teams.map((t) => t.id);
+        markUnsaved();
+        renderRoundOrder();
+      });
+
+      document.getElementById("btn-contest-deselect-all")?.addEventListener("click", () => {
+        content.round_order.contest = [];
+        content.round_order.round1 = [];
+        content.round_order.round2 = [];
+        content.round_order.round3 = [];
+        markUnsaved();
+        renderRoundOrder();
+      });
+
       // Button: Reset Round Order
       document.getElementById("btn-reset-round-order")?.addEventListener("click", () => {
         const roundName = activeOrderRound === "round1" ? "Vòng 1" : activeOrderRound === "round2" ? "Vòng 2" : "Vòng 3";
-        if (confirm(`Đặt lại thứ tự ${roundName} theo đúng danh sách đội ban đầu?`)) {
-          if (!content.round_order) content.round_order = {};
-          content.round_order[activeOrderRound] = content.teams.map((t) => t.id);
+        if (confirm(`Đặt lại thứ tự ${roundName} theo danh sách các đội tham gia hội thi?`)) {
+          const contestTeams = getContestTeams(content.teams, content.round_order);
+          content.round_order[activeOrderRound] = contestTeams.map((t) => t.id);
+          markUnsaved();
           renderRoundOrder();
-          showToast(`Đã đặt lại thứ tự thi đấu ${roundName} theo danh sách đội!`);
+          showToast(`Đã đặt lại thứ tự thi đấu ${roundName}!`);
         }
+      });
+
+      // Round 1 Filter Controls
+      document.getElementById("r1-filter-team")?.addEventListener("change", (e) => {
+        r1FilterTeamId = e.target.value;
+        renderRound1();
+      });
+
+      document.getElementById("r1-filter-search")?.addEventListener("input", (e) => {
+        r1SearchQuery = e.target.value;
+        renderRound1();
+      });
+
+      // Round 2 Filter Controls
+      document.getElementById("r2-filter-set")?.addEventListener("change", (e) => {
+        r2FilterSet = e.target.value;
+        renderRound2();
+      });
+
+      document.getElementById("r2-filter-search")?.addEventListener("input", (e) => {
+        r2SearchQuery = e.target.value;
+        renderRound2();
+      });
+
+      // Round 3 Filter Controls
+      document.getElementById("r3-filter-search")?.addEventListener("input", (e) => {
+        r3SearchQuery = e.target.value;
+        renderRound3();
       });
 
       // Button: Add Team
@@ -1251,6 +1754,10 @@
           color: autoColor,
           image_url: ""
         });
+        if (content.round_order && Array.isArray(content.round_order.contest)) {
+          content.round_order.contest.push(autoId);
+        }
+        markUnsaved();
         renderTeams();
         renderRoundOrder();
         updateBadgeCounts();
@@ -1258,7 +1765,7 @@
 
       // Button: Add Round 1 Package
       document.getElementById("btn-add-round1")?.addEventListener("click", () => {
-        const firstTeam = content.teams[0]?.id || "";
+        const firstTeam = r1FilterTeamId || content.teams[0]?.id || "";
         content.round1.push({
           package: "Gói mới",
           team_id: firstTeam,
@@ -1267,6 +1774,7 @@
           points: Number(content.config?.round1_default_points) || 50,
           image_url: ""
         });
+        markUnsaved();
         renderRound1();
         updateBadgeCounts();
       });
@@ -1276,7 +1784,7 @@
         const existingSets = Array.from(new Set(content.round2.map((q) => String(q.set || '1'))));
         const nextSetNum = existingSets.length + 1;
         const newSetName = String(nextSetNum);
-        activeR2Set = newSetName;
+        r2FilterSet = newSetName;
         content.round2.push({
           set: newSetName,
           number: 1,
@@ -1289,16 +1797,18 @@
           time_seconds: Number(content.config?.round2_time_seconds) || 30,
           image_url: ""
         });
+        markUnsaved();
         renderRound2();
         updateBadgeCounts();
       });
 
       // Button: Add Round 2 Question
       document.getElementById("btn-add-round2")?.addEventListener("click", () => {
-        const currentSetQuestions = content.round2.filter((q) => String(q.set || "1") === activeR2Set);
+        const targetSet = r2FilterSet || "1";
+        const currentSetQuestions = content.round2.filter((q) => String(q.set || "1") === targetSet);
         const nextNum = currentSetQuestions.length + 1;
         content.round2.push({
-          set: activeR2Set,
+          set: targetSet,
           number: nextNum,
           question: "",
           option_a: "",
@@ -1309,6 +1819,7 @@
           time_seconds: Number(content.config?.round2_time_seconds) || 30,
           image_url: ""
         });
+        markUnsaved();
         renderRound2();
         updateBadgeCounts();
       });
@@ -1323,6 +1834,7 @@
           points: Number(content.config?.round3_default_points) || 30,
           image_url: ""
         });
+        markUnsaved();
         renderRound3();
         updateBadgeCounts();
       });
@@ -1334,6 +1846,7 @@
           id: `gk-${String(nextNum).padStart(2, "0")}`,
           name: `Ban Giám khảo ${nextNum}`
         });
+        markUnsaved();
         renderJudges();
         updateBadgeCounts();
       });
@@ -1347,6 +1860,7 @@
           ref_id: content.teams[0]?.id || "",
           display_name: ""
         });
+        markUnsaved();
         renderAccounts();
         updateBadgeCounts();
       });
@@ -1360,6 +1874,7 @@
             judges: content.judges,
             teams: content.teams
           });
+          markUnsaved();
           renderAccounts();
           updateBadgeCounts();
           showToast("Đã tạo lại danh sách tài khoản mặc định!");
@@ -1372,7 +1887,6 @@
         if (saveBtn) saveBtn.disabled = true;
 
         try {
-          // Validate before saving
           const validation = validateContent(content);
           if (!validation.valid) {
             renderErrors(validation.errors);
@@ -1380,11 +1894,12 @@
             return;
           }
 
-          renderErrors([]); // Clear errors
+          renderErrors([]);
           await set("content", content);
           if (content.round_order) {
             await set("content/round_order", content.round_order);
           }
+          markSaved();
           showToast("✓ Đã lưu cấu hình nội dung thành công và đồng bộ tới toàn bộ thiết bị!");
         } catch (err) {
           showToast(`Lỗi khi lưu dữ liệu: ${err.message || 'Không thể kết nối'}`);
@@ -1405,7 +1920,7 @@
           const sampleData = await fetchSampleQuizData(true);
           content = {
             teams: sampleData.teams || [],
-            round_order: sampleData.round_order || { round1: [], round2: [], round3: [] },
+            round_order: sampleData.round_order || { contest: (sampleData.teams || []).map((t) => t.id), round1: [], round2: [], round3: [] },
             round1: sampleData.round1Packages.map((p) => ({
               package: p.package,
               team_id: p.team_id,
@@ -1437,8 +1952,10 @@
             accounts: sampleData.accounts || [],
             config: sampleData.config || {}
           };
+          ensureRoundOrderStructure();
           renderAllPanels();
           renderErrors([]);
+          markUnsaved();
           showToast("Đã nạp dữ liệu mẫu vào trình soạn thảo (bấm 'Lưu' để áp dụng)!");
         } catch (err) {
           showToast(`Lỗi khi nạp dữ liệu mẫu: ${err.message}`);
@@ -1480,8 +1997,10 @@
           }
 
           content = res.content;
+          ensureRoundOrderStructure();
           renderAllPanels();
           renderErrors([]);
+          markUnsaved();
           showToast("Đã nạp dữ liệu từ file sao lưu (bấm 'Lưu' để áp dụng)!");
         } catch (err) {
           showToast(`Lỗi nhập file: ${err.message}`);

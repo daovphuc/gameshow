@@ -89,7 +89,7 @@
         const counterEl = document.getElementById("r2-answered-counter");
         if (counterEl && quizData) {
           const participatingTeams = getRoundTeams(quizData.teams, quizData.round_order, "round2");
-          const count = Object.keys(liveR2.answers).length;
+          const count = participatingTeams.filter((t) => liveR2.answers && liveR2.answers[t.id]).length;
           counterEl.textContent = `${count}/${participatingTeams.length} đội đã trả lời`;
         }
       });
@@ -430,8 +430,8 @@
       }
 
       const totalQuestions = getQuestionsInActiveSet().length;
-      const answeredCount = Object.keys(liveR2.answers || {}).length;
       const participatingTeams = getRoundTeams(quizData.teams, quizData.round_order, "round2");
+      const answeredCount = participatingTeams.filter((t) => liveR2.answers && liveR2.answers[t.id]).length;
 
       const durationSec = Number(q.time_seconds) || 30;
       const isRevealed = liveR2.status === "revealed";
