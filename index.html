@@ -87,13 +87,14 @@
   <script type="module">
     import { fetchQuizData, escapeHtml, logoutUser } from "./js/app.js";
     import { contentToQuizData } from "./js/content.js";
-    import { listen } from "./js/backend.js";
+    import { listen, isFirebaseBackend, signInAndResolveRole } from "./js/backend.js";
     import {
       authenticate,
       getActiveSession,
       saveActiveSession,
       validateSession,
-      getPortalUrl
+      getPortalUrl,
+      isRoleAllowedForPortal
     } from "./js/auth.js";
 
     let quizData = null;
@@ -102,10 +103,24 @@
       const banner = document.getElementById("home-active-session");
       if (!banner) return;
       const session = getActiveSession();
-      const valid = validateSession(session, accounts);
+      if (!session) {
+        banner.style.display = "none";
+        return;
+      }
+
+      let valid = null;
+      if (isFirebaseBackend()) {
+        const portal = (session.role === "judge" || session.role === "head_judge") ? "judge" : (session.role === "team" ? "team" : "host");
+        if (isRoleAllowedForPortal(session.role, portal)) {
+          valid = session;
+        }
+      } else {
+        valid = validateSession(session, accounts);
+      }
+
       if (valid) {
         const portalUrl = getPortalUrl(valid.role);
-        const roleLabels = { host: "Dẫn chương trình", judge: "Ban Giám khảo", team: "Đội thi" };
+        const roleLabels = { host: "Dẫn chương trình", judge: "Ban Giám khảo", head_judge: "Giám khảo tổng", team: "Đội thi" };
         const roleName = roleLabels[valid.role] || valid.role;
         banner.style.display = "inline-flex";
         banner.innerHTML = `
@@ -166,6 +181,24 @@
 
       if (submitBtn) submitBtn.disabled = true;
       try {
+        if (isFirebaseBackend()) {
+          const res = await signInAndResolveRole(u, p);
+          if (res.ok) {
+            saveActiveSession(res.session);
+            window.location.href = res.portalUrl;
+          } else {
+            if (errorEl) {
+              errorEl.textContent = res.error || "Tên đăng nhập hoặc mật khẩu không chính xác.";
+            }
+            if (passwordInput) {
+              passwordInput.select();
+              passwordInput.focus();
+            }
+          }
+          return;
+        }
+
+        // Local Mode
         const accounts = quizData?.accounts || [];
         const res = authenticate(u, p, accounts);
         if (res.ok) {

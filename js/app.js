@@ -3,13 +3,25 @@
 // and right-side live leaderboard drawer with FLIP animation.
 
 import { CONTENT_TABS, SHEET_TABS } from "./config.js";
-import { getActiveSession, saveActiveSession, clearActiveSession, validateSession } from "./auth.js";
+import { getActiveSession, saveActiveSession, clearActiveSession, validateSession, isRoleAllowedForPortal } from "./auth.js";
 import { normaliseAllData, resolveImageUrl } from "./data.js";
 import { contentToQuizData, isContentEmpty, getContestTeams } from "./content.js";
 import { createInitialState, syncStateWithTeams, exportState, importState, computeTeamScores } from "./state.js";
 import { getTeamInitials, computeLeaderboard, diffLeaderboard } from "./leaderboard.js";
 import { LIGHT_THEME, mergeTheme, themeToCssVars } from "./theme.js";
-import { initBackend, listen, get, set, getServerTime, getConnectionStatus, onStatusChange } from "./backend.js";
+import {
+  initBackend,
+  listen,
+  get,
+  set,
+  getServerTime,
+  getConnectionStatus,
+  onStatusChange,
+  isFirebaseBackend,
+  waitForAuth,
+  signOutPortal,
+  changePassword
+} from "./backend.js";
 
 export const STORAGE_KEYS = {
   SIDEBAR_COLLAPSED: "gameshow_sidebar_collapsed",
@@ -24,10 +36,30 @@ export const STORAGE_KEYS = {
  * If invalid, redirects immediately to index.html and clears storage.
  * @param {"host"|"judge"|"team"|string} portal
  * @param {Array<any>} [accounts]
- * @returns {any|null}
+ * @returns {Promise<any|null>}
  */
-export function ensurePortalSession(portal = "host", accounts = []) {
+export async function ensurePortalSession(portal = "host", accounts = []) {
   if (typeof window === "undefined") return null;
+
+  const isFb = isFirebaseBackend();
+  if (isFb) {
+    const user = await waitForAuth(portal);
+    if (!user) {
+      clearActiveSession(undefined, portal);
+      window.location.href = "./index.html";
+      return null;
+    }
+    const session = getActiveSession(undefined, portal);
+    if (!session || !isRoleAllowedForPortal(session.role, portal)) {
+      clearActiveSession(undefined, portal);
+      window.location.href = "./index.html";
+      return null;
+    }
+    document.body.classList.add("auth-unlocked");
+    return session;
+  }
+
+  // Local Mode
   const session = getActiveSession(undefined, portal);
   const validAccount = validateSession(session, accounts, portal);
   if (!validAccount) {
@@ -48,11 +80,127 @@ export function ensurePortalSession(portal = "host", accounts = []) {
 /**
  * Logs out the current session and redirects to index.html.
  */
-export function logoutUser(role = null) {
+export async function logoutUser(role = null) {
+  const portal = (role === "head_judge" || role === "judge") ? "judge" : (role === "team" ? "team" : "host");
+  try {
+    await signOutPortal(portal);
+  } catch {
+    // Ignore sign out error
+  }
   clearActiveSession(undefined, role);
   if (typeof window !== "undefined") {
     window.location.href = "./index.html";
   }
+}
+
+/**
+ * Opens a clean modal dialog allowing any signed-in user to change their password.
+ * @param {string} [portal]
+ */
+export function openChangePasswordModal(portal = "host") {
+  if (typeof document === "undefined") return;
+  let modal = document.getElementById("change-pwd-modal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "change-pwd-modal";
+    modal.className = "login-modal";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.innerHTML = `
+      <div class="login-modal-card" style="max-width: 420px;">
+        <button type="button" id="btn-change-pwd-close" class="login-modal-close" aria-label="Đóng">✕</button>
+        <div class="login-modal-header">
+          <div class="login-modal-icon">🔑</div>
+          <h2 class="login-modal-title">Đổi Mật Khẩu</h2>
+        </div>
+        <form id="change-pwd-form" class="login-form" novalidate>
+          <div class="login-field">
+            <label for="pwd-current" class="login-label">Mật khẩu hiện tại</label>
+            <input type="password" id="pwd-current" class="login-input" placeholder="Nhập mật khẩu hiện tại..." autocomplete="current-password" required />
+          </div>
+          <div class="login-field">
+            <label for="pwd-new" class="login-label">Mật khẩu mới (ít nhất 6 ký tự)</label>
+            <input type="password" id="pwd-new" class="login-input" placeholder="Nhập mật khẩu mới..." autocomplete="new-password" minlength="6" required />
+          </div>
+          <div class="login-field">
+            <label for="pwd-confirm" class="login-label">Xác nhận mật khẩu mới</label>
+            <input type="password" id="pwd-confirm" class="login-input" placeholder="Nhập lại mật khẩu mới..." autocomplete="new-password" required />
+          </div>
+          <div id="pwd-error" class="login-error" role="alert" aria-live="polite"></div>
+          <button type="submit" id="btn-submit-change-pwd" class="btn btn-primary btn-lg" style="width: 100%; justify-content: center; margin-top: 0.5rem;">
+            Cập nhật mật khẩu
+          </button>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const closeBtn = document.getElementById("btn-change-pwd-close");
+    closeBtn?.addEventListener("click", () => {
+      modal.style.display = "none";
+    });
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) modal.style.display = "none";
+    });
+
+    const form = document.getElementById("change-pwd-form");
+    form?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const currentInp = document.getElementById("pwd-current");
+      const newInp = document.getElementById("pwd-new");
+      const confirmInp = document.getElementById("pwd-confirm");
+      const errorEl = document.getElementById("pwd-error");
+      const submitBtn = document.getElementById("btn-submit-change-pwd");
+
+      const curVal = currentInp?.value || "";
+      const newVal = newInp?.value || "";
+      const confVal = confirmInp?.value || "";
+
+      if (errorEl) errorEl.textContent = "";
+
+      if (!curVal) {
+        if (errorEl) errorEl.textContent = "Vui lòng nhập mật khẩu hiện tại.";
+        currentInp?.focus();
+        return;
+      }
+      if (!newVal || newVal.length < 6) {
+        if (errorEl) errorEl.textContent = "Mật khẩu mới phải có ít nhất 6 ký tự.";
+        newInp?.focus();
+        return;
+      }
+      if (newVal !== confVal) {
+        if (errorEl) errorEl.textContent = "Xác nhận mật khẩu mới không khớp.";
+        confirmInp?.focus();
+        return;
+      }
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Đang cập nhật...";
+      }
+
+      try {
+        await changePassword(curVal, newVal, portal);
+        modal.style.display = "none";
+        showToast("✓ Đổi mật khẩu thành công!");
+        form.reset();
+      } catch (err) {
+        if (errorEl) errorEl.textContent = err.message || "Không thể đổi mật khẩu.";
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Cập nhật mật khẩu";
+        }
+      }
+    });
+  }
+
+  const errEl = document.getElementById("pwd-error");
+  if (errEl) errEl.textContent = "";
+  const form = document.getElementById("change-pwd-form");
+  if (form) form.reset();
+  modal.style.display = "flex";
+  document.getElementById("pwd-current")?.focus();
 }
 
 export function escapeHtml(value) {
@@ -122,7 +270,7 @@ export async function fetchSampleQuizData(forceRefresh = false) {
  * @param {{forceRefresh?: boolean, portal?: string}} options
  */
 export async function fetchQuizData({ forceRefresh = false, portal = "host" } = {}) {
-  await initBackend();
+  await initBackend({ portal });
 
   let remoteContent = null;
   try {
@@ -147,7 +295,7 @@ export async function fetchQuizData({ forceRefresh = false, portal = "host" } = 
   }
 
   applyResolvedTheme(data.config);
-  const session = portal ? ensurePortalSession(portal, data.accounts) : getActiveSession();
+  const session = portal ? await ensurePortalSession(portal, data.accounts) : getActiveSession();
   return { ...data, isSample, session };
 }
 
@@ -455,6 +603,16 @@ export function wireStageLayout({
 
         <button
           type="button"
+          id="btn-sidebar-change-pwd"
+          class="sidebar-link"
+          title="Đổi mật khẩu"
+        >
+          <span class="sidebar-link-icon">🔑</span>
+          <span class="sidebar-link-label">Đổi mật khẩu</span>
+        </button>
+
+        <button
+          type="button"
           id="btn-sidebar-logout"
           class="sidebar-link"
           title="Đăng xuất (${escapeHtml(displayName)})"
@@ -479,6 +637,10 @@ export function wireStageLayout({
       connBadge.className = `conn-status-badge ${status.code || "local"}`;
       connBadge.title = status.label || "Chế độ thử trên 1 máy";
       connLabel.textContent = status.label || "Chế độ thử trên 1 máy";
+    });
+
+    document.getElementById("btn-sidebar-change-pwd")?.addEventListener("click", () => {
+      openChangePasswordModal("host");
     });
 
     document.getElementById("btn-sidebar-logout")?.addEventListener("click", () => {

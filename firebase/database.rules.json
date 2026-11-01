@@ -1,17 +1,37 @@
 {
   "rules": {
-    ".read": true,
+    ".read": false,
+    ".write": false,
+    "roles": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'host'",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && ((root.child('roles').child(auth.uid).child('role').val() === 'host') || (!root.child('roles').exists() && newData.child('role').val() === 'host' && $uid === auth.uid))"
+      }
+    },
     "content": {
-      ".write": true
+      ".read": "auth != null && root.child('roles').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'host'"
     },
     "live": {
-      ".write": true
+      ".read": "auth != null && root.child('roles').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'host'",
+      "judgeScores": {
+        "$round": {
+          "$team": {
+            "$judgeId": {
+              ".write": "auth != null && (root.child('roles').child(auth.uid).child('role').val() === 'host' || root.child('roles').child(auth.uid).child('role').val() === 'head_judge' || (root.child('roles').child(auth.uid).child('role').val() === 'judge' && root.child('roles').child(auth.uid).child('ref_id').val() === $judgeId))"
+            }
+          }
+        }
+      }
     },
     "answers": {
-      ".write": "!newData.exists()",
+      ".read": "auth != null && root.child('roles').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'host' && !newData.exists()",
       "$questionKey": {
         "$teamId": {
-          ".write": "!data.exists() && newData.exists() && $questionKey === root.child('live/round2/questionKey').val() && root.child('live/round2/status').val() === 'open' && (!root.child('live/round2/deadline').exists() || now <= root.child('live/round2/deadline').val()) && newData.child('answeredAt').val() === now"
+          ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'team' && root.child('roles').child(auth.uid).child('ref_id').val() === $teamId && !data.exists() && newData.exists() && $questionKey === root.child('live/round2/questionKey').val() && root.child('live/round2/status').val() === 'open' && (!root.child('live/round2/deadline').exists() || now <= root.child('live/round2/deadline').val()) && newData.child('answeredAt').val() === now"
         }
       }
     }
