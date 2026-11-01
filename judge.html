@@ -20,7 +20,8 @@
       renderAvatarHtml,
       escapeHtml,
       showToast,
-      logoutUser
+      logoutUser,
+      openChangePasswordModal
     } from "./js/app.js";
     import { clampScore, buildPerJudgeScoreWrites, calculateTeamRoundScore } from "./js/judges.js";
     import { getRoundTeams } from "./js/content.js";
@@ -70,6 +71,9 @@
               <span style="font-size: 0.8rem;">${escapeHtml(connStatus.label)}</span>
             </div>
 
+            <button type="button" id="btn-judge-change-pwd" class="btn btn-sm" title="Đổi mật khẩu">
+              🔑 Đổi MK
+            </button>
             <button type="button" id="btn-judge-logout" class="btn btn-sm">
               ⎋ Đăng xuất (${escapeHtml(judgeDisplayName)})
             </button>
@@ -682,6 +686,9 @@
     }
 
     function wireHeaderControls() {
+      document.getElementById("btn-judge-change-pwd")?.addEventListener("click", () => {
+        openChangePasswordModal("judge");
+      });
       document.getElementById("btn-judge-logout")?.addEventListener("click", () => {
         logoutUser(isHeadJudge ? "head_judge" : "judge");
       });

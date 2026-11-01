@@ -244,21 +244,7 @@
 
       <!-- Panel: Accounts -->
       <section id="panel-accounts" class="editor-panel">
-        <div class="tab-explanation">
-          <strong>🔑 Tài khoản:</strong> Quản lý tài khoản đăng nhập cho MC, Giám khảo tổng, các Giám khảo và các Đội thi trên máy tính bảng hoặc laptop.
-        </div>
-
-        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
-          <div>
-            <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0;">Tài khoản đăng nhập</h2>
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.2rem 0 0;">Phân quyền truy cập các cổng: Host (Dẫn chương trình), Judge (Giám khảo), Team (Đội thi).</p>
-          </div>
-          <div style="display: flex; gap: 0.5rem;">
-            <button type="button" id="btn-gen-default-accounts" class="btn btn-sm">⚡ Tạo lại tài khoản mặc định</button>
-            <button type="button" id="btn-add-account" class="btn btn-primary btn-sm">+ Thêm tài khoản</button>
-          </div>
-        </div>
-        <div id="accounts-list"></div>
+        <div id="accounts-panel-root"></div>
       </section>
 
       <!-- Panel: Config -->
@@ -274,6 +260,79 @@
         <div id="config-form"></div>
       </section>
     </main>
+  </div>
+
+  <!-- Modal: Create Account -->
+  <div id="modal-create-account" class="login-modal" role="dialog" aria-modal="true" style="display: none;">
+    <div class="login-modal-card" style="max-width: 500px;">
+      <button type="button" id="btn-close-modal-create-account" class="login-modal-close" aria-label="Đóng">✕</button>
+      <div class="login-modal-header">
+        <div class="login-modal-icon">👤</div>
+        <h2 class="login-modal-title">Tạo Tài Khoản Mới</h2>
+      </div>
+      <form id="form-create-account" class="login-form" novalidate>
+        <div class="login-field">
+          <label for="create-acc-username" class="login-label">Tên đăng nhập</label>
+          <input type="text" id="create-acc-username" class="login-input" placeholder="vd: gk4, doi36..." autocomplete="off" required />
+          <span style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;">Email đăng nhập trên hệ thống: &lt;tên_đăng_nhập&gt;@hoithi.local</span>
+        </div>
+        <div class="login-field">
+          <label for="create-acc-password" class="login-label">Mật khẩu (ít nhất 6 ký tự)</label>
+          <input type="password" id="create-acc-password" class="login-input" placeholder="Nhập mật khẩu..." minlength="6" required />
+        </div>
+        <div class="login-field">
+          <label for="create-acc-role" class="login-label">Vai trò</label>
+          <select id="create-acc-role" class="editor-select">
+            <option value="host">Dẫn chương trình (host)</option>
+            <option value="head_judge">Giám khảo tổng (head_judge)</option>
+            <option value="judge">Ban Giám khảo (judge)</option>
+            <option value="team" selected>Đội thi (team)</option>
+          </select>
+        </div>
+        <div class="login-field" id="create-acc-ref-group">
+          <label for="create-acc-ref" class="login-label">Đối tượng liên kết</label>
+          <select id="create-acc-ref" class="editor-select"></select>
+        </div>
+        <div class="login-field">
+          <label for="create-acc-display-name" class="login-label">Tên hiển thị (Tùy chọn)</label>
+          <input type="text" id="create-acc-display-name" class="login-input" placeholder="Để trống sẽ tự động lấy theo tên Giám khảo / Đội thi" />
+        </div>
+        <div id="create-acc-error" class="login-error" role="alert" aria-live="polite"></div>
+        <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1rem;">
+          <button type="button" id="btn-cancel-create-account" class="btn">Hủy</button>
+          <button type="submit" id="btn-submit-create-account" class="btn btn-primary">Tạo tài khoản</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Bulk Create Accounts -->
+  <div id="modal-bulk-accounts" class="login-modal" role="dialog" aria-modal="true" style="display: none;">
+    <div class="login-modal-card" style="max-width: 720px; max-height: 90vh; overflow-y: auto;">
+      <button type="button" id="btn-close-modal-bulk-accounts" class="login-modal-close" aria-label="Đóng">✕</button>
+      <div class="login-modal-header">
+        <div class="login-modal-icon">📁</div>
+        <h2 class="login-modal-title">Tạo Tài Khoản Hàng Loạt từ CSV</h2>
+      </div>
+      <div>
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin: 0 0 1rem;">
+          Dán nội dung CSV hoặc chọn tệp CSV có các cột: <code>username,password,role,ref_id,display_name</code> (giống tệp <code>data/sample/accounts.csv</code>).
+        </p>
+        <div style="margin-bottom: 1rem;">
+          <label class="btn btn-sm" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; margin-bottom: 0.5rem;">
+            📂 Chọn tệp CSV...
+            <input type="file" id="file-bulk-csv" accept=".csv,text/csv" style="display: none;" />
+          </label>
+          <textarea id="bulk-csv-text" class="editor-textarea" rows="6" placeholder="username,password,role,ref_id,display_name&#10;gk1,122345678910,judge,gk-01,Ban Giám khảo 1&#10;doi01,122345678910,team,doi-01,Công an TP. Hà Nội"></textarea>
+        </div>
+        <div id="bulk-acc-error" class="login-error" role="alert" aria-live="polite"></div>
+        <div id="bulk-acc-results" style="margin-top: 1rem; display: none;"></div>
+        <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.25rem;">
+          <button type="button" id="btn-cancel-bulk-accounts" class="btn">Đóng</button>
+          <button type="button" id="btn-submit-bulk-accounts" class="btn btn-primary">⚡ Bắt đầu tạo tài khoản</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <datalist id="preset-team-names"></datalist>
@@ -294,13 +353,14 @@
       contentToQuizData,
       getContestTeams,
       getRoundTeams,
-      isTeamInRound
+      isTeamInRound,
+      serializeContentForSave
     } from "./js/content.js";
     import { matchesSearch } from "./js/scores-filter.js";
     import { getTeamInitials } from "./js/leaderboard.js";
-    import { generateDefaultAccounts } from "./js/auth.js";
+    import { generateDefaultAccounts, parseBulkAccountsCsv, usernameToEmail } from "./js/auth.js";
     import { resolveImageUrl } from "./js/data.js";
-    import { set, get } from "./js/backend.js";
+    import { set, get, listen, isFirebaseBackend, createUserWithSecondaryApp } from "./js/backend.js";
 
     // Populate preset team names datalist
     const datalistEl = document.getElementById("preset-team-names");
@@ -319,6 +379,8 @@
       accounts: [],
       config: {}
     };
+
+    let firebaseRoles = {};
 
     let activeTab = "teams";
     let activeOrderRound = "round1";
@@ -405,7 +467,11 @@
       document.getElementById("count-round2").textContent = content.round2?.length || 0;
       document.getElementById("count-round3").textContent = content.round3?.length || 0;
       document.getElementById("count-judges").textContent = content.judges?.length || 0;
-      document.getElementById("count-accounts").textContent = content.accounts?.length || 0;
+      if (isFirebaseBackend()) {
+        document.getElementById("count-accounts").textContent = Object.keys(firebaseRoles || {}).length;
+      } else {
+        document.getElementById("count-accounts").textContent = content.accounts?.length || 0;
+      }
     }
 
     // -------------------------------------------------------------------------
@@ -1342,111 +1408,406 @@
     }
 
     // -------------------------------------------------------------------------
-    // 7. Accounts Section
+    // 7. Accounts Section (Firebase Roles in Firebase mode, Content Accounts in Local mode)
     // -------------------------------------------------------------------------
 
-    function renderAccounts() {
-      const container = document.getElementById("accounts-list");
-      if (!container) return;
-      if (!content.accounts || content.accounts.length === 0) {
-        container.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Chưa có tài khoản nào. Bấm "⚡ Tạo lại tài khoản mặc định" hoặc "+ Thêm tài khoản".</div>`;
-        return;
+    function updateCreateAccRefDropdown() {
+      const roleSel = document.getElementById("create-acc-role");
+      const refGroup = document.getElementById("create-acc-ref-group");
+      const refSel = document.getElementById("create-acc-ref");
+      if (!roleSel || !refSel || !refGroup) return;
+
+      const role = roleSel.value;
+      if (role === "host" || role === "head_judge") {
+        refGroup.style.display = "none";
+        refSel.innerHTML = `<option value="">(Không cần liên kết)</option>`;
+      } else if (role === "judge") {
+        refGroup.style.display = "block";
+        refSel.innerHTML = (content.judges || [])
+          .map((j) => `<option value="${escapeHtml(j.id)}">${escapeHtml(j.name)} (${escapeHtml(j.id)})</option>`)
+          .join("");
+      } else if (role === "team") {
+        refGroup.style.display = "block";
+        refSel.innerHTML = (content.teams || [])
+          .map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)} (${escapeHtml(t.id)})</option>`)
+          .join("");
       }
+    }
 
-      container.innerHTML = content.accounts
-        .map((acc, idx) => {
-          const role = String(acc.role || "team").toLowerCase();
-          const isRefDisabled = role === "host" || role === "head_judge";
+    function openCreateAccountModal() {
+      const modal = document.getElementById("modal-create-account");
+      const form = document.getElementById("form-create-account");
+      const errEl = document.getElementById("create-acc-error");
+      if (!modal) return;
+      if (form) form.reset();
+      if (errEl) errEl.textContent = "";
+      updateCreateAccRefDropdown();
+      modal.style.display = "flex";
+      document.getElementById("create-acc-username")?.focus();
+    }
 
-          let refOptions = `<option value="">(Không cần liên kết)</option>`;
-          if (role === "judge") {
-            refOptions = content.judges
-              .map(
-                (j) =>
-                  `<option value="${escapeHtml(j.id)}" ${acc.ref_id === j.id ? 'selected' : ''}>${escapeHtml(j.name)} (${escapeHtml(j.id)})</option>`
-              )
-              .join("");
-          } else if (role === "team") {
-            refOptions = content.teams
-              .map(
-                (t) =>
-                  `<option value="${escapeHtml(t.id)}" ${acc.ref_id === t.id ? 'selected' : ''}>${escapeHtml(t.name)} (${escapeHtml(t.id)})</option>`
-              )
-              .join("");
-          }
+    function closeCreateAccountModal() {
+      const modal = document.getElementById("modal-create-account");
+      if (modal) modal.style.display = "none";
+    }
 
-          return `
-            <div class="editor-card" data-acc-index="${idx}">
-              <div class="editor-card-header">
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                  <span class="meta-pill ${role === 'host' || role === 'head_judge' ? 'accent' : ''}">${escapeHtml(role.toUpperCase())}</span>
-                  <h3 class="editor-card-title">${escapeHtml(acc.username || `Tài khoản ${idx + 1}`)}</h3>
-                </div>
-                <button type="button" class="btn btn-sm btn-danger" data-remove-acc="${idx}">Xóa tài khoản</button>
-              </div>
+    function openBulkAccountsModal() {
+      const modal = document.getElementById("modal-bulk-accounts");
+      const errEl = document.getElementById("bulk-acc-error");
+      const resEl = document.getElementById("bulk-acc-results");
+      if (!modal) return;
+      if (errEl) errEl.textContent = "";
+      if (resEl) {
+        resEl.style.display = "none";
+        resEl.innerHTML = "";
+      }
+      modal.style.display = "flex";
+      document.getElementById("bulk-csv-text")?.focus();
+    }
 
-              <div class="editor-grid-4">
-                <div class="editor-field">
-                  <label class="editor-label">Tên đăng nhập</label>
-                  <input type="text" class="editor-input" data-acc-field="username" data-index="${idx}" value="${escapeHtml(acc.username || '')}" placeholder="vd: mc, gktong, gk1, doi01" required />
-                </div>
+    function closeBulkAccountsModal() {
+      const modal = document.getElementById("modal-bulk-accounts");
+      if (modal) modal.style.display = "none";
+    }
 
-                <div class="editor-field">
-                  <label class="editor-label">Mật khẩu</label>
-                  <input type="text" class="editor-input" data-acc-field="password" data-index="${idx}" value="${escapeHtml(acc.password || '')}" placeholder="vd: 122345678910" required />
-                </div>
+    function renderAccounts() {
+      const root = document.getElementById("accounts-panel-root");
+      if (!root) return;
 
-                <div class="editor-field">
-                  <label class="editor-label">Vai trò</label>
-                  <select class="editor-select" data-acc-field="role" data-index="${idx}">
-                    <option value="host" ${role === 'host' ? 'selected' : ''}>Dẫn chương trình (host)</option>
-                    <option value="head_judge" ${role === 'head_judge' ? 'selected' : ''}>Giám khảo tổng (head_judge)</option>
-                    <option value="judge" ${role === 'judge' ? 'selected' : ''}>Ban Giám khảo (judge)</option>
-                    <option value="team" ${role === 'team' ? 'selected' : ''}>Đội thi (team)</option>
-                  </select>
-                </div>
+      if (isFirebaseBackend()) {
+        const uids = Object.keys(firebaseRoles || {});
+        const count = uids.length;
 
-                <div class="editor-field">
-                  <label class="editor-label">Đối tượng liên kết</label>
-                  <select class="editor-select" data-acc-field="ref_id" data-index="${idx}" ${isRefDisabled ? 'disabled' : ''}>
-                    ${refOptions}
-                  </select>
-                </div>
-              </div>
+        root.innerHTML = `
+          <div class="tab-explanation" style="border-left: 4px solid var(--accent); background: var(--surface-elevated); margin-bottom: 1.25rem;">
+            <p style="margin: 0 0 0.5rem; font-weight: 700; color: var(--text);">🔐 Quản lý phân quyền tài khoản (Firebase Authentication):</p>
+            <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.9rem; line-height: 1.6; color: var(--text-muted);">
+              <li>Mật khẩu đăng nhập được mã hóa an toàn trên Firebase Authentication và không lưu trong cơ sở dữ liệu.</li>
+              <li>Dẫn chương trình không thể xem hoặc đặt lại mật khẩu của người dùng khác. Để đặt lại mật khẩu của một tài khoản, hãy xóa người dùng đó trong <strong>Firebase Console (Authentication)</strong> rồi tạo lại tại đây.</li>
+              <li>Bất kỳ người dùng nào đã đăng nhập đều có thể tự đổi mật khẩu của mình từ cổng qua nút <strong>"🔑 Đổi mật khẩu"</strong> trên thanh bên hoặc thanh tiêu đề.</li>
+              <li>Nút <strong>"Thu hồi quyền"</strong> sẽ xóa quyền truy cập của tài khoản ngay lập tức (xóa <code>roles/&lt;uid&gt;</code>) dù tài khoản Auth vẫn tồn tại trên Firebase. Để xóa vĩnh viễn tài khoản Auth, thực hiện trong Firebase Console.</li>
+            </ul>
+          </div>
 
-              <div class="editor-field" style="margin-top: 0.25rem;">
-                <label class="editor-label">Tên hiển thị người dùng (Tùy chọn)</label>
-                <input type="text" class="editor-input" data-acc-field="display_name" data-index="${idx}" value="${escapeHtml(acc.display_name || '')}" placeholder="Để trống sẽ tự động lấy theo tên Giám khảo / Đội thi" />
-              </div>
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
+            <div>
+              <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0;">Danh sách tài khoản &amp; phân quyền</h2>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.2rem 0 0;">Phân quyền truy cập các cổng: Host (Dẫn chương trình), Judge (Giám khảo), Team (Đội thi).</p>
             </div>
-          `;
-        })
-        .join("");
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button type="button" id="btn-open-bulk-modal" class="btn btn-sm">📁 Tạo hàng loạt từ CSV</button>
+              <button type="button" id="btn-open-create-modal" class="btn btn-primary btn-sm">+ Thêm 1 tài khoản</button>
+            </div>
+          </div>
 
-      container.querySelectorAll("[data-acc-field]").forEach((input) => {
-        input.addEventListener("input", (e) => {
-          markUnsaved();
-          const idx = Number(e.target.dataset.index);
-          const field = e.target.dataset.accField;
-          content.accounts[idx][field] = e.target.value;
-          if (field === "role") {
-            if (e.target.value === "host" || e.target.value === "head_judge") {
-              content.accounts[idx].ref_id = "";
+          <div id="fb-accounts-list">
+            ${
+              count === 0
+                ? `<div style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">
+                    Chưa có tài khoản nào trong hệ thống phân quyền. Bấm "+ Thêm 1 tài khoản" hoặc "📁 Tạo hàng loạt từ CSV" để bắt đầu.
+                  </div>`
+                : uids
+                    .map((uid) => {
+                      const acc = firebaseRoles[uid] || {};
+                      const role = String(acc.role || "team").toLowerCase();
+                      const isRefDisabled = role === "host" || role === "head_judge";
+
+                      let refOptions = `<option value="">(Không cần liên kết)</option>`;
+                      if (role === "judge") {
+                        refOptions = (content.judges || [])
+                          .map(
+                            (j) =>
+                              `<option value="${escapeHtml(j.id)}" ${acc.ref_id === j.id ? "selected" : ""}>${escapeHtml(j.name)} (${escapeHtml(j.id)})</option>`
+                          )
+                          .join("");
+                      } else if (role === "team") {
+                        refOptions = (content.teams || [])
+                          .map(
+                            (t) =>
+                              `<option value="${escapeHtml(t.id)}" ${acc.ref_id === t.id ? "selected" : ""}>${escapeHtml(t.name)} (${escapeHtml(t.id)})</option>`
+                          )
+                          .join("");
+                      }
+
+                      return `
+                        <div class="editor-card" data-fb-uid="${escapeHtml(uid)}">
+                          <div class="editor-card-header">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                              <span class="meta-pill ${role === 'host' || role === 'head_judge' ? 'accent' : ''}">${escapeHtml(role.toUpperCase())}</span>
+                              <h3 class="editor-card-title">${escapeHtml(acc.username || "Tài khoản")} <span style="font-size: 0.85rem; font-weight: normal; color: var(--text-muted); font-family: var(--font-mono);">(${escapeHtml(acc.username || "")}@hoithi.local)</span></h3>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem;">
+                              <button type="button" class="btn btn-sm btn-primary" data-save-fb-role="${escapeHtml(uid)}">💾 Lưu thay đổi</button>
+                              <button type="button" class="btn btn-sm btn-danger" data-revoke-fb-role="${escapeHtml(uid)}">🚫 Thu hồi quyền</button>
+                            </div>
+                          </div>
+
+                          <div class="editor-grid-3">
+                            <div class="editor-field">
+                              <label class="editor-label">Vai trò</label>
+                              <select class="editor-select" data-fb-field="role" data-uid="${escapeHtml(uid)}">
+                                <option value="host" ${role === "host" ? "selected" : ""}>Dẫn chương trình (host)</option>
+                                <option value="head_judge" ${role === "head_judge" ? "selected" : ""}>Giám khảo tổng (head_judge)</option>
+                                <option value="judge" ${role === "judge" ? "selected" : ""}>Ban Giám khảo (judge)</option>
+                                <option value="team" ${role === "team" ? "selected" : ""}>Đội thi (team)</option>
+                              </select>
+                            </div>
+
+                            <div class="editor-field">
+                              <label class="editor-label">Đối tượng liên kết</label>
+                              <select class="editor-select" data-fb-field="ref_id" data-uid="${escapeHtml(uid)}" ${isRefDisabled ? "disabled" : ""}>
+                                ${refOptions}
+                              </select>
+                            </div>
+
+                            <div class="editor-field">
+                              <label class="editor-label">Tên hiển thị người dùng</label>
+                              <input type="text" class="editor-input" data-fb-field="display_name" data-uid="${escapeHtml(uid)}" value="${escapeHtml(acc.display_name || "")}" placeholder="Để trống sẽ lấy theo tên Giám khảo / Đội thi" />
+                            </div>
+                          </div>
+                        </div>
+                      `;
+                    })
+                    .join("")
             }
-            renderAccounts();
-          }
-        });
-      });
+          </div>
+        `;
 
-      container.querySelectorAll("[data-remove-acc]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const idx = Number(btn.dataset.removeAcc);
-          content.accounts.splice(idx, 1);
+        // Wire role changes
+        root.querySelectorAll('[data-fb-field="role"]').forEach((sel) => {
+          sel.addEventListener("change", (e) => {
+            const uid = e.target.dataset.uid;
+            const newRole = e.target.value;
+            if (firebaseRoles[uid]) {
+              firebaseRoles[uid].role = newRole;
+              if (newRole === "host" || newRole === "head_judge") {
+                firebaseRoles[uid].ref_id = "";
+              }
+              renderAccounts();
+            }
+          });
+        });
+
+        // Wire save changes button
+        root.querySelectorAll("[data-save-fb-role]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const uid = btn.dataset.saveFbRole;
+            const card = root.querySelector(`[data-fb-uid="${uid}"]`);
+            if (!card) return;
+            const roleSel = card.querySelector('[data-fb-field="role"]');
+            const refSel = card.querySelector('[data-fb-field="ref_id"]');
+            const nameInp = card.querySelector('[data-fb-field="display_name"]');
+
+            const role = roleSel ? roleSel.value : "team";
+            const ref_id = refSel ? refSel.value : "";
+            const display_name = nameInp ? nameInp.value.trim() : "";
+            const username = firebaseRoles[uid]?.username || "";
+
+            btn.disabled = true;
+            btn.textContent = "Đang lưu...";
+            try {
+              const updated = {
+                username,
+                role,
+                ref_id: (role === "host" || role === "head_judge") ? "" : ref_id,
+                display_name
+              };
+              await set(`roles/${uid}`, updated);
+              firebaseRoles[uid] = updated;
+              showToast(`✓ Đã lưu thay đổi cho tài khoản "${username}"!`);
+            } catch (err) {
+              showToast(`Lỗi khi lưu: ${err.message || "Không có quyền"}`);
+            } finally {
+              btn.disabled = false;
+              btn.textContent = "💾 Lưu thay đổi";
+            }
+          });
+        });
+
+        // Wire revoke role button
+        root.querySelectorAll("[data-revoke-fb-role]").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const uid = btn.dataset.revokeFbRole;
+            const username = firebaseRoles[uid]?.username || "này";
+            if (
+              confirm(`Bạn có chắc chắn muốn thu hồi quyền truy cập của tài khoản "${username}"?\nTài khoản sẽ bị ngắt kết nối và chặn truy cập ngay lập tức.\n\n(Để xóa vĩnh viễn tài khoản Auth, thực hiện trên Firebase Console)`)
+            ) {
+              btn.disabled = true;
+              try {
+                await set(`roles/${uid}`, null);
+                delete firebaseRoles[uid];
+                renderAccounts();
+                updateBadgeCounts();
+                showToast(`✓ Đã thu hồi quyền của tài khoản "${username}"!`);
+              } catch (err) {
+                showToast(`Lỗi khi thu hồi quyền: ${err.message}`);
+                btn.disabled = false;
+              }
+            }
+          });
+        });
+
+        // Wire open create modal
+        document.getElementById("btn-open-create-modal")?.addEventListener("click", () => {
+          openCreateAccountModal();
+        });
+
+        // Wire open bulk modal
+        document.getElementById("btn-open-bulk-modal")?.addEventListener("click", () => {
+          openBulkAccountsModal();
+        });
+      } else {
+        // Local Mode
+        root.innerHTML = `
+          <div class="tab-explanation" style="border-left: 4px solid var(--accent); background: var(--surface-elevated); margin-bottom: 1.25rem;">
+            <p style="margin: 0 0 0.5rem; font-weight: 700; color: var(--text);">ℹ️ Chế độ thử trên 1 máy (Local Mode):</p>
+            <p style="margin: 0; font-size: 0.9rem; color: var(--text-muted);">
+              Hệ thống đang hoạt động ở chế độ Local Mode. Mật khẩu dưới đây là mật khẩu thử nghiệm lưu trong bộ nhớ máy để trình diễn. Khi kết nối Firebase, mật khẩu thật sẽ do Ban tổ chức thiết lập trên Firebase Authentication.
+            </p>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+            <div>
+              <h2 style="font-size: 1.25rem; font-family: var(--font-serif); margin: 0;">Tài khoản đăng nhập</h2>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0.2rem 0 0;">Phân quyền truy cập các cổng: Host (Dẫn chương trình), Judge (Giám khảo), Team (Đội thi).</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button type="button" id="btn-gen-default-accounts" class="btn btn-sm">⚡ Tạo lại tài khoản mặc định</button>
+              <button type="button" id="btn-add-account" class="btn btn-primary btn-sm">+ Thêm tài khoản</button>
+            </div>
+          </div>
+          <div id="accounts-list"></div>
+        `;
+
+        const container = document.getElementById("accounts-list");
+        if (!container) return;
+        if (!content.accounts || content.accounts.length === 0) {
+          container.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Chưa có tài khoản nào. Bấm "⚡ Tạo lại tài khoản mặc định" hoặc "+ Thêm tài khoản".</div>`;
+        } else {
+          container.innerHTML = content.accounts
+            .map((acc, idx) => {
+              const role = String(acc.role || "team").toLowerCase();
+              const isRefDisabled = role === "host" || role === "head_judge";
+
+              let refOptions = `<option value="">(Không cần liên kết)</option>`;
+              if (role === "judge") {
+                refOptions = (content.judges || [])
+                  .map(
+                    (j) =>
+                      `<option value="${escapeHtml(j.id)}" ${acc.ref_id === j.id ? "selected" : ""}>${escapeHtml(j.name)} (${escapeHtml(j.id)})</option>`
+                  )
+                  .join("");
+              } else if (role === "team") {
+                refOptions = (content.teams || [])
+                  .map(
+                    (t) =>
+                      `<option value="${escapeHtml(t.id)}" ${acc.ref_id === t.id ? "selected" : ""}>${escapeHtml(t.name)} (${escapeHtml(t.id)})</option>`
+                  )
+                  .join("");
+              }
+
+              return `
+                <div class="editor-card" data-acc-index="${idx}">
+                  <div class="editor-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                      <span class="meta-pill ${role === 'host' || role === 'head_judge' ? 'accent' : ''}">${escapeHtml(role.toUpperCase())}</span>
+                      <h3 class="editor-card-title">${escapeHtml(acc.username || `Tài khoản ${idx + 1}`)}</h3>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-danger" data-remove-acc="${idx}">Xóa tài khoản</button>
+                  </div>
+
+                  <div class="editor-grid-4">
+                    <div class="editor-field">
+                      <label class="editor-label">Tên đăng nhập</label>
+                      <input type="text" class="editor-input" data-acc-field="username" data-index="${idx}" value="${escapeHtml(acc.username || '')}" placeholder="vd: mc, gktong, gk1, doi01" required />
+                    </div>
+
+                    <div class="editor-field">
+                      <label class="editor-label">Mật khẩu</label>
+                      <input type="text" class="editor-input" data-acc-field="password" data-index="${idx}" value="${escapeHtml(acc.password || '')}" placeholder="vd: 122345678910" required />
+                    </div>
+
+                    <div class="editor-field">
+                      <label class="editor-label">Vai trò</label>
+                      <select class="editor-select" data-acc-field="role" data-index="${idx}">
+                        <option value="host" ${role === 'host' ? 'selected' : ''}>Dẫn chương trình (host)</option>
+                        <option value="head_judge" ${role === 'head_judge' ? 'selected' : ''}>Giám khảo tổng (head_judge)</option>
+                        <option value="judge" ${role === 'judge' ? 'selected' : ''}>Ban Giám khảo (judge)</option>
+                        <option value="team" ${role === 'team' ? 'selected' : ''}>Đội thi (team)</option>
+                      </select>
+                    </div>
+
+                    <div class="editor-field">
+                      <label class="editor-label">Đối tượng liên kết</label>
+                      <select class="editor-select" data-acc-field="ref_id" data-index="${idx}" ${isRefDisabled ? 'disabled' : ''}>
+                        ${refOptions}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="editor-field" style="margin-top: 0.25rem;">
+                    <label class="editor-label">Tên hiển thị người dùng (Tùy chọn)</label>
+                    <input type="text" class="editor-input" data-acc-field="display_name" data-index="${idx}" value="${escapeHtml(acc.display_name || '')}" placeholder="Để trống sẽ tự động lấy theo tên Giám khảo / Đội thi" />
+                  </div>
+                </div>
+              `;
+            })
+            .join("");
+
+          container.querySelectorAll("[data-acc-field]").forEach((input) => {
+            input.addEventListener("input", (e) => {
+              markUnsaved();
+              const idx = Number(e.target.dataset.index);
+              const field = e.target.dataset.accField;
+              content.accounts[idx][field] = e.target.value;
+              if (field === "role") {
+                if (e.target.value === "host" || e.target.value === "head_judge") {
+                  content.accounts[idx].ref_id = "";
+                }
+                renderAccounts();
+              }
+            });
+          });
+
+          container.querySelectorAll("[data-remove-acc]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const idx = Number(btn.dataset.removeAcc);
+              content.accounts.splice(idx, 1);
+              markUnsaved();
+              renderAccounts();
+              updateBadgeCounts();
+            });
+          });
+        }
+
+        document.getElementById("btn-add-account")?.addEventListener("click", () => {
+          content.accounts.push({
+            username: `user${content.accounts.length + 1}`,
+            password: "122345678910",
+            role: "team",
+            ref_id: content.teams[0]?.id || "",
+            display_name: ""
+          });
           markUnsaved();
           renderAccounts();
           updateBadgeCounts();
         });
-      });
+
+        document.getElementById("btn-gen-default-accounts")?.addEventListener("click", () => {
+          if (
+            confirm("Tạo lại toàn bộ tài khoản mặc định theo danh sách Đội thi và Giám khảo hiện tại? (Các tài khoản đang có sẽ bị thay thế)")
+          ) {
+            content.accounts = generateDefaultAccounts({
+              judges: content.judges,
+              teams: content.teams
+            });
+            markUnsaved();
+            renderAccounts();
+            updateBadgeCounts();
+            showToast("Đã tạo lại danh sách tài khoản mặc định!");
+          }
+        });
+      }
     }
 
     // -------------------------------------------------------------------------
@@ -1653,6 +2014,22 @@
           accounts: sampleData.accounts || [],
           config: sampleData.config || {}
         };
+      }
+
+      if (isFirebaseBackend()) {
+        try {
+          const initialRoles = await get("roles");
+          if (initialRoles && typeof initialRoles === "object") {
+            firebaseRoles = initialRoles;
+          }
+          listen("roles", (snapshot) => {
+            firebaseRoles = snapshot || {};
+            renderAccounts();
+            updateBadgeCounts();
+          });
+        } catch (err) {
+          console.warn("Could not load roles:", err);
+        }
       }
 
       ensureRoundOrderStructure();
@@ -1895,9 +2272,18 @@
           }
 
           renderErrors([]);
-          await set("content", content);
-          if (content.round_order) {
-            await set("content/round_order", content.round_order);
+          if (isFirebaseBackend()) {
+            const payload = serializeContentForSave(content);
+            await set("content", payload);
+            if (content.round_order) {
+              await set("content/round_order", content.round_order);
+            }
+            await set("content/accounts", null);
+          } else {
+            await set("content", content);
+            if (content.round_order) {
+              await set("content/round_order", content.round_order);
+            }
           }
           markSaved();
           showToast("✓ Đã lưu cấu hình nội dung thành công và đồng bộ tới toàn bộ thiết bị!");
@@ -1906,6 +2292,272 @@
         } finally {
           if (saveBtn) saveBtn.disabled = false;
         }
+      });
+
+      // Modal: Create Account
+      document.getElementById("btn-close-modal-create-account")?.addEventListener("click", closeCreateAccountModal);
+      document.getElementById("btn-cancel-create-account")?.addEventListener("click", closeCreateAccountModal);
+      document.getElementById("create-acc-role")?.addEventListener("change", updateCreateAccRefDropdown);
+
+      document.getElementById("form-create-account")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const errEl = document.getElementById("create-acc-error");
+        const submitBtn = document.getElementById("btn-submit-create-account");
+        if (errEl) errEl.textContent = "";
+
+        const username = document.getElementById("create-acc-username")?.value.trim().toLowerCase() || "";
+        const password = document.getElementById("create-acc-password")?.value || "";
+        const role = document.getElementById("create-acc-role")?.value || "team";
+        const refId = (role === "host" || role === "head_judge") ? "" : (document.getElementById("create-acc-ref")?.value || "");
+        const displayName = document.getElementById("create-acc-display-name")?.value.trim() || "";
+
+        if (!username) {
+          if (errEl) errEl.textContent = "Vui lòng nhập tên đăng nhập.";
+          return;
+        }
+        if (!/^[a-z0-9._-]+$/.test(username)) {
+          if (errEl) errEl.textContent = "Tên đăng nhập chỉ chứa chữ cái thường không dấu, số, dấu chấm, gạch dưới hoặc gạch ngang.";
+          return;
+        }
+        if (!password || password.length < 6) {
+          if (errEl) errEl.textContent = "Mật khẩu phải có ít nhất 6 ký tự.";
+          return;
+        }
+        if (role === "judge" && !refId) {
+          if (errEl) errEl.textContent = "Vui lòng chọn Ban Giám khảo liên kết.";
+          return;
+        }
+        if (role === "team" && !refId) {
+          if (errEl) errEl.textContent = "Vui lòng chọn Đội thi liên kết.";
+          return;
+        }
+
+        const usernameExists = Object.values(firebaseRoles || {}).some(
+          (r) => String(r.username || "").toLowerCase() === username
+        );
+        if (usernameExists) {
+          if (errEl) errEl.textContent = `Tên đăng nhập "${username}" đã tồn tại trong danh sách tài khoản.`;
+          return;
+        }
+
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Đang tạo tài khoản...";
+        }
+
+        try {
+          const email = usernameToEmail(username);
+          const { uid } = await createUserWithSecondaryApp(email, password);
+          const roleRecord = {
+            username,
+            role,
+            ref_id: refId,
+            display_name: displayName || (role === "team" ? (content.teams.find(t => t.id === refId)?.name || "") : (role === "judge" ? (content.judges.find(j => j.id === refId)?.name || "") : ""))
+          };
+          await set(`roles/${uid}`, roleRecord);
+          firebaseRoles[uid] = roleRecord;
+          closeCreateAccountModal();
+          renderAccounts();
+          updateBadgeCounts();
+          showToast(`✓ Đã tạo tài khoản "${username}" thành công!`);
+        } catch (err) {
+          if (errEl) {
+            let msg = err.message || "Không thể tạo tài khoản.";
+            if (err.code === "auth/email-already-in-use" || msg.includes("email-already-in-use")) {
+              msg = `Tài khoản "${username}" đã tồn tại trên Firebase Authentication. Hãy xóa tài khoản cũ trên Firebase Console hoặc đổi tên đăng nhập khác.`;
+            } else if (err.code === "auth/weak-password" || msg.includes("weak-password")) {
+              msg = "Mật khẩu quá yếu (cần tối thiểu 6 ký tự).";
+            }
+            errEl.textContent = msg;
+          }
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Tạo tài khoản";
+          }
+        }
+      });
+
+      // Modal: Bulk Create Accounts
+      document.getElementById("btn-close-modal-bulk-accounts")?.addEventListener("click", closeBulkAccountsModal);
+      document.getElementById("btn-cancel-bulk-accounts")?.addEventListener("click", closeBulkAccountsModal);
+
+      document.getElementById("file-bulk-csv")?.addEventListener("change", async (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          try {
+            const text = await file.text();
+            const textarea = document.getElementById("bulk-csv-text");
+            if (textarea) textarea.value = text;
+          } catch (err) {
+            showToast(`Lỗi đọc file: ${err.message}`);
+          }
+        }
+      });
+
+      document.getElementById("btn-submit-bulk-accounts")?.addEventListener("click", async () => {
+        const text = document.getElementById("bulk-csv-text")?.value.trim() || "";
+        const errEl = document.getElementById("bulk-acc-error");
+        const resEl = document.getElementById("bulk-acc-results");
+        const submitBtn = document.getElementById("btn-submit-bulk-accounts");
+
+        if (errEl) errEl.innerHTML = "";
+        if (resEl) {
+          resEl.style.display = "none";
+          resEl.innerHTML = "";
+        }
+
+        if (!text) {
+          if (errEl) errEl.textContent = "Vui lòng nhập nội dung CSV hoặc chọn tệp CSV.";
+          return;
+        }
+
+        const parseResult = parseBulkAccountsCsv(text, {
+          teams: content.teams,
+          judges: content.judges
+        });
+
+        if (parseResult.errors && parseResult.errors.length > 0) {
+          if (errEl) {
+            errEl.innerHTML = `
+              <div style="font-weight: 700; margin-bottom: 0.35rem;">Phát hiện ${parseResult.errors.length} lỗi trong dữ liệu CSV:</div>
+              <ul style="margin: 0; padding-left: 1.25rem;">
+                ${parseResult.errors.map((e) => `<li>${escapeHtml(e)}</li>`).join("")}
+              </ul>
+            `;
+          }
+          return;
+        }
+
+        if (!parseResult.rows || parseResult.rows.length === 0) {
+          if (errEl) errEl.textContent = "Không tìm thấy dòng tài khoản hợp lệ nào trong tệp CSV.";
+          return;
+        }
+
+        const rows = parseResult.rows;
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = `Đang xử lý (0/${rows.length})...`;
+        }
+
+        const existingUsernames = new Set();
+        for (const r of Object.values(firebaseRoles || {})) {
+          if (r?.username) {
+            existingUsernames.add(String(r.username).toLowerCase());
+          }
+        }
+
+        const results = [];
+        let createdCount = 0;
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          if (submitBtn) {
+            submitBtn.textContent = `Đang xử lý (${i + 1}/${rows.length}): ${row.username}...`;
+          }
+
+          if (existingUsernames.has(row.username)) {
+            results.push({
+              username: row.username,
+              status: "exists",
+              message: "Đã tồn tại trong roles/"
+            });
+            continue;
+          }
+
+          try {
+            const email = usernameToEmail(row.username);
+            let uid;
+            try {
+              const res = await createUserWithSecondaryApp(email, row.password);
+              uid = res.uid;
+            } catch (authErr) {
+              const errMsg = authErr.message || "";
+              if (authErr.code === "auth/email-already-in-use" || errMsg.includes("email-already-in-use")) {
+                results.push({
+                  username: row.username,
+                  status: "exists",
+                  message: "Đã có tài khoản trên Firebase Authentication"
+                });
+                continue;
+              }
+              throw authErr;
+            }
+
+            const roleRecord = {
+              username: row.username,
+              role: row.role,
+              ref_id: (row.role === "host" || row.role === "head_judge") ? "" : (row.ref_id || ""),
+              display_name: row.display_name || ""
+            };
+            await set(`roles/${uid}`, roleRecord);
+            firebaseRoles[uid] = roleRecord;
+            existingUsernames.add(row.username);
+            createdCount++;
+            results.push({
+              username: row.username,
+              status: "created",
+              message: "Đã tạo tài khoản thành công"
+            });
+          } catch (rowErr) {
+            results.push({
+              username: row.username,
+              status: "error",
+              message: rowErr.message || "Lỗi tạo tài khoản"
+            });
+          }
+        }
+
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "⚡ Bắt đầu tạo tài khoản";
+        }
+
+        renderAccounts();
+        updateBadgeCounts();
+
+        if (resEl) {
+          resEl.style.display = "block";
+          resEl.innerHTML = `
+            <div style="font-weight: 700; margin-bottom: 0.5rem; color: var(--text);">
+              Kết quả thực hiện: Đã tạo ${createdCount}/${rows.length} tài khoản
+            </div>
+            <div style="max-height: 240px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <thead>
+                  <tr style="background: var(--surface-elevated); border-bottom: 1px solid var(--border);">
+                    <th style="padding: 0.4rem 0.6rem; text-align: left;">Tên đăng nhập</th>
+                    <th style="padding: 0.4rem 0.6rem; text-align: left;">Trạng thái</th>
+                    <th style="padding: 0.4rem 0.6rem; text-align: left;">Chi tiết</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${results
+                    .map(
+                      (r) => `
+                    <tr style="border-bottom: 1px solid var(--border);">
+                      <td style="padding: 0.4rem 0.6rem; font-family: var(--font-mono); font-weight: 600;">${escapeHtml(r.username)}</td>
+                      <td style="padding: 0.4rem 0.6rem;">
+                        ${
+                          r.status === "created"
+                            ? '<span style="color: var(--success, #28a745); font-weight: 600;">✓ Đã tạo</span>'
+                            : r.status === "exists"
+                            ? '<span style="color: var(--warning, #e67e22);">⚠️ Đã có</span>'
+                            : '<span style="color: var(--danger, #dc3545);">✕ Lỗi</span>'
+                        }
+                      </td>
+                      <td style="padding: 0.4rem 0.6rem; color: var(--text-muted);">${escapeHtml(r.message)}</td>
+                    </tr>
+                  `
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `;
+        }
+
+        showToast(`Đã xử lý xong: ${createdCount} tài khoản được tạo mới!`);
       });
 
       // Button: Load Sample

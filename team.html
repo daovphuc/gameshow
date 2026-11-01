@@ -20,7 +20,8 @@
       renderAvatarHtml,
       escapeHtml,
       showToast,
-      logoutUser
+      logoutUser,
+      openChangePasswordModal
     } from "./js/app.js";
     import { resolveImageUrl } from "./js/data.js";
     import { isTeamInRound, isTeamInContest } from "./js/content.js";
@@ -78,6 +79,9 @@
               <span style="font-size: 0.8rem;">${escapeHtml(connStatus.label)}</span>
             </div>
 
+            <button type="button" id="btn-team-change-pwd" class="btn btn-sm" title="Đổi mật khẩu">
+              🔑 Đổi MK
+            </button>
             <button type="button" id="btn-team-logout" class="btn btn-sm">
               ⎋ Đăng xuất (${escapeHtml(team.name)})
             </button>
@@ -456,6 +460,9 @@
     }
 
     function wireHeaderControls() {
+      document.getElementById("btn-team-change-pwd")?.addEventListener("click", () => {
+        openChangePasswordModal("team");
+      });
       document.getElementById("btn-team-logout")?.addEventListener("click", () => {
         logoutUser("team");
       });

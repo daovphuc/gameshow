@@ -537,6 +537,23 @@ export function validateContent(content = {}) {
 }
 
 /**
+ * Prepares and serializes content for saving to database.
+ * Strips accounts property so plaintext passwords/accounts are never saved to database.
+ * @param {any} content
+ * @returns {Record<string, any>}
+ */
+export function serializeContentForSave(content = {}) {
+  if (!content || typeof content !== "object") {
+    return {};
+  }
+  const copy = { ...content };
+  delete copy.accounts;
+  return copy;
+}
+
+export const prepareContentForSave = serializeContentForSave;
+
+/**
  * Serializes content object to formatted JSON string.
  * @param {any} content
  * @returns {string}
