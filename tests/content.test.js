@@ -14,7 +14,9 @@ import {
   exportContentToJson,
   importContentFromJson,
   getRoundTeams,
-  isTeamInRound
+  isTeamInRound,
+  getContestTeams,
+  isTeamInContest
 } from "../js/content.js";
 
 const sampleDir = path.resolve("data/sample");
@@ -394,4 +396,82 @@ test("getRoundTeams and isTeamInRound filter and order teams correctly", () => {
   assert.equal(isTeamInRound("doi-03", allTeams, roundOrder, "round1"), true);
   assert.equal(isTeamInRound("doi-01", allTeams, roundOrder, "round1"), true);
   assert.equal(isTeamInRound("doi-02", allTeams, roundOrder, "round1"), false);
+});
+
+test("contest selection helper respects default, custom subset, and intersects with round lists", () => {
+  const allTeams = [
+    { id: "doi-01", name: "Hà Nội" },
+    { id: "doi-02", name: "Đà Nẵng" },
+    { id: "doi-03", name: "TP. Hồ Chí Minh" },
+    { id: "doi-04", name: "Hải Phòng" }
+  ];
+
+  // 1. Default when round_order.contest is unset -> all teams
+  const defaultContest = getContestTeams(allTeams, {});
+  assert.equal(defaultContest.length, 4);
+  assert.equal(isTeamInContest("doi-01", allTeams, {}), true);
+  assert.equal(isTeamInContest("doi-04", allTeams, {}), true);
+  assert.equal(isTeamInContest("doi-99", allTeams, {}), false);
+
+  // 2. Custom contest subset respected
+  const roundOrder = {
+    contest: ["doi-03", "doi-01"],
+    round1: ["doi-01", "doi-02", "doi-03"] // doi-02 is NOT in contest!
+  };
+  const contestTeams = getContestTeams(allTeams, roundOrder);
+  assert.equal(contestTeams.length, 2);
+  assert.equal(contestTeams[0].id, "doi-03");
+  assert.equal(contestTeams[1].id, "doi-01");
+
+  assert.equal(isTeamInContest("doi-03", allTeams, roundOrder), true);
+  assert.equal(isTeamInContest("doi-01", allTeams, roundOrder), true);
+  assert.equal(isTeamInContest("doi-02", allTeams, roundOrder), false);
+  assert.equal(isTeamInContest("doi-04", allTeams, roundOrder), false);
+
+  // 3. Round lists are intersected with contest list
+  const r1Teams = getRoundTeams(allTeams, roundOrder, "round1");
+  assert.equal(r1Teams.length, 2);
+  assert.equal(r1Teams[0].id, "doi-01");
+  assert.equal(r1Teams[0].orderNumber, 1);
+  assert.equal(r1Teams[1].id, "doi-03");
+  assert.equal(r1Teams[1].orderNumber, 2);
+
+  // doi-02 was in round1 list, but because it's not in contest, isTeamInRound must be false
+  assert.equal(isTeamInRound("doi-02", allTeams, roundOrder, "round1"), false);
+  assert.equal(isTeamInRound("doi-01", allTeams, roundOrder, "round1"), true);
+  assert.equal(isTeamInRound("doi-03", allTeams, roundOrder, "round1"), true);
+
+  // 4. When a round has no roundOrder, it defaults to contest teams, not allTeams
+  const r2Teams = getRoundTeams(allTeams, roundOrder, "round2");
+  assert.equal(r2Teams.length, 2);
+  assert.equal(r2Teams[0].id, "doi-03");
+  assert.equal(r2Teams[1].id, "doi-01");
+});
+
+test("validation rejects unknown team IDs and duplicates in round_order.contest with Vietnamese message", () => {
+  const content = csvToContent({ teamsCsv, judgesCsv });
+
+  // Unknown team ID in round_order.contest
+  const unkContent = JSON.parse(JSON.stringify(content));
+  unkContent.round_order = {
+    contest: ["doi-01", "doi-unknown-contest"]
+  };
+  const resUnk = validateContent(unkContent);
+  assert.equal(resUnk.valid, false);
+  assert.ok(
+    resUnk.errors.some((e) => e.includes("không tồn tại") && e.includes("doi-unknown-contest") && e.includes("Đội tham gia hội thi")),
+    `Expected error for unknown team in contest list, got: ${JSON.stringify(resUnk.errors)}`
+  );
+
+  // Duplicate team ID in round_order.contest
+  const dupContent = JSON.parse(JSON.stringify(content));
+  dupContent.round_order = {
+    contest: ["doi-01", "doi-02", "doi-01"]
+  };
+  const resDup = validateContent(dupContent);
+  assert.equal(resDup.valid, false);
+  assert.ok(
+    resDup.errors.some((e) => e.includes("trùng lặp") && e.includes("doi-01") && e.includes("Đội tham gia hội thi")),
+    `Expected error for duplicate team in contest list, got: ${JSON.stringify(resDup.errors)}`
+  );
 });

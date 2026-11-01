@@ -17,7 +17,7 @@ export const DEFAULT_CONFIG = {
     "10 câu hỏi trắc nghiệm A/B/C/D trên thiết bị iPad; mỗi câu đúng được 2 điểm; tính điểm chính xác và tốc độ trả lời.",
   round3_name: "Phần thi thứ ba: Xử lý tình huống truyền thông về PCCC và CNCH",
   round3_description:
-    "15 ô tình huống thực tế về PCCC và CNCH (2 phút chuẩn bị + 5 phút trả lời); Ban Giám khảo chấm điểm trên iPad.",
+    "15 ô tình huống thực tế về PCCC và CNCH (2 phút chuẩn bị + 5 phút trả lời).",
   round1_time_seconds: 15,
   round1_default_points: 10,
   round1_max_content: 45,

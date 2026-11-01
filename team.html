@@ -23,7 +23,7 @@
       logoutUser
     } from "./js/app.js";
     import { resolveImageUrl } from "./js/data.js";
-    import { isTeamInRound } from "./js/content.js";
+    import { isTeamInRound, isTeamInContest } from "./js/content.js";
     import { formatTimer } from "./js/timer.js";
     import { set, listen, getServerTime, serverTimestamp, onStatusChange } from "./js/backend.js";
     import { getActiveSession } from "./js/auth.js";
@@ -58,7 +58,7 @@
     let timerInterval = null;
 
     function renderTeamHeader() {
-      const team = quizData.teams.find((t) => t.id === selectedTeamId) || { name: teamDisplayName || selectedTeamId };
+      const team = (quizData?.allTeams || quizData?.teams || []).find((t) => t.id === selectedTeamId) || { name: teamDisplayName || selectedTeamId };
 
       return `
         <header class="tablet-header">
@@ -173,6 +173,24 @@
       } catch (err) {
         showToast("Lỗi gửi đáp án. Vui lòng thử lại!");
       }
+    }
+
+    function renderNotInContestScreen(root) {
+      stopTimerLoop();
+      root.innerHTML = `
+        ${renderTeamHeader()}
+
+        <main class="tablet-stage-card" style="text-align: center; padding: 4.5rem 1.5rem;">
+          <div style="font-size: 3.5rem; margin-bottom: 1rem;">ℹ️</div>
+          <h2 style="font-family: var(--font-serif); font-size: 1.7rem; margin: 0 0 0.6rem;">
+            Đội không tham gia hội thi này
+          </h2>
+          <p style="color: var(--text-muted); font-size: 1.1rem; max-width: 520px; margin: 0 auto;">
+            Theo danh sách cấu hình, đội của bạn không nằm trong danh sách các đội tham gia hội thi này. Vui lòng liên hệ Ban tổ chức nếu cần hỗ trợ.
+          </p>
+        </main>
+      `;
+      wireHeaderControls();
     }
 
     function renderNonParticipatingScreen(root, roundKey) {
@@ -447,6 +465,11 @@
       const root = document.getElementById("team-app-root");
       if (!root || !quizData) return;
 
+      if (selectedTeamId && !isTeamInContest(selectedTeamId, quizData.allTeams || quizData.teams, quizData.round_order)) {
+        renderNotInContestScreen(root);
+        return;
+      }
+
       const curRound = liveState.currentRound || "round1";
 
       if (selectedTeamId && !isTeamInRound(selectedTeamId, quizData.teams, quizData.round_order, curRound)) {
@@ -471,7 +494,7 @@
 
       const session = getActiveSession(undefined, "team");
       selectedTeamId = session?.ref_id || "";
-      const matchedTeam = quizData.teams.find((t) => t.id === selectedTeamId);
+      const matchedTeam = (quizData.allTeams || quizData.teams).find((t) => t.id === selectedTeamId);
       teamDisplayName = matchedTeam ? matchedTeam.name : (session?.display_name || "Đội thi");
 
       document.title = `Đội Thi (${teamDisplayName}) - ${quizData.config.show_title}`;

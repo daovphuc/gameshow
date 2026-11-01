@@ -6,7 +6,7 @@ round1_description,Mỗi đội lựa chọn 1 trong 2 cơ sở/chủ đề và 
 round2_name,"Phần thi thứ hai: Kiến thức pháp luật, nghiệp vụ về PCCC và CNCH"
 round2_description,10 câu hỏi trắc nghiệm A/B/C/D trên thiết bị iPad; mỗi câu đúng được 2 điểm; tính điểm chính xác và tốc độ trả lời.
 round3_name,Phần thi thứ ba: Xử lý tình huống truyền thông về PCCC và CNCH
-round3_description,15 ô tình huống thực tế về PCCC và CNCH (2 phút chuẩn bị + 5 phút trả lời); Ban Giám khảo chấm điểm trên iPad.
+round3_description,15 ô tình huống thực tế về PCCC và CNCH (2 phút chuẩn bị + 5 phút trả lời).
 round1_time_seconds,900
 round1_default_points,50
 round1_max_content,45

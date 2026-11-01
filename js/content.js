@@ -124,24 +124,27 @@ export function contentToQuizData(content = {}, sampleFallback = null) {
 
   const rawConfig = content && typeof content === "object" ? content.config : {};
   const config = normaliseConfig(rawConfig);
-  const teams = normaliseTeams(content?.teams || []);
+  const allTeams = normaliseTeams(content?.teams || []);
+  const round_order = content?.round_order || {};
+  const teams = getContestTeams(allTeams, round_order);
   const round1Packages = normaliseRound1(content?.round1 || [], config);
   const round2Questions = normaliseRound2(content?.round2 || [], config);
   const round3Questions = normaliseRound3(content?.round3 || [], config);
   const judges = normaliseJudges(content?.judges || []);
 
   const rawAccounts = content?.accounts;
-  const accounts = resolveAccounts(Array.isArray(rawAccounts) ? rawAccounts : [], { judges, teams });
+  const accounts = resolveAccounts(Array.isArray(rawAccounts) ? rawAccounts : [], { judges, teams: allTeams });
 
   return {
     config,
     teams,
+    allTeams,
     round1Packages,
     round2Questions,
     round3Questions,
     judges,
     accounts,
-    round_order: content?.round_order || {},
+    round_order,
     scores: {}
   };
 }
@@ -160,8 +163,61 @@ export function resolveQuizData(content, sampleFallback) {
 }
 
 /**
+ * Returns participating teams in the overall contest.
+ * If round_order.contest is unset (undefined or null), returns all teams in their default order.
+ * If round_order.contest is an array, returns only matching teams in the configured order.
+ *
+ * @param {Array<{id: string, name?: string}>} allTeams
+ * @param {Record<string, Array<string>>|Array<string>} [roundOrder]
+ * @returns {Array<any>}
+ */
+export function getContestTeams(allTeams = [], roundOrder = {}) {
+  const teamsList = Array.isArray(allTeams) ? allTeams : [];
+  if (!roundOrder || typeof roundOrder !== "object") {
+    return teamsList.slice();
+  }
+
+  const contestIds = roundOrder.contest;
+  if (!Array.isArray(contestIds)) {
+    return teamsList.slice();
+  }
+
+  const teamMap = new Map(teamsList.map((t) => [String(t.id).trim(), t]));
+  const result = [];
+  const seen = new Set();
+
+  for (let i = 0; i < contestIds.length; i++) {
+    const id = String(contestIds[i]).trim();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const team = teamMap.get(id);
+    if (team) {
+      result.push(team);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Checks whether a team participates in the contest.
+ *
+ * @param {string} teamId
+ * @param {Array<{id: string}>} allTeams
+ * @param {Record<string, Array<string>>} [roundOrder]
+ * @returns {boolean}
+ */
+export function isTeamInContest(teamId, allTeams = [], roundOrder = {}) {
+  if (!teamId) return false;
+  const cleanId = String(teamId).trim();
+  const contestTeams = getContestTeams(allTeams, roundOrder);
+  return contestTeams.some((t) => String(t.id).trim() === cleanId);
+}
+
+/**
  * Returns participating teams for a given round in configured order.
- * If round_order is not configured or empty for this round, returns all teams in their default order.
+ * If round_order is not configured or empty for this round, returns all contest teams in their default order.
+ * Any teams not in the contest are automatically excluded (intersection with contest teams).
  *
  * @param {Array<{id: string, name?: string}>} allTeams
  * @param {Record<string, Array<string>>|Array<string>} [roundOrder]
@@ -170,8 +226,14 @@ export function resolveQuizData(content, sampleFallback) {
  */
 export function getRoundTeams(allTeams = [], roundOrder = {}, roundKey = null) {
   const teamsList = Array.isArray(allTeams) ? allTeams : [];
+  const contestTeams = getContestTeams(teamsList, roundOrder);
+
+  if (roundKey === "contest") {
+    return contestTeams.map((t, idx) => ({ ...t, orderNumber: idx + 1 }));
+  }
+
   if (!roundOrder) {
-    return teamsList.map((t, idx) => ({ ...t, orderNumber: idx + 1 }));
+    return contestTeams.map((t, idx) => ({ ...t, orderNumber: idx + 1 }));
   }
 
   let orderedIds = null;
@@ -186,19 +248,22 @@ export function getRoundTeams(allTeams = [], roundOrder = {}, roundKey = null) {
   }
 
   if (!orderedIds || orderedIds.length === 0) {
-    return teamsList.map((t, idx) => ({ ...t, orderNumber: idx + 1 }));
+    return contestTeams.map((t, idx) => ({ ...t, orderNumber: idx + 1 }));
   }
 
-  const teamMap = new Map(teamsList.map((t) => [String(t.id).trim(), t]));
+  const contestMap = new Map(contestTeams.map((t) => [String(t.id).trim(), t]));
   const result = [];
+  const seen = new Set();
 
   for (let i = 0; i < orderedIds.length; i++) {
     const id = String(orderedIds[i]).trim();
-    const team = teamMap.get(id);
+    if (seen.has(id)) continue;
+    const team = contestMap.get(id);
     if (team) {
+      seen.add(id);
       result.push({
         ...team,
-        orderNumber: i + 1
+        orderNumber: result.length + 1
       });
     }
   }
@@ -431,6 +496,7 @@ export function validateContent(content = {}) {
   // 7. Round order validation
   if (content.round_order && typeof content.round_order === "object") {
     const roundLabels = {
+      contest: "Đội tham gia hội thi",
       round1: "Vòng 1",
       round2: "Vòng 2",
       round3: "Vòng 3"

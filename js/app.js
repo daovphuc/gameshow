@@ -5,7 +5,7 @@
 import { CONTENT_TABS, SHEET_TABS } from "./config.js";
 import { getActiveSession, saveActiveSession, clearActiveSession, validateSession } from "./auth.js";
 import { normaliseAllData, resolveImageUrl } from "./data.js";
-import { contentToQuizData, isContentEmpty } from "./content.js";
+import { contentToQuizData, isContentEmpty, getContestTeams } from "./content.js";
 import { createInitialState, syncStateWithTeams, exportState, importState, computeTeamScores } from "./state.js";
 import { getTeamInitials, computeLeaderboard, diffLeaderboard } from "./leaderboard.js";
 import { LIGHT_THEME, mergeTheme, themeToCssVars } from "./theme.js";
@@ -140,6 +140,10 @@ export async function fetchQuizData({ forceRefresh = false, portal = "host" } = 
   } else {
     data = await fetchSampleQuizData(forceRefresh);
     isSample = true;
+    if (!data.allTeams) {
+      data.allTeams = data.teams;
+    }
+    data.teams = getContestTeams(data.allTeams, data.round_order);
   }
 
   applyResolvedTheme(data.config);

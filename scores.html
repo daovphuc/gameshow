@@ -27,33 +27,34 @@
       display: flex;
       flex-direction: column;
       gap: 0.2rem;
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       color: var(--text-muted);
       background: var(--surface-alt, rgba(0,0,0,0.03));
-      padding: 0.35rem 0.5rem;
+      padding: 0.4rem 0.55rem;
       border-radius: 6px;
     }
     .penalty-row {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 0.4rem;
-      font-size: 0.8rem;
+      gap: 0.35rem;
+      font-size: 0.85rem;
     }
     .penalty-input {
       width: 58px;
-      padding: 0.2rem 0.35rem;
-      font-size: 0.82rem;
+      padding: 0.25rem 0.35rem;
+      font-size: 0.85rem;
       border: 1px solid var(--border);
       border-radius: 4px;
       text-align: center;
       background: var(--surface);
       color: var(--text);
+      font-weight: 700;
     }
     .score-final-badge {
       font-family: var(--font-mono);
       font-size: 1.15rem;
-      font-weight: 700;
-      color: var(--primary);
+      font-weight: 800;
+      color: var(--accent);
     }
     .r2-score-box {
       display: flex;
@@ -86,47 +87,50 @@
         </div>
       </div>
 
-      <!-- Score Adjustment Table -->
-      <section class="panel-card">
-        <h2 class="panel-title">Bảng Điểm Chi Tiết Các Đội Thi</h2>
-        <p class="panel-desc">
-          Điểm Vòng 1 &amp; 3 tự động tính từ trung bình điểm Ban Giám khảo trừ điểm phạt. Vòng 2 tính 2 điểm/câu đúng kèm ô ghi đè khi có sự cố.
-        </p>
-        <div class="scores-table-wrap">
-          <table class="scores-table">
-            <thead>
-              <tr>
-                <th style="min-width: 140px;">Đội thi</th>
-                <th>Vòng 1 (Điểm GK - Phạt)</th>
-                <th>Vòng 2 (Điểm trắc nghiệm / Ghi đè)</th>
-                <th>Vòng 3 (Điểm GK - Phạt)</th>
-                <th>Tổng điểm</th>
-                <th>Trạng thái V1</th>
-              </tr>
-            </thead>
-            <tbody id="scores-tbody"></tbody>
-          </table>
+      <!-- Toolbar: View Tabs, Search, Round Filter, Sort -->
+      <section class="scores-toolbar">
+        <div class="scores-view-tabs" role="tablist" aria-label="Chọn góc nhìn điểm số">
+          <button type="button" class="scores-view-btn active" data-view="total">Tổng hợp</button>
+          <button type="button" class="scores-view-btn" data-view="round1">Vòng 1</button>
+          <button type="button" class="scores-view-btn" data-view="round2">Vòng 2</button>
+          <button type="button" class="scores-view-btn" data-view="round3">Vòng 3</button>
+        </div>
+
+        <div class="scores-controls-row">
+          <input
+            type="text"
+            id="scores-search-input"
+            class="scores-search-input"
+            placeholder="🔍 Tìm tên hoặc mã đội..."
+            aria-label="Tìm kiếm đội thi"
+          />
+
+          <label class="scores-toggle-label" id="scores-round-only-wrap" style="display: none;">
+            <input type="checkbox" id="scores-round-only-check" />
+            <span>Chỉ đội thi vòng này</span>
+          </label>
+
+          <div style="display: inline-flex; align-items: center; gap: 0.4rem;">
+            <label for="scores-sort-select" style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted); white-space: nowrap;">Sắp xếp:</label>
+            <select id="scores-sort-select" class="editor-select" style="padding: 0.4rem 0.65rem; font-size: 0.88rem; min-width: 125px;">
+              <option value="rank">Thứ hạng</option>
+              <option value="stt">Số thứ tự</option>
+              <option value="name">Tên đội</option>
+            </select>
+          </div>
         </div>
       </section>
 
-      <!-- Round 2 Statistics Table -->
-      <section class="panel-card" style="margin-top: 1.5rem;">
-        <h2 class="panel-title">Bảng Thống Kê Vòng 2 (Trắc Nghiệm)</h2>
-        <p class="panel-desc">
-          Thứ hạng sắp xếp theo: Điểm số giảm dần &rarr; Tổng thời gian trả lời câu đúng tăng dần (nhanh hơn xếp trên) &rarr; Thứ tự đội thi.
-        </p>
+      <!-- Main Filtered Scores Table Panel -->
+      <section class="panel-card" style="padding: 1rem 1.25rem;">
+        <div id="scores-view-description" style="margin-bottom: 0.85rem; font-size: 0.9rem; color: var(--text-muted);">
+          Bảng tổng hợp điểm chính thức của tất cả các đội thi qua 3 phần thi.
+        </div>
+
         <div class="scores-table-wrap">
-          <table class="scores-table">
-            <thead>
-              <tr>
-                <th style="width: 70px; text-align: center;">Hạng</th>
-                <th style="min-width: 140px;">Đội thi</th>
-                <th style="text-align: center;">Điểm số</th>
-                <th style="text-align: center;">Số câu đúng</th>
-                <th style="text-align: center;">Tổng thời gian câu đúng (s)</th>
-              </tr>
-            </thead>
-            <tbody id="r2-stats-tbody"></tbody>
+          <table class="scores-table" id="main-scores-table">
+            <thead id="scores-thead"></thead>
+            <tbody id="scores-tbody"></tbody>
           </table>
         </div>
       </section>
@@ -172,18 +176,25 @@
       setRoundScore,
       setRound2Score,
       setTeamPenalty,
-      adjustRoundScore,
       computeTeamScores
     } from "./js/state.js";
+    import { computeLeaderboard } from "./js/leaderboard.js";
     import { calculateTeamRoundScore } from "./js/judges.js";
-    import { calculateRound2Score, computeRound2Ranking, recomputeRound2FromAnswers } from "./js/round2.js";
-    import { getRoundTeams } from "./js/content.js";
+    import { computeRound2Ranking, recomputeRound2FromAnswers } from "./js/round2.js";
+    import { getRoundTeams, isTeamInRound } from "./js/content.js";
     import { buildReportCsv } from "./js/report.js";
+    import { getMissingJudgeFlags, filterAndSortScoreRows } from "./js/scores-filter.js";
     import { get, listen, update, resetLiveState } from "./js/backend.js";
 
     let quizData = null;
     let gameState = null;
     let round2Stats = {};
+
+    // View state
+    let currentView = "total"; // "total" | "round1" | "round2" | "round3"
+    let searchQuery = "";
+    let onlyRoundTeams = false;
+    let currentSort = "rank"; // "rank" | "stt" | "name"
 
     async function syncScoresToBackend() {
       saveAppState(gameState);
@@ -204,10 +215,10 @@
       } catch {
         // Backend update error
       }
-      renderAdminPage();
+      renderScoresPage();
     }
 
-    function renderAdminPage() {
+    function renderScoresPage() {
       if (!quizData || !gameState) return;
 
       const derivedScores = computeTeamScores({
@@ -216,172 +227,335 @@
         config: quizData.config
       });
 
-      const tbody = document.getElementById("scores-tbody");
-      const cfg = quizData.config;
+      // Rankings for each mode
+      const totalRanked = computeLeaderboard(quizData.teams, derivedScores, "total", { tieBreak: true });
+      const totalRankMap = new Map(totalRanked.map((e) => [e.id, e.rank]));
 
-      tbody.innerHTML = quizData.teams
-        .map((team) => {
-          const s = derivedScores[team.id] || { round1: 0, round2: 0, round3: 0, total: 0 };
-          const total = s.total;
-          const locked = isTeamLocked(gameState, team.id);
+      const r1Ranked = computeLeaderboard(quizData.teams, derivedScores, "round1", { tieBreak: true });
+      const r1RankMap = new Map(r1Ranked.map((e) => [e.id, e.rank]));
 
-          // R1 details
-          const r1Judges = gameState.judgeScores?.round1?.[team.id] || {};
-          const r1Penalty = gameState.penalties?.round1?.[team.id] || 0;
-          const r1JudgesList = (quizData.judges || [])
-            .map((j) => {
-              const entry = r1Judges[j.id];
-              if (!entry || (entry.content === undefined && entry.manner === undefined)) {
-                return `<span>${escapeHtml(j.name)}: <em>chưa chấm</em></span>`;
-              }
-              return `<span>${escapeHtml(j.name)}: <strong>${entry.content ?? 0}</strong> + <strong>${entry.manner ?? 0}</strong></span>`;
-            })
-            .join("");
+      const r3Ranked = computeLeaderboard(quizData.teams, derivedScores, "round3", { tieBreak: true });
+      const r3RankMap = new Map(r3Ranked.map((e) => [e.id, e.rank]));
 
-          // R2 details
-          const r2Override = gameState.manualOverrides?.round2?.[team.id];
-          const hasOverride = r2Override !== undefined && r2Override !== null && r2Override !== "";
+      const r2Participating = getRoundTeams(quizData.teams, quizData.round_order, "round2");
+      const r2Ranking = computeRound2Ranking(r2Participating, round2Stats || gameState.round2Stats || {});
+      const r2RankMap = new Map(r2Ranking.map((e) => [e.id, e.rank]));
+      const r2StatMap = new Map(r2Ranking.map((e) => [e.id, e]));
 
-          // R3 details
-          const r3Judges = gameState.judgeScores?.round3?.[team.id] || {};
-          const r3Penalty = gameState.penalties?.round3?.[team.id] || 0;
-          const r3JudgesList = (quizData.judges || [])
-            .map((j) => {
-              const entry = r3Judges[j.id];
-              if (!entry || (entry.content === undefined && entry.manner === undefined)) {
-                return `<span>${escapeHtml(j.name)}: <em>chưa chấm</em></span>`;
-              }
-              return `<span>${escapeHtml(j.name)}: <strong>${entry.content ?? 0}</strong> + <strong>${entry.manner ?? 0}</strong></span>`;
-            })
-            .join("");
+      // Build rows for each team
+      const rows = quizData.teams.map((team, idx) => {
+        const s = derivedScores[team.id] || { round1: 0, round2: 0, round3: 0, total: 0 };
+        const r1Penalty = gameState.penalties?.round1?.[team.id] || 0;
+        const r3Penalty = gameState.penalties?.round3?.[team.id] || 0;
+        const totalPenalty = r1Penalty + r3Penalty;
 
-          return `
+        const inR1 = isTeamInRound(team.id, quizData.teams, quizData.round_order, "round1");
+        const inR2 = isTeamInRound(team.id, quizData.teams, quizData.round_order, "round2");
+        const inR3 = isTeamInRound(team.id, quizData.teams, quizData.round_order, "round3");
+
+        let inRound = true;
+        let rank = totalRankMap.get(team.id) || (idx + 1);
+
+        if (currentView === "round1") {
+          inRound = inR1;
+          rank = r1RankMap.get(team.id) || 999;
+        } else if (currentView === "round2") {
+          inRound = inR2;
+          rank = r2RankMap.get(team.id) || 999;
+        } else if (currentView === "round3") {
+          inRound = inR3;
+          rank = r3RankMap.get(team.id) || 999;
+        }
+
+        const r1Judges = gameState.judgeScores?.round1?.[team.id] || {};
+        const r3Judges = gameState.judgeScores?.round3?.[team.id] || {};
+        const r2Stat = r2StatMap.get(team.id) || { points: 0, correctCount: 0, totalCorrectTimeSeconds: 0 };
+
+        return {
+          id: team.id,
+          name: team.name,
+          team,
+          orderNumber: idx + 1,
+          rank,
+          inRound,
+          round1: s.round1,
+          round2: s.round2,
+          round3: s.round3,
+          total: s.total,
+          r1Penalty,
+          r3Penalty,
+          totalPenalty,
+          r1Judges,
+          r3Judges,
+          r2Stat,
+          lockedV1: isTeamLocked(gameState, team.id)
+        };
+      });
+
+      // Filter & Sort
+      const displayedRows = filterAndSortScoreRows(rows, {
+        search: searchQuery,
+        onlyRoundTeams: currentView === "total" ? false : onlyRoundTeams,
+        sortBy: currentSort
+      });
+
+      // Update View Description
+      const descEl = document.getElementById("scores-view-description");
+      if (descEl) {
+        if (currentView === "total") {
+          descEl.textContent = `Bảng tổng hợp điểm chính thức của tất cả ${quizData.teams.length} đội thi qua 3 phần thi. Hàng đầu tiên nổi bật top 3 dẫn đầu.`;
+        } else if (currentView === "round1") {
+          descEl.textContent = `Chi tiết điểm Vòng 1: điểm từng giám khảo (Nội dung + Hình thức), điểm trung bình, điểm phạt và điểm chính thức. Cờ cảnh báo màu đỏ hiển thị khi có giám khảo chưa chấm.`;
+        } else if (currentView === "round2") {
+          descEl.textContent = `Bảng xếp hạng Vòng 2 trắc nghiệm: điểm phần mềm, số câu đúng, tổng thời gian trả lời câu đúng và ô ghi đè điểm khi có sự cố.`;
+        } else if (currentView === "round3") {
+          descEl.textContent = `Chi tiết điểm Vòng 3 câu hỏi tình huống: điểm từng giám khảo, điểm trung bình, điểm phạt và điểm vòng thi.`;
+        }
+      }
+
+      // Render Table Header
+      const thead = document.getElementById("scores-thead");
+      if (thead) {
+        if (currentView === "total") {
+          thead.innerHTML = `
             <tr>
-              <td>
-                <div style="display: flex; align-items: center; gap: 0.65rem;">
-                  ${renderAvatarHtml(team, "team-avatar-sm")}
-                  <strong>${escapeHtml(team.name)}</strong>
-                </div>
-              </td>
+              <th style="width: 72px; text-align: center;">Hạng</th>
+              <th style="width: 60px; text-align: center;">STT</th>
+              <th style="min-width: 170px;">Đội thi</th>
+              <th style="text-align: center; width: 90px;">V1</th>
+              <th style="text-align: center; width: 120px;">V2</th>
+              <th style="text-align: center; width: 90px;">V3</th>
+              <th style="text-align: center; width: 100px;">Điểm phạt</th>
+              <th style="text-align: center; width: 110px;">Tổng</th>
+            </tr>
+          `;
+        } else if (currentView === "round1" || currentView === "round3") {
+          const isR1 = currentView === "round1";
+          thead.innerHTML = `
+            <tr>
+              <th style="width: 72px; text-align: center;">Hạng</th>
+              <th style="width: 60px; text-align: center;">STT</th>
+              <th style="min-width: 170px;">Đội thi</th>
+              <th style="min-width: 250px;">Chi tiết Ban Giám khảo</th>
+              <th style="text-align: center; width: 105px;">Điểm TB GK</th>
+              <th style="text-align: center; width: 120px;">Điểm phạt</th>
+              <th style="text-align: center; width: 110px;">Điểm vòng</th>
+              <th style="text-align: center; width: 120px;">${isR1 ? 'Trạng thái V1' : 'Ghi chú'}</th>
+            </tr>
+          `;
+        } else if (currentView === "round2") {
+          thead.innerHTML = `
+            <tr>
+              <th style="width: 72px; text-align: center;">Hạng</th>
+              <th style="width: 60px; text-align: center;">STT</th>
+              <th style="min-width: 170px;">Đội thi</th>
+              <th style="text-align: center; width: 125px;">Điểm phần mềm</th>
+              <th style="text-align: center; width: 105px;">Số câu đúng</th>
+              <th style="text-align: center; width: 135px;">Tổng thời gian (s)</th>
+              <th style="text-align: center; min-width: 160px;">Ghi đè sự cố</th>
+              <th style="text-align: center; width: 120px;">Điểm chính thức</th>
+            </tr>
+          `;
+        }
+      }
 
-              <!-- Vong 1 -->
-              <td>
-                <div class="score-breakdown-box">
-                  <div class="score-final-badge">${s.round1}đ</div>
-                  <div class="judge-mini-list">${r1JudgesList || "<em>Chưa có dữ liệu GK</em>"}</div>
-                  <div class="penalty-row">
+      // Render Table Body
+      const tbody = document.getElementById("scores-tbody");
+      if (!tbody) return;
+
+      if (displayedRows.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+              Không tìm thấy đội thi nào phù hợp với bộ lọc hiện tại.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = displayedRows
+        .map((row) => {
+          const rank = row.rank;
+          const topClass = currentView === "total" && rank >= 1 && rank <= 3 ? `top-${rank}` : "";
+          const rankBadgeHtml =
+            currentView === "total" && rank >= 1 && rank <= 3
+              ? `<span class="rank-badge top-${rank}">#${rank}</span>`
+              : `<span style="font-weight: 700; font-family: var(--font-mono);">#${rank > 900 ? '—' : rank}</span>`;
+
+          const r2Override = gameState.manualOverrides?.round2?.[row.id];
+          const hasR2Override = r2Override !== undefined && r2Override !== null && r2Override !== "";
+
+          if (currentView === "total") {
+            return `
+              <tr class="${topClass}">
+                <td style="text-align: center;">${rankBadgeHtml}</td>
+                <td style="text-align: center; color: var(--text-muted); font-size: 0.88rem;">#${row.orderNumber}</td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 0.65rem;">
+                    ${renderAvatarHtml(row.team, "team-avatar-sm")}
+                    <strong>${escapeHtml(row.name)}</strong>
+                  </div>
+                </td>
+                <td style="text-align: center; font-family: var(--font-mono); font-weight: 700;">${row.round1}đ</td>
+                <td style="text-align: center; font-family: var(--font-mono); font-weight: 700;">
+                  ${row.round2}đ
+                  ${hasR2Override ? '<span style="font-size: 0.72rem; color: var(--accent); display: block;">(Ghi đè)</span>' : ''}
+                </td>
+                <td style="text-align: center; font-family: var(--font-mono); font-weight: 700;">${row.round3}đ</td>
+                <td style="text-align: center; font-family: var(--font-mono); color: ${row.totalPenalty > 0 ? 'var(--danger)' : 'var(--text-muted)'};">
+                  ${row.totalPenalty > 0 ? `-${row.totalPenalty}đ` : '0đ'}
+                </td>
+                <td style="text-align: center;">
+                  <strong style="font-family: var(--font-mono); font-size: 1.25rem; color: var(--accent);">
+                    ${row.total}
+                  </strong>
+                </td>
+              </tr>
+            `;
+          }
+
+          if (currentView === "round1" || currentView === "round3") {
+            const isR1 = currentView === "round1";
+            const teamJudgeScores = isR1 ? row.r1Judges : row.r3Judges;
+            const penalty = isR1 ? row.r1Penalty : row.r3Penalty;
+            const roundScore = isR1 ? row.round1 : row.round3;
+
+            const missingFlags = getMissingJudgeFlags(quizData.judges, teamJudgeScores);
+            const judgesListHtml = (quizData.judges || [])
+              .map((j) => {
+                const entry = teamJudgeScores[j.id];
+                if (!entry || (entry.content === undefined && entry.manner === undefined)) {
+                  return `<span>${escapeHtml(j.name)}: <em>chưa chấm</em></span>`;
+                }
+                const c = entry.content ?? 0;
+                const m = entry.manner ?? 0;
+                return `<span>${escapeHtml(j.name)}: <strong>${c}</strong> + <strong>${m}</strong> = <strong>${Math.round((c + m) * 100) / 100}</strong></span>`;
+              })
+              .join("");
+
+            // Compute raw average of judges
+            const judgeCalc = calculateTeamRoundScore({
+              judgeScores: teamJudgeScores,
+              penalty: 0,
+              maxContent: isR1 ? Number(quizData.config?.round1_max_content) || 45 : Number(quizData.config?.round3_max_content) || 25,
+              maxManner: isR1 ? Number(quizData.config?.round1_max_manner) || 5 : Number(quizData.config?.round3_max_manner) || 5
+            });
+
+            return `
+              <tr>
+                <td style="text-align: center;">${rankBadgeHtml}</td>
+                <td style="text-align: center; color: var(--text-muted); font-size: 0.88rem;">#${row.orderNumber}</td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 0.65rem;">
+                    ${renderAvatarHtml(row.team, "team-avatar-sm")}
+                    <div>
+                      <strong>${escapeHtml(row.name)}</strong>
+                      ${!row.inRound ? '<span style="font-size: 0.76rem; color: var(--text-muted); display: block;">(Không thi vòng này)</span>' : ''}
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div class="judge-mini-list">
+                    ${judgesListHtml || "<em>Chưa có dữ liệu GK</em>"}
+                  </div>
+                  ${
+                    missingFlags.length > 0
+                      ? `<div style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem;">
+                          ${missingFlags.map((f) => `<span class="judge-missing-badge">⚠️ ${escapeHtml(f)}</span>`).join("")}
+                        </div>`
+                      : ""
+                  }
+                </td>
+                <td style="text-align: center; font-family: var(--font-mono); font-weight: 700;">
+                  ${judgeCalc.judgeCount > 0 ? `${judgeCalc.avgTotal}đ` : '—'}
+                </td>
+                <td style="text-align: center;">
+                  <div class="penalty-row" style="justify-content: center;">
                     <span>Phạt:</span>
                     <input
                       type="number"
                       class="penalty-input"
-                      value="${r1Penalty}"
+                      value="${penalty}"
                       step="1"
                       min="0"
-                      data-penalty-team="${escapeHtml(team.id)}"
-                      data-penalty-round="round1"
-                      title="Điểm trừ quá giờ hoặc lỗi quy chế"
+                      data-penalty-team="${escapeHtml(row.id)}"
+                      data-penalty-round="${currentView}"
+                      title="Điểm trừ vi phạm quy chế hoặc quá giờ"
                     />
                     <span>đ</span>
                   </div>
-                </div>
-              </td>
+                </td>
+                <td style="text-align: center;">
+                  <span class="score-final-badge">${roundScore}đ</span>
+                </td>
+                <td style="text-align: center;">
+                  ${
+                    isR1
+                      ? row.lockedV1
+                        ? `<button type="button" class="btn btn-sm" data-unlock-team="${escapeHtml(row.id)}">🔓 Mở khóa</button>`
+                        : `<span style="color: var(--text-muted); font-size: 0.85rem;">Đang mở</span>`
+                      : `<span style="color: var(--text-muted); font-size: 0.85rem;">${row.inRound ? 'Thi đấu' : 'Không tham gia'}</span>`
+                  }
+                </td>
+              </tr>
+            `;
+          }
 
-              <!-- Vong 2 -->
-              <td>
-                <div class="r2-score-box">
-                  <div class="score-final-badge">
-                    ${s.round2}đ ${hasOverride ? '<span style="font-size: 0.72rem; color: var(--accent);">(Ghi đè)</span>' : ""}
+          if (currentView === "round2") {
+            const r2Stat = row.r2Stat || { points: 0, correctCount: 0, totalCorrectTimeSeconds: 0 };
+            return `
+              <tr>
+                <td style="text-align: center;">${rankBadgeHtml}</td>
+                <td style="text-align: center; color: var(--text-muted); font-size: 0.88rem;">#${row.orderNumber}</td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 0.65rem;">
+                    ${renderAvatarHtml(row.team, "team-avatar-sm")}
+                    <div>
+                      <strong>${escapeHtml(row.name)}</strong>
+                      ${!row.inRound ? '<span style="font-size: 0.76rem; color: var(--text-muted); display: block;">(Không thi vòng này)</span>' : ''}
+                    </div>
                   </div>
-                  <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.2rem;">
-                    <button type="button" class="btn btn-sm" data-r2-adj="${escapeHtml(team.id)}" data-r2-delta="-1">-1</button>
+                </td>
+                <td style="text-align: center; font-family: var(--font-mono); font-weight: 700; color: var(--accent);">
+                  ${r2Stat.points}đ
+                </td>
+                <td style="text-align: center; font-family: var(--font-mono); font-weight: 600;">
+                  ${r2Stat.correctCount}
+                </td>
+                <td style="text-align: center; font-family: var(--font-mono);">
+                  ${(r2Stat.totalCorrectTimeSeconds || 0).toFixed(2)}s
+                </td>
+                <td style="text-align: center;">
+                  <div style="display: inline-flex; align-items: center; gap: 0.35rem; justify-content: center;">
+                    <button type="button" class="btn btn-sm" data-r2-adj="${escapeHtml(row.id)}" data-r2-delta="-1">-1</button>
                     <input
                       type="number"
                       class="score-input"
-                      style="width: 72px; padding: 0.25rem 0.35rem;"
-                      value="${s.round2}"
+                      style="width: 68px; padding: 0.25rem 0.35rem;"
+                      value="${row.round2}"
                       step="0.25"
                       min="0"
                       max="20"
-                      data-r2-team="${escapeHtml(team.id)}"
+                      data-r2-team="${escapeHtml(row.id)}"
                       title="Ghi đè điểm Vòng 2 trực tiếp"
                     />
-                    <button type="button" class="btn btn-sm" data-r2-adj="${escapeHtml(team.id)}" data-r2-delta="1">+1</button>
+                    <button type="button" class="btn btn-sm" data-r2-adj="${escapeHtml(row.id)}" data-r2-delta="1">+1</button>
                   </div>
-                </div>
-              </td>
+                </td>
+                <td style="text-align: center;">
+                  <span class="score-final-badge">${row.round2}đ</span>
+                  ${hasR2Override ? '<span style="font-size: 0.72rem; color: var(--accent); display: block;">(Ghi đè)</span>' : ''}
+                </td>
+              </tr>
+            `;
+          }
 
-              <!-- Vong 3 -->
-              <td>
-                <div class="score-breakdown-box">
-                  <div class="score-final-badge">${s.round3}đ</div>
-                  <div class="judge-mini-list">${r3JudgesList || "<em>Chưa có dữ liệu GK</em>"}</div>
-                  <div class="penalty-row">
-                    <span>Phạt:</span>
-                    <input
-                      type="number"
-                      class="penalty-input"
-                      value="${r3Penalty}"
-                      step="1"
-                      min="0"
-                      data-penalty-team="${escapeHtml(team.id)}"
-                      data-penalty-round="round3"
-                      title="Điểm trừ quá giờ hoặc lỗi quy chế"
-                    />
-                    <span>đ</span>
-                  </div>
-                </div>
-              </td>
-
-              <!-- Tong diem -->
-              <td>
-                <strong style="font-family: var(--font-mono); font-size: 1.35rem; color: var(--accent);">
-                  ${total}
-                </strong>
-              </td>
-
-              <!-- Trang thai V1 -->
-              <td>
-                ${
-                  locked
-                    ? `<button type="button" class="btn btn-sm" data-unlock-team="${escapeHtml(team.id)}">
-                        🔓 Mở khóa
-                      </button>`
-                    : `<span style="color: var(--text-muted); font-size: 0.85rem;">Đang mở</span>`
-                }
-              </td>
-            </tr>
-          `;
+          return "";
         })
         .join("");
 
-      // Render Round 2 stats table
-      const r2Participating = getRoundTeams(quizData.teams, quizData.round_order, "round2");
-      const r2Ranking = computeRound2Ranking(r2Participating, round2Stats || gameState.round2Stats || {});
-      const r2Tbody = document.getElementById("r2-stats-tbody");
-      if (r2Tbody) {
-        r2Tbody.innerHTML = r2Ranking.map((entry) => `
-          <tr>
-            <td style="text-align: center; font-weight: 700;">#${entry.rank}</td>
-            <td>
-              <div style="display: flex; align-items: center; gap: 0.65rem;">
-                ${renderAvatarHtml(entry, "team-avatar-sm")}
-                <strong>${escapeHtml(entry.name)}</strong>
-              </div>
-            </td>
-            <td style="text-align: center; font-family: var(--font-mono); font-weight: 700; color: var(--accent);">
-              ${entry.points}đ
-            </td>
-            <td style="text-align: center; font-family: var(--font-mono);">
-              ${entry.correctCount}
-            </td>
-            <td style="text-align: center; font-family: var(--font-mono);">
-              ${(entry.totalCorrectTimeSeconds || 0).toFixed(2)}s
-            </td>
-          </tr>
-        `).join("");
-      }
-
-      // Penalty inputs
+      // Penalty inputs wire
       tbody.querySelectorAll("[data-penalty-team]").forEach((input) => {
         input.addEventListener("change", () => {
           const teamId = input.dataset.penaltyTeam;
@@ -389,11 +563,11 @@
           const val = Math.max(0, Number(input.value) || 0);
           gameState = setTeamPenalty(gameState, { round, teamId, penalty: val });
           syncScoresToBackend();
-          showToast(`Đã cập nhật điểm phạt ${teamId}.`);
+          showToast(`Đã cập nhật điểm phạt cho ${teamId}.`);
         });
       });
 
-      // Round 2 overrides
+      // Round 2 overrides wire
       tbody.querySelectorAll("[data-r2-team]").forEach((input) => {
         input.addEventListener("change", () => {
           const teamId = input.dataset.r2Team;
@@ -408,14 +582,14 @@
         btn.addEventListener("click", () => {
           const teamId = btn.dataset.r2Adj;
           const delta = Number(btn.dataset.r2Delta) || 0;
-          const current = Number(gameState.scores[teamId]?.round2) || 0;
+          const current = Number(gameState.scores?.[teamId]?.round2 ?? derivedScores[teamId]?.round2) || 0;
           const next = Math.max(0, Math.round((current + delta) * 100) / 100);
           gameState = setRound2Score(gameState, teamId, next);
           syncScoresToBackend();
         });
       });
 
-      // Unlock team V1
+      // Unlock team V1 wire
       tbody.querySelectorAll("[data-unlock-team]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const teamId = btn.dataset.unlockTeam;
@@ -427,63 +601,68 @@
 
       // Picked packages list
       const pkgListEl = document.getElementById("picked-packages-list");
-      const picked = gameState.round1.pickedPackages || [];
-      if (picked.length === 0) {
-        pkgListEl.innerHTML = `<span style="color: var(--text-muted); font-size: 0.95rem;">Chưa có gói câu hỏi nào được chọn.</span>`;
-      } else {
-        pkgListEl.innerHTML = picked
-          .map((pkgId) => {
-            const pkgObj = quizData.round1Packages.find((p) => p.id === pkgId);
-            const teamObj = pkgObj ? quizData.teams.find((t) => t.id === pkgObj.team_id) : null;
-            const label = pkgObj
-              ? `${teamObj ? teamObj.name : pkgObj.team_id} — ${pkgObj.package}`
-              : pkgId;
-            return `
-              <button type="button" class="btn btn-sm" data-unlock-pkg="${escapeHtml(pkgId)}" data-unlock-label="${escapeHtml(label)}">
-                🔓 ${escapeHtml(label)} (Bấm để mở lại)
-              </button>
-            `;
-          })
-          .join("");
+      if (pkgListEl) {
+        const picked = gameState.round1.pickedPackages || [];
+        if (picked.length === 0) {
+          pkgListEl.innerHTML = `<span style="color: var(--text-muted); font-size: 0.95rem;">Chưa có gói câu hỏi nào được chọn.</span>`;
+        } else {
+          pkgListEl.innerHTML = picked
+            .map((pkgId) => {
+              const pkgObj = quizData.round1Packages.find((p) => p.id === pkgId);
+              const teamObj = pkgObj ? quizData.teams.find((t) => t.id === pkgObj.team_id) : null;
+              const label = pkgObj
+                ? `${teamObj ? teamObj.name : pkgObj.team_id} — ${pkgObj.package}`
+                : pkgId;
+              return `
+                <button type="button" class="btn btn-sm" data-unlock-pkg="${escapeHtml(pkgId)}" data-unlock-label="${escapeHtml(label)}">
+                  🔓 ${escapeHtml(label)} (Bấm để mở lại)
+                </button>
+              `;
+            })
+            .join("");
 
-        pkgListEl.querySelectorAll("[data-unlock-pkg]").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            gameState = unlockRound1Package(gameState, btn.dataset.unlockPkg);
-            syncScoresToBackend();
-            showToast(`Đã mở khóa gói "${btn.dataset.unlockLabel || btn.dataset.unlockPkg}".`);
+          pkgListEl.querySelectorAll("[data-unlock-pkg]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              gameState = unlockRound1Package(gameState, btn.dataset.unlockPkg);
+              syncScoresToBackend();
+              showToast(`Đã mở khóa gói "${btn.dataset.unlockLabel || btn.dataset.unlockPkg}".`);
+            });
           });
-        });
+        }
       }
 
       // Opened Round 3 tiles list
       const tilesListEl = document.getElementById("opened-tiles-list");
-      const opened = (gameState.round3.openedTiles || []).slice().sort((a, b) => a - b);
-      if (opened.length === 0) {
-        tilesListEl.innerHTML = `<span style="color: var(--text-muted); font-size: 0.95rem;">Chưa có ô câu hỏi Vòng 3 nào được mở.</span>`;
-      } else {
-        tilesListEl.innerHTML = opened
-          .map(
-            (num) => `
-            <button type="button" class="btn btn-sm" data-unlock-tile="${num}">
-              🔓 Ô #${num} (Mở lại)
-            </button>
-          `
-          )
-          .join("");
+      if (tilesListEl) {
+        const opened = (gameState.round3.openedTiles || []).slice().sort((a, b) => a - b);
+        if (opened.length === 0) {
+          tilesListEl.innerHTML = `<span style="color: var(--text-muted); font-size: 0.95rem;">Chưa có ô câu hỏi Vòng 3 nào được mở.</span>`;
+        } else {
+          tilesListEl.innerHTML = opened
+            .map(
+              (num) => `
+              <button type="button" class="btn btn-sm" data-unlock-tile="${num}">
+                🔓 Ô #${num} (Mở lại)
+              </button>
+            `
+            )
+            .join("");
 
-        tilesListEl.querySelectorAll("[data-unlock-tile]").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const num = Number(btn.dataset.unlockTile);
-            gameState = unlockRound3Tile(gameState, num);
-            syncScoresToBackend();
-            showToast(`Đã mở khóa lại Ô số #${num}.`);
+          tilesListEl.querySelectorAll("[data-unlock-tile]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const num = Number(btn.dataset.unlockTile);
+              gameState = unlockRound3Tile(gameState, num);
+              syncScoresToBackend();
+              showToast(`Đã mở khóa lại Ô số #${num}.`);
+            });
           });
-        });
+        }
       }
     }
 
+    // Unlock All Round 3 tiles
     document.getElementById("btn-unlock-all-tiles")?.addEventListener("click", () => {
-      if (!gameState.round3.openedTiles.length) return;
+      if (!gameState?.round3?.openedTiles?.length) return;
       gameState.round3.openedTiles = [];
       gameState.round3.activeTile = null;
       syncScoresToBackend();
@@ -501,7 +680,7 @@
         gameState = fresh;
         saveAppState(gameState);
         sessionStorage.removeItem("gameshow_r1_pending_team");
-        renderAdminPage();
+        renderScoresPage();
         showToast("Đã đặt lại toàn bộ trận đấu về trạng thái ban đầu cho tất cả thiết bị!");
       } catch (err) {
         showToast("Lỗi khi đặt lại trận đấu: " + err.message);
@@ -537,6 +716,53 @@
       }
     });
 
+    // Wire Toolbar Controls
+    function setupToolbar() {
+      // View tabs
+      document.querySelectorAll(".scores-view-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          currentView = btn.dataset.view;
+          document.querySelectorAll(".scores-view-btn").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+
+          // Show/hide round-only toggle
+          const roundToggleWrap = document.getElementById("scores-round-only-wrap");
+          if (roundToggleWrap) {
+            roundToggleWrap.style.display = currentView === "total" ? "none" : "inline-flex";
+          }
+
+          renderScoresPage();
+        });
+      });
+
+      // Search
+      const searchInput = document.getElementById("scores-search-input");
+      if (searchInput) {
+        searchInput.addEventListener("input", (e) => {
+          searchQuery = e.target.value;
+          renderScoresPage();
+        });
+      }
+
+      // Round-only toggle
+      const roundOnlyCheck = document.getElementById("scores-round-only-check");
+      if (roundOnlyCheck) {
+        roundOnlyCheck.addEventListener("change", (e) => {
+          onlyRoundTeams = e.target.checked;
+          renderScoresPage();
+        });
+      }
+
+      // Sort
+      const sortSelect = document.getElementById("scores-sort-select");
+      if (sortSelect) {
+        sortSelect.addEventListener("change", (e) => {
+          currentSort = e.target.value;
+          renderScoresPage();
+        });
+      }
+    }
+
     async function initScoresPage(forceRefresh = false) {
       quizData = await fetchQuizData({ forceRefresh, portal: "host" });
       gameState = loadAppState(quizData.teams);
@@ -566,10 +792,11 @@
           round2Stats = remoteLive.round2Stats;
         }
         saveAppState(gameState);
-        renderAdminPage();
+        renderScoresPage();
       });
 
-      renderAdminPage();
+      setupToolbar();
+      renderScoresPage();
 
       wireStageLayout({
         activePage: "scores",
