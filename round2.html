@@ -184,9 +184,13 @@
       stopTimerTick();
       liveR2 = lockRound2Question(liveR2);
 
-      await update("live/round2", {
-        status: "locked"
-      });
+      try {
+        await update("live/round2", {
+          status: "locked"
+        });
+      } catch (err) {
+        showToast(`Không khóa được câu hỏi: ${err?.message || err}`, 6000);
+      }
 
       renderStage();
     }
@@ -198,14 +202,18 @@
       const pointsPerCorrect = Number(quizData.config?.round2_points_per_correct) || 2;
       liveR2 = revealRound2Question(liveR2, q, { pointsPerCorrect });
 
-      await update("live/round2", {
-        status: "revealed",
-        results: liveR2.results,
-        stats: liveR2.stats
-      });
+      try {
+        await update("live/round2", {
+          status: "revealed",
+          results: liveR2.results,
+          stats: liveR2.stats
+        });
 
-      // Update round 2 totals for teams in live state
-      await updateAccumulatedScores();
+        // Update round 2 totals for teams in live state
+        await updateAccumulatedScores();
+      } catch (err) {
+        showToast(`Không công bố được đáp án: ${err?.message || err}`, 6000);
+      }
       renderStage();
     }
 

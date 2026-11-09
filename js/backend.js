@@ -698,6 +698,7 @@ export async function get(path = "") {
  * @returns {Promise<void>}
  */
 export async function set(path = "", value) {
+  value = dropUndefined(value);
   if (isFirebase && firebaseDb) {
     const { ref, set: fbSet } = await import(
       "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"
@@ -721,12 +722,33 @@ export async function set(path = "", value) {
 }
 
 /**
+ * Firebase rejects a whole write when any value inside it is `undefined`
+ * (local mode silently accepted it), so drop such fields in both modes:
+ * object keys are removed, array slots become null.
+ * @param {any} value
+ * @returns {any}
+ */
+export function dropUndefined(value) {
+  if (value === undefined) return null;
+  if (Array.isArray(value)) return value.map((v) => (v === undefined ? null : dropUndefined(v)));
+  if (value && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (v !== undefined) out[k] = dropUndefined(v);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
  * Updates properties at `path` without overwriting existing sibling fields.
  * @param {string} path
  * @param {Record<string, any>} data
  * @returns {Promise<void>}
  */
 export async function update(path = "", data = {}) {
+  data = dropUndefined(data) ?? {};
   if (isFirebase && firebaseDb) {
     const { ref, update: fbUpdate } = await import(
       "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"

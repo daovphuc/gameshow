@@ -662,14 +662,7 @@
       // Render Cluster Preset Selection Buttons
       const clusterWrap = document.getElementById("cluster-buttons-wrap");
       if (clusterWrap) {
-        const clusterList = Array.isArray(content.clusters) && content.clusters.length > 0
-          ? content.clusters
-          : [
-              { id: "cum-1", name: "Cụm 1", venue: "Học viện PCCC và CNCH (T06)", date: "26-27/11/2026", subtitle: "Cụm 1 – Ngày 26-27/11/2026 tại Học viện PCCC và CNCH (T06)" },
-              { id: "cum-2", name: "Cụm 2", venue: "Công an tỉnh Quảng Ngãi", date: "19-20/11/2026", subtitle: "Cụm 2 – Ngày 19-20/11/2026 tại Công an tỉnh Quảng Ngãi" },
-              { id: "cum-3", name: "Cụm 3", venue: "Công an tỉnh Tây Ninh", date: "30/11-01/12/2026", subtitle: "Cụm 3 – Ngày 30/11-01/12/2026 tại Công an tỉnh Tây Ninh" },
-              { id: "chung-ket", name: "Chung kết", venue: "Công an tỉnh Khánh Hòa", date: "10-11/12/2026", subtitle: "Vòng Chung kết – Ngày 10-11/12/2026 tại Công an tỉnh Khánh Hòa" }
-            ];
+        const clusterList = Array.isArray(content.clusters) ? content.clusters : [];
 
         const curSubtitle = String(content.config?.show_subtitle || "").trim();
 
@@ -702,7 +695,13 @@
             markUnsaved();
             renderRoundOrder();
             renderConfig();
-            showToast(`Đã áp dụng ${res.appliedCluster?.name || clusterId}!`);
+            const teamCount = res.appliedCluster?.team_ids?.length || 0;
+            showToast(
+              teamCount > 0
+                ? `Đã áp dụng ${res.appliedCluster.name}: ${teamCount} đội. Bấm Lưu để áp dụng cho các màn hình.`
+                : `Đã chọn ${res.appliedCluster?.name || clusterId}: hãy tích chọn các đội thi ở mục 1 rồi bấm Lưu.`,
+              5000
+            );
           });
         });
       }
@@ -2087,6 +2086,12 @@
           config: remoteContent.config || {},
           clusters: remoteContent.clusters || []
         };
+        // Content saved before clusters existed: seed them from the sample plan,
+        // otherwise picking a cluster could not set its teams.
+        if (!Array.isArray(content.clusters) || content.clusters.length === 0) {
+          const sampleData = await fetchSampleQuizData();
+          content.clusters = sampleData.clusters || [];
+        }
       } else {
         const sampleData = await fetchSampleQuizData();
         content = {
