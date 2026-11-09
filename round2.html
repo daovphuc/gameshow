@@ -171,6 +171,8 @@
         questionIndex: currentQuestionIdx,
         questionKey,
         activeQuestion: tabletQuestion,
+        correct: null,
+        explanation: null,
         shownAt: liveR2.shownAt,
         deadline: liveR2.deadline,
         [`questionsMeta/${questionKey}`]: liveR2.questionsMeta[questionKey]
@@ -207,7 +209,8 @@
         await update("live/round2", {
           status: "revealed",
           results: liveR2.results,
-          stats: liveR2.stats
+          correct: liveR2.correct,
+          explanation: liveR2.explanation || null
         });
 
         // Update round 2 totals for teams in live state
@@ -248,12 +251,16 @@
       liveR2.activeQuestion = null;
       liveR2.answers = {};
       liveR2.results = null;
+      delete liveR2.correct;
+      delete liveR2.explanation;
 
       await update("live/round2", {
         status: "idle",
         questionIndex: currentQuestionIdx,
         questionKey: null,
         activeQuestion: null,
+        correct: null,
+        explanation: null,
         results: null,
         stats: null
       });
@@ -405,7 +412,7 @@
         liveR2.setStarted = true;
         liveR2.history = [];
         renderStage();
-        await update("live/round2", { set: selectedSet, setStarted: true, questionIndex: 0, status: "idle" });
+        await update("live/round2", { set: selectedSet, setStarted: true, questionIndex: 0, status: "idle", activeQuestion: null, correct: null, explanation: null });
       });
     }
 
