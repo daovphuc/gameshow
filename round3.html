@@ -341,15 +341,7 @@
         activePage: "round3",
         config: quizData.config,
         teams: quizData.teams,
-        onBack: handleBack,
-        onContinue: handleContinue,
-        onReload: () => initRound3(true),
-        onSpace: () => {
-          if (gameState.round3.activeTile) {
-            return triggerStartTimer();
-          }
-          return false;
-        }
+        onReload: () => initRound3(true)
       });
     }
 

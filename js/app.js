@@ -7,7 +7,7 @@ import { getActiveSession, saveActiveSession, clearActiveSession, validateSessio
 import { normaliseAllData, resolveImageUrl } from "./data.js";
 import { contentToQuizData, isContentEmpty, getContestTeams } from "./content.js";
 import { createInitialState, syncStateWithTeams, exportState, importState, computeTeamScores } from "./state.js";
-import { getTeamInitials, computeLeaderboard, diffLeaderboard } from "./leaderboard.js";
+import { getTeamInitials, computeLeaderboard, diffLeaderboard, shortenTeamName } from "./leaderboard.js";
 import { LIGHT_THEME, mergeTheme, themeToCssVars } from "./theme.js";
 import {
   initBackend,
@@ -450,9 +450,9 @@ export function wireLiveLeaderboardPanel({ teams = [], getLiveScores } = {}) {
           class="drawer-ranking-row ${changedScoreIds.has(entry.id) ? "score-tick" : ""}"
           data-team-id="${escapeHtml(entry.id)}"
         >
-          <span class="drawer-rank ${entry.rank === 1 ? "top-1" : ""}">#${entry.rank}</span>
+          <span class="drawer-rank ${entry.rank === 1 ? "top-1" : ""}">${entry.rank != null ? `#${entry.rank}` : "–"}</span>
           ${renderAvatarHtml(entry, "team-avatar-sm")}
-          <span class="drawer-team-name" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
+          <span class="drawer-team-name" title="${escapeHtml(entry.name)}">${escapeHtml(shortenTeamName(entry.name))}</span>
           <span class="drawer-team-score">${entry.score}đ</span>
         </div>
       `
@@ -517,8 +517,7 @@ export function wireStageLayout({
       { id: "round1", href: "./round1.html", icon: "①", label: "Vòng 1" },
       { id: "round2", href: "./round2.html", icon: "②", label: "Vòng 2" },
       { id: "round3", href: "./round3.html", icon: "③", label: "Vòng 3" },
-      { id: "leaderboard", href: "./leaderboard.html", icon: "★", label: "Bảng xếp hạng" },
-      { id: "scores", href: "./scores.html", icon: "✎", label: "Điểm số" }
+      { id: "leaderboard", href: "./leaderboard.html", icon: "★", label: "Bảng xếp hạng" }
     ];
 
     const showTitle = escapeHtml(config.show_title || "Hội thi PCCC và CNCH");
@@ -581,28 +580,10 @@ export function wireStageLayout({
             <span class="sidebar-link-icon">⚙</span>
             <span class="sidebar-link-label">Cấu hình nội dung</span>
           </a>
-          <button
-            type="button"
-            id="btn-reload-data"
-            class="sidebar-link"
-            title="Tải lại dữ liệu"
-          >
-            <span class="sidebar-link-icon">↻</span>
-            <span class="sidebar-link-label">Tải lại dữ liệu</span>
-          </button>
         </div>
       </div>
 
       <div class="sidebar-bottom">
-        <a
-          href="./index.html"
-          class="sidebar-link"
-          title="Về màn hình chọn cổng"
-        >
-          <span class="sidebar-link-icon">⌂</span>
-          <span class="sidebar-link-label">Đổi cổng</span>
-        </a>
-
         <button
           type="button"
           id="btn-sidebar-change-pwd"
@@ -622,12 +603,6 @@ export function wireStageLayout({
           <span class="sidebar-link-icon">⏻</span>
           <span class="sidebar-link-label">Đăng xuất</span>
         </button>
-
-        <div class="sidebar-footer-note">
-          <span><kbd>Space</kbd> Bắt đầu giờ</span>
-          <span><kbd>←</kbd> Quay lại</span>
-          <span><kbd>→</kbd> Tiếp tục</span>
-        </div>
       </div>
     `;
 
@@ -658,21 +633,6 @@ export function wireStageLayout({
       }
     });
 
-    const reloadBtn = document.getElementById("btn-reload-data");
-    if (reloadBtn && typeof onReload === "function") {
-      reloadBtn.addEventListener("click", async () => {
-        reloadBtn.disabled = true;
-        try {
-          await onReload();
-          showToast("Đã tải lại dữ liệu mới nhất!");
-        } catch (err) {
-          showToast(err.message || "Không thể tải lại dữ liệu.");
-        } finally {
-          reloadBtn.disabled = false;
-        }
-      });
-    }
-
     // Auto update when content changes in backend (unless we are editing on content.html).
     // Subscribe once per page: onReload re-renders and calls wireStageLayout again.
     if (activePage !== "content" && typeof onReload === "function") {
@@ -702,23 +662,4 @@ export function wireStageLayout({
   if (teams && teams.length > 0) {
     wireLiveLeaderboardPanel({ teams });
   }
-
-  window.onkeydown = (e) => {
-    const tag = (e.target?.tagName || "").toLowerCase();
-    if (tag === "input" || tag === "textarea" || tag === "select" || e.target?.isContentEditable) {
-      return;
-    }
-    if (e.code === "Space" && typeof onSpace === "function") {
-      const handled = onSpace();
-      if (handled !== false) {
-        e.preventDefault();
-      }
-    } else if (e.code === "ArrowRight" && typeof onContinue === "function") {
-      e.preventDefault();
-      onContinue();
-    } else if (e.code === "ArrowLeft" && typeof onBack === "function") {
-      e.preventDefault();
-      onBack();
-    }
-  };
 }

@@ -54,6 +54,7 @@
       recomputeRound2FromAnswers
     } from "./js/round2.js";
     import { formatTimer } from "./js/timer.js";
+    import { formatSeconds } from "./js/leaderboard.js";
     import { get, set, update, listen, getServerTime } from "./js/backend.js";
 
     let quizData = null;
@@ -184,9 +185,13 @@
       stopTimerTick();
       liveR2 = lockRound2Question(liveR2);
 
-      await update("live/round2", {
-        status: "locked"
-      });
+      try {
+        await update("live/round2", {
+          status: "locked"
+        });
+      } catch (err) {
+        showToast(`Không khóa được câu hỏi: ${err?.message || err}`, 6000);
+      }
 
       renderStage();
     }
@@ -198,14 +203,18 @@
       const pointsPerCorrect = Number(quizData.config?.round2_points_per_correct) || 2;
       liveR2 = revealRound2Question(liveR2, q, { pointsPerCorrect });
 
-      await update("live/round2", {
-        status: "revealed",
-        results: liveR2.results,
-        stats: liveR2.stats
-      });
+      try {
+        await update("live/round2", {
+          status: "revealed",
+          results: liveR2.results,
+          stats: liveR2.stats
+        });
 
-      // Update round 2 totals for teams in live state
-      await updateAccumulatedScores();
+        // Update round 2 totals for teams in live state
+        await updateAccumulatedScores();
+      } catch (err) {
+        showToast(`Không công bố được đáp án: ${err?.message || err}`, 6000);
+      }
       renderStage();
     }
 
@@ -304,13 +313,13 @@
                     </div>
                   </td>
                   <td style="font-family: var(--font-mono); font-weight: 900; font-size: 1.25rem; color: var(--accent);">
-                    ${entry.points}đ
+                    ${entry.points}đ <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-muted); margin-left: 0.35rem;">(${formatSeconds(entry.totalCorrectTimeMs / 1000)})</span>
                   </td>
                   <td style="font-family: var(--font-mono); font-weight: 700;">
                     ${entry.correctCount}/${questions.length || 10}
                   </td>
                   <td style="font-family: var(--font-mono); font-size: 1.05rem;">
-                    ${(entry.totalCorrectTimeMs / 1000).toFixed(2)}s
+                    ${formatSeconds(entry.totalCorrectTimeMs / 1000)}
                   </td>
                 </tr>
               `
@@ -647,35 +656,7 @@
         activePage: "round2",
         config: quizData.config,
         teams: quizData.teams,
-        onBack: () => {
-          if (liveR2.status === "idle" && currentQuestionIdx === 0) {
-            window.location.href = "./round1.html";
-          } else {
-            document.getElementById("btn-screen-back")?.click();
-          }
-        },
-        onContinue: () => {
-          if (liveR2.status === "idle") {
-            handleStartQuestion();
-          } else if (liveR2.status === "open") {
-            handleLockQuestion();
-          } else if (liveR2.status === "locked") {
-            handleRevealQuestion();
-          } else {
-            handleNextQuestion();
-          }
-        },
-        onReload: () => initRound2(true),
-        onSpace: () => {
-          if (liveR2.status === "idle") {
-            handleStartQuestion();
-            return true;
-          } else if (liveR2.status === "open") {
-            handleLockQuestion();
-            return true;
-          }
-          return false;
-        }
+        onReload: () => initRound2(true)
       });
     }
 

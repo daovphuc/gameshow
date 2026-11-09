@@ -61,3 +61,11 @@ test("firebase/database.rules.json policy assertion", () => {
     "Rule must contain condition for ref_id"
   );
 });
+
+test("only host and head judge may write overtime penalties", () => {
+  const parsed = JSON.parse(fs.readFileSync(path.resolve("firebase/database.rules.json"), "utf8"));
+  const rule = parsed.rules?.live?.penalties?.["$round"]?.["$team"]?.[".write"];
+  assert.ok(typeof rule === "string", "live/penalties/$round/$team/.write must exist");
+  assert.ok(rule.includes("'host'") && rule.includes("'head_judge'"));
+  assert.ok(!rule.includes("'judge'") && !rule.includes("'team'"));
+});

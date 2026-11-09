@@ -23,14 +23,20 @@
           </p>
         </div>
 
-        <div class="tabs-bar" role="tablist" aria-label="Chọn bảng xếp hạng">
-          <button type="button" class="tab-btn active" data-tab="total">Tổng Điểm</button>
-          <button type="button" class="tab-btn" data-tab="round1">Vòng 1</button>
-          <button type="button" class="tab-btn" data-tab="round2">Vòng 2</button>
-          <button type="button" class="tab-btn" data-tab="round3">Vòng 3</button>
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+          <div class="tabs-bar" role="tablist" aria-label="Chọn bảng xếp hạng">
+            <button type="button" class="tab-btn active" data-tab="total">Tổng Điểm</button>
+            <button type="button" class="tab-btn" data-tab="round1">Vòng 1</button>
+            <button type="button" class="tab-btn" data-tab="round2">Vòng 2</button>
+            <button type="button" class="tab-btn" data-tab="round3">Vòng 3</button>
+          </div>
+          <button type="button" id="btn-export-report-csv" class="btn btn-outline" title="Xuất báo cáo tổng kết dạng bảng CSV/Excel">
+            ⬇ Tải báo cáo kết quả (CSV)
+          </button>
         </div>
       </div>
 
+      <canvas id="fireworks-canvas" class="fireworks-canvas" style="position: fixed; inset: 0; pointer-events: none; z-index: 1000; width: 100vw; height: 100vh;"></canvas>
       <section id="podium-section" class="trophy-podium-stage animate-rise" aria-label="Bục vinh danh Top 5"></section>
       <section id="leaderboard-list" class="leaderboard-list" aria-label="Danh sách các đội tiếp theo"></section>
     </main>
@@ -42,11 +48,13 @@
       loadAppState,
       renderAvatarHtml,
       escapeHtml,
-      wireStageLayout
+      wireStageLayout,
+      showToast
     } from "./js/app.js";
-    import { computeLeaderboard, buildPodiumSlots } from "./js/leaderboard.js";
+    import { computeLeaderboard, buildPodiumSlots, formatSeconds } from "./js/leaderboard.js";
     import { computeTeamScores } from "./js/state.js";
-    import { listen } from "./js/backend.js";
+    import { listen, get } from "./js/backend.js";
+    import { buildReportCsv } from "./js/report.js";
 
     const params = new URLSearchParams(window.location.search);
     let currentMode = params.get("tab") || "total";
@@ -164,12 +172,15 @@
 
     function renderPodiumSlot(slotEntry) {
       const isWinner = slotEntry.slot === 1;
+      const r2TimeStr = currentMode === "round2" && slotEntry.round2Seconds
+        ? ` <span class="podium-r2-time" style="font-size: 0.88rem; font-weight: normal; color: var(--text-muted);">(${formatSeconds(slotEntry.round2Seconds)})</span>`
+        : "";
       return `
         <div class="podium-column slot-${slotEntry.slot}" data-slot="${slotEntry.slot}" data-rank="${slotEntry.rank}">
           <div class="podium-team-card">
             ${renderAvatarHtml(slotEntry, isWinner ? "team-avatar-lg" : "")}
             <h2 class="podium-team-name" title="${escapeHtml(slotEntry.name)}">${escapeHtml(slotEntry.name)}</h2>
-            <div class="podium-team-score">${slotEntry.score} <span>điểm</span></div>
+            <div class="podium-team-score">${slotEntry.score} <span>điểm</span>${r2TimeStr}</div>
             <div class="podium-team-rounds">
               V1: ${slotEntry.round1} • V2: ${slotEntry.round2} • V3: ${slotEntry.round3}
             </div>
@@ -180,10 +191,126 @@
           </div>
 
           <div class="podium-block slot-${slotEntry.slot}" aria-label="Bục vị trí ${slotEntry.slot}, hạng ${slotEntry.rank}">
-            <span class="podium-block-rank">${slotEntry.rank}</span>
+            <span class="podium-block-rank">${slotEntry.slot}</span>
           </div>
         </div>
       `;
+    }
+
+    let hasPlayedFireworks = false;
+
+    function launchPodiumFireworks() {
+      if (hasPlayedFireworks) return;
+      hasPlayedFireworks = true;
+
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        return;
+      }
+
+      const canvas = document.getElementById("fireworks-canvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const dpr = window.devicePixelRatio || 1;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const podiumCols = document.querySelectorAll(".podium-column");
+      const origins = [];
+      podiumCols.forEach((col) => {
+        const rect = col.getBoundingClientRect();
+        origins.push({
+          x: rect.left + rect.width / 2,
+          y: Math.max(90, rect.top - 30)
+        });
+      });
+
+      if (origins.length === 0) {
+        origins.push(
+          { x: width * 0.3, y: height * 0.3 },
+          { x: width * 0.5, y: height * 0.22 },
+          { x: width * 0.7, y: height * 0.3 }
+        );
+      }
+
+      const colors = ["#F59E0B", "#EF4444", "#10B981", "#3B82F6", "#8B5CF6", "#EC4899", "#FBBF24", "#FFFFFF"];
+      const particles = [];
+
+      function createBurst(originX, originY) {
+        const count = 35 + Math.floor(Math.random() * 20);
+        const baseColor = colors[Math.floor(Math.random() * colors.length)];
+        for (let i = 0; i < count; i++) {
+          const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
+          const speed = 2.5 + Math.random() * 5;
+          particles.push({
+            x: originX,
+            y: originY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            color: Math.random() > 0.3 ? baseColor : colors[Math.floor(Math.random() * colors.length)],
+            alpha: 1,
+            decay: 0.012 + Math.random() * 0.012,
+            radius: 2 + Math.random() * 2
+          });
+        }
+      }
+
+      origins.forEach((orig, idx) => {
+        setTimeout(() => {
+          createBurst(orig.x + (Math.random() - 0.5) * 30, orig.y + (Math.random() - 0.5) * 20);
+        }, idx * 220);
+      });
+
+      setTimeout(() => {
+        origins.forEach((orig) => {
+          if (Math.random() > 0.3) {
+            createBurst(orig.x + (Math.random() - 0.5) * 50, orig.y - 15);
+          }
+        });
+      }, 900);
+
+      const startTime = performance.now();
+      const maxDuration = 3500;
+
+      function loop(now) {
+        const elapsed = now - startTime;
+        ctx.clearRect(0, 0, width, height);
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.055;
+          p.vx *= 0.985;
+          p.vy *= 0.985;
+          p.alpha -= p.decay;
+
+          if (p.alpha <= 0) {
+            particles.splice(i, 1);
+            continue;
+          }
+
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, p.alpha);
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        if (elapsed < maxDuration || particles.length > 0) {
+          requestAnimationFrame(loop);
+        } else {
+          ctx.clearRect(0, 0, width, height);
+        }
+      }
+
+      requestAnimationFrame(loop);
     }
 
     function renderBoard() {
@@ -199,12 +326,15 @@
         config: quizData.config
       });
 
-      const ranked = computeLeaderboard(quizData.teams, derivedScores, currentMode, { tieBreak: true });
+      const ranked = computeLeaderboard(quizData.teams, derivedScores, currentMode, {
+        tieBreak: true,
+        round2Stats: gameState?.round2Stats || {}
+      });
       const podiumEl = document.getElementById("podium-section");
       const listEl = document.getElementById("leaderboard-list");
 
       const podiumSlots = buildPodiumSlots(ranked);
-      const rest = ranked.slice(5);
+      const rest = podiumSlots.length === 0 ? ranked : ranked.slice(Math.min(5, podiumSlots.length));
 
       const nextSignature = `${currentMode}::${podiumSlots
         .map((s) => `${s.slot}:${s.id}:${s.rank}:${s.score}:${s.round1}:${s.round2}:${s.round3}`)
@@ -217,7 +347,11 @@
         podiumEl.classList.add("animate-rise");
 
         if (podiumSlots.length === 0) {
-          podiumEl.innerHTML = "";
+          podiumEl.innerHTML = `
+            <div class="podium-waiting-card" style="text-align: center; padding: 3.5rem 1.5rem; color: var(--text-muted); font-size: 1.25rem; font-weight: 700;">
+              Chưa có điểm
+            </div>
+          `;
         } else {
           podiumEl.innerHTML = `
             <div class="podium-columns-row">
@@ -225,6 +359,7 @@
             </div>
             <div class="podium-striped-base" aria-hidden="true"></div>
           `;
+          launchPodiumFireworks();
         }
       }
 
@@ -232,7 +367,7 @@
         .map(
           (entry) => `
           <div class="leaderboard-row">
-            <div class="rank-number">#${entry.rank}</div>
+            <div class="rank-number">${entry.rank != null ? `#${entry.rank}` : "–"}</div>
             <div class="leaderboard-team-info">
               ${renderAvatarHtml(entry)}
               <div class="leaderboard-team-name">${escapeHtml(entry.name)}</div>
@@ -243,7 +378,10 @@
               <span>V3: <strong>${entry.round3}</strong></span>
               <span>Tổng: <strong>${entry.total}</strong></span>
             </div>
-            <div class="leaderboard-main-score">${entry.score} đ</div>
+            <div class="leaderboard-main-score">
+              ${entry.score} đ
+              ${currentMode === "round2" && entry.round2Seconds ? `<span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-left: 0.35rem;">(${formatSeconds(entry.round2Seconds)})</span>` : ""}
+            </div>
           </div>
         `
         )
@@ -274,15 +412,37 @@
         activePage: "leaderboard",
         config: quizData.config,
         teams: quizData.teams,
-        onBack: () => {
-          window.location.href = "./round3.html";
-        },
-        onContinue: () => {
-          window.location.href = "./scores.html";
-        },
         onReload: () => initLeaderboard(true)
       });
     }
+
+    document.getElementById("btn-export-report-csv")?.addEventListener("click", async () => {
+      try {
+        const allAnswers = (await get("answers")) || {};
+        const csvContent = buildReportCsv({
+          teams: quizData.teams,
+          judges: quizData.judges,
+          gameState,
+          round2Questions: quizData.round2Questions,
+          allAnswers,
+          config: quizData.config
+        });
+
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const dateStr = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `Ket_qua_Hoi_thi_PCCC_CNCH_${dateStr}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast("Đã tải file báo cáo CSV thành công!");
+      } catch (err) {
+        showToast("Lỗi khi xuất báo cáo: " + err.message);
+      }
+    });
 
     document.querySelectorAll(".tab-btn").forEach((btn) => {
       btn.addEventListener("click", () => {

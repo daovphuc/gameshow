@@ -1,9 +1,43 @@
 // Leaderboard ranking, trophy podium slot mapping, Điều 22 tie-break,
-// animation diff helper, and team avatar helpers (DOM-free).
+// animation diff helper, team name shortening, and team avatar helpers (DOM-free).
 
 import { TEAM_PALETTE } from "./config.js";
 
 export const PODIUM_SLOT_ORDER = [4, 2, 1, 3, 5];
+
+/**
+ * Shortens Vietnamese police team names for display in narrow lists:
+ * - Strips leading "Công an tỉnh ", "Công an TP. ", "Công an thành phố ".
+ * - T06 shows "T06".
+ * - Team names without these prefixes are left unchanged.
+ *
+ * @param {string} name
+ * @returns {string}
+ */
+export function shortenTeamName(name) {
+  if (!name || typeof name !== "string") {
+    return "";
+  }
+  const trimmed = name.trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (/\bT06\b/i.test(trimmed)) {
+    return "T06";
+  }
+  return trimmed.replace(/^công an\s+(?:thành phố|tp\.?|tỉnh)\s+/i, "").trim();
+}
+
+/**
+ * Formats a duration in seconds with Vietnamese comma decimal and 's' suffix,
+ * matching the brief format (e.g. "12,34 s").
+ * @param {number} sec
+ * @returns {string}
+ */
+export function formatSeconds(sec) {
+  const s = Number(sec) || 0;
+  return s.toFixed(2).replace(".", ",") + " s";
+}
 
 /**
  * Generates 1-2 character uppercase initials from a Vietnamese team name.
@@ -87,6 +121,7 @@ export function computeLeaderboard(teams = [], stateOrScores = {}, mode = "total
   const tieBreak = Boolean(options && (options.tieBreak || options.useDieu22));
   const r1Content = options?.contentScores?.round1 || {};
   const r3Content = options?.contentScores?.round3 || {};
+  const r2Stats = options?.round2Stats || (stateOrScores && stateOrScores.round2Stats) || {};
 
   const entries = teams.map((team, index) => {
     const raw = scoresMap[team.id] || {};
@@ -94,6 +129,13 @@ export function computeLeaderboard(teams = [], stateOrScores = {}, mode = "total
     const round2 = Number(raw.round2) || 0;
     const round3 = Number(raw.round3) || 0;
     const total = Math.round((round1 + round2 + round3) * 100) / 100;
+
+    const r2Stat = r2Stats[team.id] || {};
+    const round2TimeMs = Number(r2Stat.totalCorrectTimeMs) || 0;
+    const round2Fastest = Number(r2Stat.fastestCount) || 0;
+    const round2Seconds = r2Stat.totalCorrectTimeSeconds !== undefined
+      ? Number(r2Stat.totalCorrectTimeSeconds)
+      : Math.round((round2TimeMs / 1000) * 100) / 100;
 
     const score =
       scoreKey === "round1"
@@ -115,6 +157,9 @@ export function computeLeaderboard(teams = [], stateOrScores = {}, mode = "total
       round3,
       r1Content: Number(r1Content[team.id]) || 0,
       r3Content: Number(r3Content[team.id]) || 0,
+      round2TimeMs,
+      round2Fastest,
+      round2Seconds,
       total,
       score,
       rank: 1,
@@ -151,6 +196,14 @@ export function computeLeaderboard(teams = [], stateOrScores = {}, mode = "total
         if (b.r1Content !== a.r1Content) {
           return b.r1Content - a.r1Content;
         }
+      } else if (scoreKey === "round2") {
+        // Điều 21.2: most fastest answers first, then shorter total time.
+        if (b.round2Fastest !== a.round2Fastest) {
+          return b.round2Fastest - a.round2Fastest;
+        }
+        if (a.round2TimeMs !== b.round2TimeMs) {
+          return a.round2TimeMs - b.round2TimeMs;
+        }
       } else if (scoreKey === "round3") {
         if (b.r3Content !== a.r3Content) {
           return b.r3Content - a.r3Content;
@@ -165,11 +218,13 @@ export function computeLeaderboard(teams = [], stateOrScores = {}, mode = "total
   });
 
   for (let i = 0; i < entries.length; i++) {
-    if (i === 0) {
-      entries[i].rank = 1;
+    const curr = entries[i];
+    if (curr.score <= 0) {
+      curr.rank = null;
+    } else if (i === 0) {
+      curr.rank = 1;
     } else {
       const prev = entries[i - 1];
-      const curr = entries[i];
       let isIdentical = curr.score === prev.score;
 
       if (tieBreak && isIdentical) {
@@ -182,12 +237,14 @@ export function computeLeaderboard(teams = [], stateOrScores = {}, mode = "total
             curr.round2 === prev.round2;
         } else if (scoreKey === "round1") {
           isIdentical = curr.round1 === prev.round1 && curr.r1Content === prev.r1Content;
+        } else if (scoreKey === "round2") {
+          isIdentical = curr.round2Fastest === prev.round2Fastest && curr.round2TimeMs === prev.round2TimeMs;
         } else if (scoreKey === "round3") {
           isIdentical = curr.round3 === prev.round3 && curr.r3Content === prev.r3Content;
         }
       }
 
-      if (isIdentical) {
+      if (isIdentical && prev.rank !== null) {
         curr.rank = prev.rank;
       } else {
         curr.rank = i + 1;
@@ -202,12 +259,19 @@ export function computeLeaderboard(teams = [], stateOrScores = {}, mode = "total
 /**
  * Maps ranked leaderboard entries into left-to-right trophy podium slots (4 - 2 - 1 - 3 - 5).
  * - For fewer than 5 teams (1-4), returns only existing places in that relative left-to-right order.
+ * - While nobody has points, returns empty array so podium displays waiting message.
  * - Placement follows sorted order (`slot` = 1..5), while `rank` keeps shared ranks for ties.
  * @param {Array<Record<string, any>>} [rankedEntries]
  * @returns {Array<Record<string, any> & {slot: number, rank: number, trophy: "gold"|"silver"|"bronze"|"clay"}>}
  */
 export function buildPodiumSlots(rankedEntries = []) {
-  const top = Array.isArray(rankedEntries) ? rankedEntries.slice(0, 5) : [];
+  const hasAnyScore = Array.isArray(rankedEntries) && rankedEntries.some((e) => Number(e?.score) > 0);
+  if (!hasAnyScore) {
+    return [];
+  }
+  const top = Array.isArray(rankedEntries)
+    ? rankedEntries.filter((e) => Number(e?.score) > 0).slice(0, 5)
+    : [];
   return PODIUM_SLOT_ORDER
     .filter((slot) => slot <= top.length)
     .map((slot) => {

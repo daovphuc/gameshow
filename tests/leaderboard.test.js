@@ -4,7 +4,9 @@ import {
   computeLeaderboard,
   buildPodiumSlots,
   getTeamInitials,
-  diffLeaderboard
+  diffLeaderboard,
+  shortenTeamName,
+  formatSeconds
 } from "../js/leaderboard.js";
 
 const TEAMS = [
@@ -35,7 +37,7 @@ test("computeLeaderboard ranks per-round and total, ties share a rank, and missi
   assert.equal(totalBoard[3].id, "t4");
   assert.equal(totalBoard[3].score, 0);
   assert.equal(totalBoard[3].total, 0);
-  assert.equal(totalBoard[3].rank, 4);
+  assert.equal(totalBoard[3].rank, null);
 
   // Round 1 leaderboard
   const r1Board = computeLeaderboard(TEAMS, scores, "round1");
@@ -197,4 +199,74 @@ test("getTeamInitials uses the place name for police teams and keeps short codes
   assert.equal(getTeamInitials("Công an TP. Huế"), "HU");
   assert.equal(getTeamInitials("Công an tỉnh Đắk Lắk"), "ĐL");
   assert.equal(getTeamInitials("T06"), "T06");
+});
+
+test("shortenTeamName strips leading tỉnh / TP. / thành phố / T06 / names without prefix unchanged", () => {
+  assert.equal(shortenTeamName("Công an tỉnh Lạng Sơn"), "Lạng Sơn");
+  assert.equal(shortenTeamName("Công an tỉnh Đồng Tháp"), "Đồng Tháp");
+  assert.equal(shortenTeamName("Công an TP. Hà Nội"), "Hà Nội");
+  assert.equal(shortenTeamName("Công an TP Hải Phòng"), "Hải Phòng");
+  assert.equal(shortenTeamName("Công an thành phố Hồ Chí Minh"), "Hồ Chí Minh");
+  assert.equal(shortenTeamName("Học viện PCCC và CNCH (T06)"), "T06");
+  assert.equal(shortenTeamName("T06"), "T06");
+  assert.equal(shortenTeamName("Đội Cảnh sát PCCC Quận 1"), "Đội Cảnh sát PCCC Quận 1");
+  assert.equal(shortenTeamName("Đoàn Thanh niên"), "Đoàn Thanh niên");
+  assert.equal(shortenTeamName(""), "");
+  assert.equal(shortenTeamName(null), "");
+});
+
+test("Leaderboard ranks are null for teams without scores and podium is empty when nobody has points", () => {
+  const teams = [
+    { id: "A", name: "Đội A" },
+    { id: "B", name: "Đội B" },
+    { id: "C", name: "Đội C" }
+  ];
+
+  // Case 1: Nobody has points yet -> every team rank is null, podium slots empty
+  const emptyScores = {
+    A: { round1: 0, round2: 0, round3: 0 },
+    B: { round1: 0, round2: 0, round3: 0 },
+    C: { round1: 0, round2: 0, round3: 0 }
+  };
+  const boardZero = computeLeaderboard(teams, emptyScores, "total");
+  for (const entry of boardZero) {
+    assert.equal(entry.rank, null, `Team ${entry.id} should have rank null when score is 0`);
+  }
+  const podiumZero = buildPodiumSlots(boardZero);
+  assert.deepEqual(podiumZero, [], "Podium must be empty when nobody has points");
+
+  // Case 2: Some teams have points, real ties still share a rank, 0-score teams get rank null
+  const partialScores = {
+    A: { round1: 30, round2: 0, round3: 0 }, // 30
+    B: { round1: 30, round2: 0, round3: 0 }, // 30 (tied with A on total!)
+    C: { round1: 0, round2: 0, round3: 0 }   // 0
+  };
+  const boardPartial = computeLeaderboard(teams, partialScores, "total");
+  assert.equal(boardPartial[0].rank, 1);
+  assert.equal(boardPartial[1].rank, 1); // Real tie shares rank 1
+  assert.equal(boardPartial[2].rank, null); // 0-score team gets null
+
+  const podiumPartial = buildPodiumSlots(boardPartial);
+  assert.equal(podiumPartial.length, 2, "Podium should include only teams with real scores");
+  assert.equal(podiumPartial.find((s) => s.id === "A")?.rank, 1);
+  assert.equal(podiumPartial.find((s) => s.id === "B")?.rank, 1);
+});
+
+test("formatSeconds formats seconds with comma decimal and s suffix", () => {
+  assert.equal(formatSeconds(12.34), "12,34 s");
+  assert.equal(formatSeconds(5), "5,00 s");
+  assert.equal(formatSeconds(0), "0,00 s");
+});
+
+test("round 2 leaderboard tie-break: most fastest answers, then shorter total time (Điều 21.2)", () => {
+  const teams = [{ id: "a", name: "A" }, { id: "b", name: "B" }, { id: "c", name: "C" }];
+  const scores = { a: { round2: 6 }, b: { round2: 6 }, c: { round2: 6 } };
+  const round2Stats = {
+    a: { fastestCount: 1, totalCorrectTimeMs: 9000 },
+    b: { fastestCount: 2, totalCorrectTimeMs: 20000 },
+    c: { fastestCount: 1, totalCorrectTimeMs: 8000 }
+  };
+  const ranked = computeLeaderboard(teams, scores, "round2", { tieBreak: true, round2Stats });
+  assert.deepEqual(ranked.map((e) => e.id), ["b", "c", "a"]);
+  assert.deepEqual(ranked.map((e) => e.rank), [1, 2, 3]);
 });
