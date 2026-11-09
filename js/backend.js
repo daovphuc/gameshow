@@ -1,19 +1,24 @@
 // Thin backend adapter: Firebase Realtime Database with automatic fallback
 // to in-browser Local Mode (BroadcastChannel + localStorage) when databaseURL is empty.
 // Implements identical interface for both backends with plain-language connection status.
+// Includes Firebase Authentication with role management and per-portal sessions.
 
 import { firebaseConfig } from "./firebase-config.js";
 import { createInitialState } from "./state.js";
+import { usernameToEmail, getPortalUrl } from "./auth.js";
 
 const LOCAL_STORAGE_KEY = "gameshow_live_db_tree";
 const BROADCAST_CHANNEL_NAME = "gameshow_live_sync_channel";
 
 let isInitialized = false;
 let isFirebase = false;
+let activePortal = "host";
 let firebaseApp = null;
 let firebaseDb = null;
 let fbServerTimestampFn = null;
 let serverTimeOffset = 0;
+
+const portalApps = new Map(); // appName -> { app, db, auth }
 
 let currentStatus = {
   code: "local",
@@ -140,14 +145,65 @@ function notifyLocalPath(path, tree) {
 }
 
 /**
- * Initializes the backend connection. Safe to call multiple times.
+ * Maps portal name to Firebase App name.
+ * @param {string} [portal]
+ * @returns {string}
  */
-export async function initBackend() {
-  if (isInitialized) {
-    return { isFirebase, status: currentStatus };
+export function getPortalAppName(portal = "host") {
+  const p = String(portal || "host").toLowerCase().trim();
+  if (p === "judge" || p === "head_judge") return "portal_judge";
+  if (p === "team") return "portal_team";
+  if (p === "host") return "portal_host";
+  return `portal_${p}`;
+}
+
+export function detectCurrentPortal() {
+  if (typeof window === "undefined") return "host";
+  const p = window.location.pathname.toLowerCase();
+  if (p.endsWith("judge.html")) return "judge";
+  if (p.endsWith("team.html")) return "team";
+  if (p.endsWith("index.html") || p === "" || p.endsWith("/")) return "portal_default";
+  return "host";
+}
+
+/**
+ * Gets or initializes a named Firebase App instance for a portal.
+ * @param {string} portal
+ * @returns {Promise<{ app: any, db: any, auth: any }>}
+ */
+export async function getOrCreatePortalInstance(portal = "host") {
+  const appName = getPortalAppName(portal);
+  if (portalApps.has(appName)) {
+    return portalApps.get(appName);
   }
 
-  isInitialized = true;
+  const { initializeApp, getApps } = await import(
+    "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"
+  );
+  const { getDatabase } = await import(
+    "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"
+  );
+  const { getAuth } = await import(
+    "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"
+  );
+
+  const existing = getApps().find((a) => a.name === appName);
+  const app = existing || initializeApp(firebaseConfig, appName);
+  const db = getDatabase(app);
+  const auth = getAuth(app);
+  const instance = { app, db, auth };
+  portalApps.set(appName, instance);
+  return instance;
+}
+
+/**
+ * Initializes the backend connection. Safe to call multiple times.
+ * @param {{ portal?: string }} [options]
+ */
+export async function initBackend(options = {}) {
+  const portal = options?.portal || detectCurrentPortal();
+  activePortal = portal;
+
   const hasFirebaseConfig = Boolean(
     firebaseConfig &&
     firebaseConfig.databaseURL &&
@@ -156,11 +212,7 @@ export async function initBackend() {
 
   if (typeof window !== "undefined" && hasFirebaseConfig) {
     try {
-      const { initializeApp } = await import(
-        "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"
-      );
       const {
-        getDatabase,
         ref,
         onValue,
         serverTimestamp: fbServerTimestamp
@@ -168,8 +220,12 @@ export async function initBackend() {
         "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"
       );
 
-      firebaseApp = initializeApp(firebaseConfig);
-      firebaseDb = getDatabase(firebaseApp);
+      const portalInst = await getOrCreatePortalInstance(portal);
+      // Restore the persisted sign-in before any read: the rules deny
+      // unauthenticated reads and Firebase cancels a denied listener for good.
+      await portalInst.auth.authStateReady();
+      firebaseApp = portalInst.app;
+      firebaseDb = portalInst.db;
       fbServerTimestampFn = fbServerTimestamp;
       isFirebase = true;
 
@@ -189,6 +245,7 @@ export async function initBackend() {
         serverTimeOffset = Number(snap.val()) || 0;
       });
 
+      isInitialized = true;
       return { isFirebase: true, status: currentStatus };
     } catch {
       // Fallback to local mode on Firebase initialization error
@@ -200,7 +257,7 @@ export async function initBackend() {
   isFirebase = false;
   notifyStatus({ code: "local", label: "Chế độ thử trên 1 máy" });
 
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && !isInitialized) {
     try {
       if ("BroadcastChannel" in window) {
         broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
@@ -235,7 +292,343 @@ export async function initBackend() {
     window.addEventListener("pageshow", resumeSync);
   }
 
+  isInitialized = true;
   return { isFirebase: false, status: currentStatus };
+}
+
+/**
+ * Returns whether Firebase mode is currently active.
+ * @returns {boolean}
+ */
+export function isFirebaseBackend() {
+  return isFirebase;
+}
+
+/**
+ * Signs in using Firebase Authentication and resolves the user's role record.
+ * Handles:
+ * - username -> email mapping (<username>@hoithi.local)
+ * - Firebase Auth sign in
+ * - Reading roles/<uid>
+ * - Bootstrap host self-write if roles is empty and username is mc
+ * - Sign out if account has no role record
+ * - Persistent sign-in to the appropriate portal's Firebase app
+ *
+ * @param {string} username
+ * @param {string} password
+ * @returns {Promise<{ ok: boolean, session?: any, error?: string, portalUrl?: string, isLocal?: boolean }>}
+ */
+export async function signInAndResolveRole(username, password) {
+  if (!isFirebase) {
+    return { ok: false, isLocal: true };
+  }
+
+  let email;
+  try {
+    email = usernameToEmail(username);
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+
+  const { initializeApp, deleteApp } = await import(
+    "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"
+  );
+  const { getAuth, signInWithEmailAndPassword, signOut } = await import(
+    "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"
+  );
+  const { getDatabase, ref, get: fbGet, set: fbSet } = await import(
+    "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js"
+  );
+
+  const probeAppName = `probe_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const probeApp = initializeApp(firebaseConfig, probeAppName);
+  const probeAuth = getAuth(probeApp);
+  const probeDb = getDatabase(probeApp);
+
+  let userCred;
+  try {
+    userCred = await signInWithEmailAndPassword(probeAuth, email, password);
+  } catch (err) {
+    try { await deleteApp(probeApp); } catch {}
+    if (
+      err.code === "auth/invalid-credential" ||
+      err.code === "auth/wrong-password" ||
+      err.code === "auth/user-not-found"
+    ) {
+      return { ok: false, error: "Tên đăng nhập hoặc mật khẩu không chính xác." };
+    }
+    if (err.code === "auth/too-many-requests") {
+      return { ok: false, error: "Đã thử đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút." };
+    }
+    return { ok: false, error: `Lỗi đăng nhập: ${err.message}` };
+  }
+
+  const uid = userCred.user.uid;
+  let roleRecord = null;
+
+  try {
+    const roleRef = ref(probeDb, `roles/${uid}`);
+    const snap = await fbGet(roleRef);
+    roleRecord = snap.val();
+
+    // Host bootstrap check: when roles does not exist at all and user is mc
+    if (!roleRecord) {
+      const cleanUser = username.trim().toLowerCase();
+      if (cleanUser === "mc") {
+        const bootstrap = {
+          username: "mc",
+          role: "host",
+          ref_id: "",
+          display_name: "Dẫn chương trình"
+        };
+        try {
+          await fbSet(roleRef, bootstrap);
+          roleRecord = bootstrap;
+        } catch {
+          // Self-write rejected because roles already exists
+          roleRecord = null;
+        }
+      }
+    }
+  } catch {
+    roleRecord = null;
+  }
+
+  // Account has no role: sign out and reject
+  if (!roleRecord || !roleRecord.role) {
+    try {
+      await signOut(probeAuth);
+      await deleteApp(probeApp);
+    } catch {}
+    return {
+      ok: false,
+      error: "Tài khoản chưa được cấp quyền."
+    };
+  }
+
+  // Sign into the designated portal's Firebase app
+  const role = roleRecord.role;
+  const targetPortal = (role === "judge" || role === "head_judge") ? "judge" : (role === "team" ? "team" : "host");
+  const portalInst = await getOrCreatePortalInstance(targetPortal);
+  try {
+    await signInWithEmailAndPassword(portalInst.auth, email, password);
+  } catch {
+    // Ignore secondary sign in error if already signed in
+  }
+
+  // Clean up probe app
+  try {
+    await signOut(probeAuth);
+    await deleteApp(probeApp);
+  } catch {}
+
+  const session = {
+    uid,
+    username: roleRecord.username || username.trim().toLowerCase(),
+    role: roleRecord.role,
+    ref_id: roleRecord.ref_id || "",
+    display_name: roleRecord.display_name || ""
+  };
+
+  return {
+    ok: true,
+    session,
+    portalUrl: getPortalUrl(roleRecord.role),
+    role: roleRecord.role
+  };
+}
+
+/**
+ * Signs out of Firebase Auth for the given portal.
+ * @param {string} portal
+ */
+export async function signOutPortal(portal = "host") {
+  if (isFirebase) {
+    try {
+      const portalInst = await getOrCreatePortalInstance(portal);
+      const { signOut } = await import(
+        "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"
+      );
+      await signOut(portalInst.auth);
+    } catch {
+      // Ignore
+    }
+  }
+}
+
+/**
+ * Waits for Firebase Auth state to be ready on the specified portal.
+ * @param {string} portal
+ * @returns {Promise<any|null>}
+ */
+export async function waitForAuth(portal = "host") {
+  if (!isFirebase) return null;
+  const portalInst = await getOrCreatePortalInstance(portal);
+  const { onAuthStateChanged } = await import(
+    "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"
+  );
+  if (portalInst.auth.currentUser) {
+    return portalInst.auth.currentUser;
+  }
+  return new Promise((resolve) => {
+    let resolved = false;
+    const unsub = onAuthStateChanged(portalInst.auth, (user) => {
+      unsub();
+      if (!resolved) {
+        resolved = true;
+        resolve(user);
+      }
+    });
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        resolve(portalInst.auth.currentUser || null);
+      }
+    }, 3000);
+  });
+}
+
+/**
+ * Returns the current signed-in Firebase user for the specified portal.
+ * @param {string} portal
+ * @returns {any|null}
+ */
+export function getCurrentUser(portal = "host") {
+  const appName = getPortalAppName(portal);
+  const inst = portalApps.get(appName);
+  return inst?.auth?.currentUser || null;
+}
+
+/**
+ * Changes password for the currently signed-in user on a portal.
+ * Verifies current password first, then updates to new password.
+ *
+ * @param {string} currentPassword
+ * @param {string} newPassword
+ * @param {string} [portal]
+ * @returns {Promise<void>}
+ */
+export async function changePassword(currentPassword, newPassword, portal = "host") {
+  if (!isFirebase) {
+    throw new Error("Chức năng đổi mật khẩu chỉ khả dụng khi kết nối Firebase Authentication.");
+  }
+  const portalInst = await getOrCreatePortalInstance(portal);
+  const user = portalInst.auth.currentUser;
+  if (!user || !user.email) {
+    throw new Error("Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.");
+  }
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error("Mật khẩu mới phải có ít nhất 6 ký tự.");
+  }
+
+  const { EmailAuthProvider, reauthenticateWithCredential, updatePassword } = await import(
+    "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"
+  );
+
+  try {
+    const cred = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, cred);
+  } catch (err) {
+    if (
+      err.code === "auth/wrong-password" ||
+      err.code === "auth/invalid-credential"
+    ) {
+      throw new Error("Mật khẩu hiện tại không chính xác.");
+    }
+    throw new Error(`Xác thực thất bại: ${err.message}`);
+  }
+
+  try {
+    await updatePassword(user, newPassword);
+  } catch (err) {
+    if (err.code === "auth/weak-password") {
+      throw new Error("Mật khẩu mới quá yếu (phải có ít nhất 6 ký tự).");
+    }
+    throw new Error(`Cập nhật mật khẩu thất bại: ${err.message}`);
+  }
+}
+
+/**
+ * Creates an account in Firebase Authentication using a secondary temporary app,
+ * so the host stays signed in.
+ *
+ * @param {string} username
+ * @param {string} password
+ * @returns {Promise<{ uid: string, email: string, username: string }>}
+ */
+export async function createUserWithSecondaryApp(username, password) {
+  if (!isFirebase) {
+    throw new Error("Tạo tài khoản Firebase chỉ khả dụng khi kết nối Firebase.");
+  }
+  const raw = String(username || "").trim().toLowerCase();
+  const email = raw.endsWith("@hoithi.local") ? raw : usernameToEmail(raw);
+  if (!password || password.length < 6) {
+    throw new Error("Mật khẩu phải có ít nhất 6 ký tự.");
+  }
+
+  const { initializeApp, deleteApp } = await import(
+    "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"
+  );
+  const { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } = await import(
+    "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js"
+  );
+
+  const secAppName = `sec_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const secApp = initializeApp(firebaseConfig, secAppName);
+  try {
+    const secAuth = getAuth(secApp);
+    const cred = await createUserWithEmailAndPassword(secAuth, email, password);
+    const uid = cred.user.uid;
+    try {
+      await signOut(secAuth);
+    } catch {}
+    return { uid, email, username: email.replace("@hoithi.local", "") };
+  } catch (err) {
+    if (err.code === "auth/email-already-in-use") {
+      // The Auth user exists (created in the console or by an earlier run):
+      // with the right password we can still recover its uid and grant a role.
+      try {
+        const cred = await signInWithEmailAndPassword(getAuth(secApp), email, password);
+        const uid = cred.user.uid;
+        try {
+          await signOut(getAuth(secApp));
+        } catch {}
+        return { uid, email, username: email.replace("@hoithi.local", ""), existed: true };
+      } catch {
+        // Wrong password for the existing user: report it as already existing.
+      }
+      const customErr = new Error(`Tài khoản "${username}" đã tồn tại trên Firebase Authentication.`);
+      customErr.code = "auth/email-already-in-use";
+      throw customErr;
+    }
+    if (err.code === "auth/weak-password") {
+      throw new Error("Mật khẩu quá yếu (phải có ít nhất 6 ký tự).");
+    }
+    throw new Error(`Lỗi tạo tài khoản: ${err.message}`);
+  } finally {
+    try {
+      await deleteApp(secApp);
+    } catch {}
+  }
+}
+
+/**
+ * Subscribes to auth state changes on a portal.
+ * @param {string} portal
+ * @param {(user: any) => void} callback
+ * @returns {() => void}
+ */
+export function onPortalAuthStateChanged(portal = "host", callback) {
+  if (!isFirebase) return () => {};
+  let unsub = () => {};
+  getOrCreatePortalInstance(portal).then(({ auth }) => {
+    import("https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js").then(
+      ({ onAuthStateChanged }) => {
+        unsub = onAuthStateChanged(auth, callback);
+      }
+    );
+  });
+  return () => unsub();
 }
 
 /**

@@ -25,6 +25,10 @@ export function getTeamInitials(name) {
     return "?";
   }
 
+  if (/\bT06\b/i.test(cleaned)) {
+    return "T06";
+  }
+
   // Police teams are named "Công an TP. X" / "Công an tỉnh X": use the place name.
   const place = cleaned
     .replace(/^công an\s+(thành phố|tp\.?|tỉnh)\s+/i, "")

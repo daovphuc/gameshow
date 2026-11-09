@@ -50,30 +50,61 @@ Hệ thống sử dụng cơ sở dữ liệu thời gian thực **Firebase Real
 3. Đặt tên dự án (ví dụ: `hoi-thi-pccc-2026`) rồi nhấn **Continue**.
 4. Ở bước Google Analytics, tắt mục này (không cần thiết) rồi nhấn **Create project**. Đợi vài giây rồi nhấn **Continue** để vào bảng điều khiển.
 
-### Bước 2: Kích hoạt Realtime Database
+### Bước 2: Kích hoạt Authentication (Xác thực) & Tạo tài khoản Dẫn chương trình (MC)
+1. Trong menu bên trái, tìm mục **Build (Xây dựng)** → chọn **Authentication**.
+2. Nhấn nút **Get started (Bắt đầu)**.
+3. Chọn tab **Sign-in method (Phương thức đăng nhập)** → chọn **Email/Password**.
+4. Bật công tắc kích hoạt đầu tiên (**Email/Password** - Enable) rồi nhấn **Save (Lưu)**. (Không cần bật Email link / passwordless).
+5. Chuyển sang tab **Users (Người dùng)** → nhấn nút **Add user (Thêm người dùng)**.
+6. Nhập:
+   - **Email**: `mc@hoithi.local`
+   - **Password**: Đặt mật khẩu đăng nhập ban đầu cho MC (ít nhất 6 ký tự).
+7. Nhấn **Add user**. Tài khoản MC ban đầu này sẽ được hệ thống tự động kích hoạt quyền quản trị Dẫn chương trình (`host`) ngay trong lần đăng nhập đầu tiên (cơ chế tự động Bootstrap).
+
+### Bước 3: Kích hoạt Realtime Database
 1. Trong menu bên trái, tìm mục **Build (Xây dựng)** → chọn **Realtime Database**.
 2. Nhấn nút **Create Database (Tạo cơ sở dữ liệu)**.
 3. Chọn vị trí máy chủ: chọn **Singapore (`asia-southeast1`)** để đảm bảo tốc độ phản hồi nhanh nhất và độ trễ thấp nhất tại Việt Nam. Nhấn **Next**.
 4. Chọn **Start in locked mode (Bắt đầu ở chế độ khóa)** → nhấn **Enable (Bật)**.
 
-### Bước 3: Cài đặt Quy tắc bảo mật (Database Rules)
+### Bước 4: Cài đặt Quy tắc bảo mật (Database Rules)
 1. Trong giao diện Realtime Database, chọn tab **Rules (Quy tắc)** ở phía trên.
 2. Sao chép toàn bộ nội dung từ file [`firebase/database.rules.json`](./firebase/database.rules.json) trong thư mục dự án và dán đè vào ô soạn thảo Rules:
 ```json
 {
   "rules": {
-    ".read": true,
+    ".read": false,
+    ".write": false,
+    "roles": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'host'",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && ((root.child('roles').child(auth.uid).child('role').val() === 'host') || (!root.child('roles').exists() && newData.child('role').val() === 'host' && $uid === auth.uid))"
+      }
+    },
     "content": {
-      ".write": true
+      ".read": "auth != null && root.child('roles').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'host'"
     },
     "live": {
-      ".write": true
+      ".read": "auth != null && root.child('roles').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'host'",
+      "judgeScores": {
+        "$round": {
+          "$team": {
+            "$judgeId": {
+              ".write": "auth != null && (root.child('roles').child(auth.uid).child('role').val() === 'host' || root.child('roles').child(auth.uid).child('role').val() === 'head_judge' || (root.child('roles').child(auth.uid).child('role').val() === 'judge' && root.child('roles').child(auth.uid).child('ref_id').val() === $judgeId))"
+            }
+          }
+        }
+      }
     },
     "answers": {
-      ".write": "!newData.exists()",
+      ".read": "auth != null && root.child('roles').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'host' && !newData.exists()",
       "$questionKey": {
         "$teamId": {
-          ".write": "!data.exists() && newData.exists() && $questionKey === root.child('live/round2/questionKey').val() && root.child('live/round2/status').val() === 'open' && (!root.child('live/round2/deadline').exists() || now <= root.child('live/round2/deadline').val()) && newData.child('answeredAt').val() === now"
+          ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'team' && root.child('roles').child(auth.uid).child('ref_id').val() === $teamId && !data.exists() && newData.exists() && $questionKey === root.child('live/round2/questionKey').val() && root.child('live/round2/status').val() === 'open' && (!root.child('live/round2/deadline').exists() || now <= root.child('live/round2/deadline').val()) && newData.child('answeredAt').val() === now"
         }
       }
     }
@@ -81,14 +112,14 @@ Hệ thống sử dụng cơ sở dữ liệu thời gian thực **Firebase Real
 }
 ```
 3. Nhấn nút **Publish (Xuất bản)**.
-   > **Tác dụng của quy tắc:**
-   > - Cho phép mọi thiết bị đọc cấu hình nội dung và trạng thái thi đấu trực tiếp.
-   > - Cho phép MC cập nhật cấu hình nội dung (`content`) và điều khiển trận đấu (`live`).
-   > - Nghiêm cấm đội thi gửi đáp án lần 2 (chống sửa đáp án đã chọn).
-   > - Tự động từ chối đáp án gửi sau khi hết thời gian đếm ngược (`now <= deadline`).
-   > - Cho phép người dẫn chương trình xóa câu trả lời cũ khi chuyển câu hỏi mới.
+   > **Tác dụng của quy tắc bảo mật:**
+   > - Chặn đọc/ghi công khai tại gốc (`.read: false`, `.write: false`). Chỉ người dùng đã đăng nhập và được cấp quyền (`roles/<uid>`) mới đọc được dữ liệu hội thi.
+   > - Phân quyền ghi tuyệt đối: Chỉ Dẫn chương trình (`host`) mới được chỉnh sửa cấu hình nội dung (`content`) và điều khiển trận đấu (`live`).
+   > - Ban Giám khảo (`judge`) chỉ có quyền ghi phiếu điểm của chính mình (`live/judgeScores/.../$judgeId`); Giám khảo tổng (`head_judge`) và Host có quyền ghi điểm cho mọi giám khảo.
+   > - Đội thi (`team`) chỉ được phép gửi duy nhất 1 lần đáp án của chính đội mình ở câu hỏi đang mở trước thời hạn đếm ngược (`now <= deadline`).
+   > - Chỉ Dẫn chương trình mới có quyền xóa (`reset`) dữ liệu câu trả lời cũ (`answers`).
 
-### Bước 4: Lấy thông tin cấu hình Web App (Firebase Config)
+### Bước 5: Lấy thông tin cấu hình Web App (Firebase Config)
 1. Nhấn vào biểu tượng **Bánh răng cài đặt** ở góc trên menu bên trái → chọn **Project settings (Cài đặt dự án)**.
 2. Cuộn xuống mục **Your apps (Ứng dụng của bạn)**, bấm vào biểu tượng Web **`</>`**.
 3. Đặt tên ứng dụng (ví dụ: `gameshow-pccc`), **không** chọn *Firebase Hosting*, rồi nhấn **Register app (Đăng ký ứng dụng)**.
@@ -105,21 +136,10 @@ const firebaseConfig = {
 };
 ```
 
-### Bước 5: Điền vào file `js/firebase-config.js`
-1. Mở file [`js/firebase-config.js`](./js/firebase-config.js) trong mã nguồn dự án.
-2. Dán các giá trị tương ứng vào:
-```javascript
-export const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "hoi-thi-pccc-2026.firebaseapp.com",
-  databaseURL: "https://hoi-thi-pccc-2026-asia-southeast1.firebasedatabase.app",
-  projectId: "hoi-thi-pccc-2026",
-  storageBucket: "hoi-thi-pccc-2026.appspot.com",
-  messagingSenderId: "123456789...",
-  appId: "1:123456789...:web:..."
-};
-```
-3. Lưu file và đẩy lên GitHub. Thông tin này là định danh công khai phía client của Firebase, hoàn toàn an toàn khi xuất bản trên GitHub Pages.
+### Bước 6: Điền vào file `js/firebase-config.js` & Đăng nhập tạo tài khoản
+1. Mở file [`js/firebase-config.js`](./js/firebase-config.js) trong mã nguồn dự án và điền thông tin config ở Bước 5.
+2. Mở `index.html`, đăng nhập bằng tài khoản `mc` với mật khẩu đã tạo ở Bước 2. Hệ thống sẽ tự động gán quyền `host` cho tài khoản này.
+3. Vào trang **Cấu hình nội dung (`content.html`)** → chọn tab **Tài khoản** để tạo thêm các tài khoản Giám khảo, Đội thi (hoặc nhấn **"📁 Tạo hàng loạt từ CSV"**).
 
 ---
 
@@ -129,13 +149,20 @@ Hệ thống tích hợp sẵn trình soạn thảo nội dung trực quan cho M
 
 Toàn bộ dữ liệu được lưu trữ tại nút `content/` trên Firebase Realtime Database (hoặc bộ nhớ nội bộ ở chế độ Local Mode) và tự động đồng bộ tức thì tới tất cả các màn hình:
 
-1. **Đội thi**: Thêm, sửa tên, xóa đội thi, chọn màu sắc đại diện và ảnh đại diện của đội (hỗ trợ gợi ý danh sách 35 đội thi có sẵn). Ảnh không tải lên database: chép file ảnh vào thư mục `images/` của dự án rồi commit, sau đó nhập tên file (ví dụ `doi01.png`) hoặc một link https vào ô ảnh; trang hiển thị ảnh xem trước. Ảnh câu hỏi các vòng dùng cùng cách này.
-2. **Thứ tự thi (Phân vòng & Xếp lượt)**: Cấu hình danh sách đội tham gia và số thứ tự thi riêng biệt cho từng Vòng 1, Vòng 2 và Vòng 3. Hỗ trợ chọn/bỏ chọn đội tham gia, đổi vị trí lên/xuống (Move Up/Down), và đặt lại thứ tự mặc định.
-3. **Vòng 1**: Chỉnh sửa các gói câu hỏi (tên gói, đội sở hữu, nội dung câu hỏi, thời gian và điểm số).
-4. **Vòng 2**: Chỉnh sửa ngân hàng câu hỏi trắc nghiệm chia theo từng bộ đề (nội dung câu hỏi, 4 phương án lựa chọn A/B/C/D, đáp án đúng, thời gian làm bài).
-5. **Vòng 3**: Quản lý danh sách các ô tình huống truyền thông (số thứ tự ô, nội dung tình huống, thời gian suy nghĩ và điểm số).
+1. **Đội thi**: Thêm, sửa tên, xóa đội thi, chọn màu sắc đại diện và ảnh đại diện của đội (hỗ trợ gợi ý danh sách 35 đội thi có sẵn theo đúng danh mục Công an các tỉnh, thành phố và các Trường CAND). Ảnh không tải lên database: chép file ảnh vào thư mục `images/` của dự án rồi commit, sau đó nhập tên file (ví dụ `doi01.png`) hoặc một link https vào ô ảnh; trang hiển thị ảnh xem trước.
+2. **Thứ tự thi & Phân cụm thi đấu (Clusters)**:
+   - Cấu hình danh sách đội tham gia và số thứ tự thi riêng biệt cho toàn bộ hội thi (`contest`) và từng vòng thi (`round1`, `round2`, `round3`).
+   - Tích hợp sẵn nút chọn cụm nhanh: **Cụm 1** (12 đội — Học viện CSND, Hà Nội), **Cụm 2** (12 đội — Công an tỉnh Quảng Ngãi), **Cụm 3** (11 đội — Công an tỉnh Tây Ninh), và **Chung kết** (Khánh Hòa) theo đúng Kế hoạch số 204/KH-BCA-C07.
+   - Khi chọn cụm, hệ thống tự động thiết lập danh sách thứ tự thi của tất cả các vòng và tự động đồng bộ dòng phụ đề hội thi (`show_subtitle`) hiển thị thời gian, địa điểm thi đấu lên đầu các màn hình máy chiếu (`host.html`, `round1.html`, `round2.html`, `round3.html`, `leaderboard.html`, `scores.html`). Dữ liệu cấu hình cụm được lưu tại `data/sample/clusters.csv`.
+3. **Vòng 1 (Tuyên truyền)**: Chỉnh sửa các gói câu hỏi (tên gói, đội sở hữu, nội dung câu hỏi, thời gian 15 phút và thang điểm tối đa 50đ gồm 45đ nội dung + 5đ hình thức).
+4. **Vòng 2 (Trắc nghiệm)**:
+   - Chỉnh sửa ngân hàng câu hỏi trắc nghiệm chia theo từng bộ đề, bao gồm bộ **"Chạy thử"** (10 câu: 4 Kiểm tra, 3 Tuyên truyền, 2 Xử phạt, 1 Điều tra) và các bộ đề chính thức.
+   - Hỗ trợ câu hỏi 4 phương án (A, B, C, D) hoặc câu hỏi 2 phương án (A, B - dạng Đúng/Sai hoặc Có/Không), tự động ẩn các nút lựa chọn C, D trên màn hình iPad của đội thi.
+   - Quản lý trường **Lĩnh vực (`category`)** (Kiểm tra, Tuyên truyền, Xử phạt, Điều tra) với bộ lọc chuyên biệt, và **Căn cứ pháp lý / Giải thích (`explanation`)**.
+   - Bảo mật thông tin: iPad đội thi (`team.html`) không bao giờ nhận được đáp án đúng hoặc nội dung giải thích trước khi câu hỏi được công bố (reveal). Khi MC mở đáp án, máy chiếu sân khấu hiển thị đáp án đúng, trích dẫn pháp lý chi tiết và bảng thống kê kết quả, thời gian phản hồi của từng đội thi.
+5. **Vòng 3 (Xử lý tình huống)**: Quản lý danh sách các ô tình huống truyền thông (số thứ tự ô, nội dung tình huống, thời gian suy nghĩ 2 phút + trả lời 5 phút và điểm số tối đa 30đ gồm 25đ nội dung + 5đ hình thức).
 6. **Ban Giám khảo**: Thêm, sửa họ tên và mã định danh của các thành viên Ban Giám khảo.
-7. **Tài khoản**: Thêm, sửa tài khoản đăng nhập (tên đăng nhập, mật khẩu, vai trò và đối tượng liên kết; hỗ trợ vai trò `head_judge` cho Giám khảo tổng) hoặc bấm **"⚡ Tạo lại tài khoản mặc định"** để tự động tạo tài khoản cho MC, các giám khảo, giám khảo tổng và các đội thi.
+7. **Tài khoản**: Quản lý phân quyền tài khoản (vai trò, đối tượng liên kết, tên hiển thị) và tạo tài khoản Firebase Authentication trực tiếp trong ứng dụng. Hỗ trợ tạo từng tài khoản hoặc tạo hàng loạt từ file CSV. Ở chế độ Local Mode, hỗ trợ thêm/sửa/tạo tài khoản thử nghiệm trực tiếp.
 8. **Cài đặt chung**: Điều chỉnh tên hội thi, tiêu đề phụ, thời gian đếm ngược, điểm trắc nghiệm mỗi câu đúng Vòng 2 và thang điểm từng vòng thi.
 
 ### Các nút chức năng tiện ích:
@@ -145,51 +172,59 @@ Toàn bộ dữ liệu được lưu trữ tại nút `content/` trên Firebase 
 
 ---
 
-## 4. Quản Lý Tài Khoản Đăng Nhập
+## 4. Quản Lý Tài Khoản Đăng Nhập & Phân Quyền Bảo Mật
 
-Hệ thống sử dụng cơ chế tài khoản riêng biệt để phân quyền tự động cho từng thiết bị:
+Hệ thống sử dụng cơ chế bảo mật kết hợp giữa **Firebase Authentication (Email/Password)** và cây phân quyền **`roles/<uid>`** trên Firebase Realtime Database:
 
-- `username`: Tên đăng nhập (không phân biệt chữ hoa, chữ thường).
-- `password`: Mật khẩu đăng nhập dạng văn bản thuần (plain-text).
-- `role`: Vai trò người dùng, gồm 4 giá trị: `host` (Dẫn chương trình), `judge` (Ban Giám khảo), `head_judge` (Giám khảo tổng), `team` (Đội thi).
-- `ref_id`: Mã giám khảo (vd: `gk-01`) hoặc mã đội (vd: `doi-01`); để trống đối với vai trò `host` và `head_judge`.
-- `display_name`: Tên hiển thị người dùng (tùy chọn, tự động lấy theo tên giám khảo/đội thi nếu để trống).
+- **Bảo mật mật khẩu tuyệt đối**: Mật khẩu được mã hóa an toàn trên dịch vụ Firebase Authentication, hoàn toàn **không lưu trữ trong cơ sở dữ liệu** và **không lưu trong mã nguồn repo**.
+- **Trải nghiệm đăng nhập thuận tiện**: Người dùng chỉ cần nhập tên đăng nhập ngắn gọn (như `mc`, `gk1`, `gktong`, `doi01`) cùng mật khẩu. Hệ thống tự động chuyển đổi tên đăng nhập sang email nội bộ `<username>@hoithi.local` (chữ thường, cắt khoảng trắng thừa).
+- **Phân quyền vai trò (`roles/<uid>`)**:
+  - `username`: Tên đăng nhập của người dùng.
+  - `role`: Một trong 4 vai trò: `host` (Dẫn chương trình), `judge` (Ban Giám khảo), `head_judge` (Giám khảo tổng), `team` (Đội thi).
+  - `ref_id`: Mã giám khảo (vd: `gk-01`) hoặc mã đội (vd: `doi-01`); để trống đối với vai trò `host` và `head_judge`.
+  - `display_name`: Tên hiển thị người dùng (tùy chọn, tự động lấy theo tên giám khảo/đội thi nếu để trống).
+- **Kiểm soát truy cập cổng (Access Control)**: Sau khi đăng nhập, hệ thống đọc bản ghi `roles/<uid>`. Nếu tài khoản chưa được cấp quyền, hệ thống sẽ tự động đăng xuất và thông báo `"Tài khoản chưa được cấp quyền"`. Mỗi cổng (`host.html`, `judge.html`, `team.html`) chỉ cho phép tài khoản có vai trò phù hợp truy cập.
+- **Duy trì phiên đa cổng đồng thời**: Mỗi cổng sử dụng một phiên Firebase App độc lập (`portal_host`, `portal_judge`, `portal_team`), cho phép người điều hành đăng nhập đồng thời cả Host, Giám khảo và Đội thi trên cùng một trình duyệt để kiểm thử mà không bị xung đột phiên.
 
-> ⚠️ **Cảnh báo bảo mật:**
-> Mật khẩu được lưu trữ dưới dạng văn bản thuần nhằm tạo sự tiện lợi tối đa cho Ban tổ chức không chuyên về kỹ thuật. Đây là cơ chế ngăn khán giả hoặc người lạ bấm nhầm vào trang điều khiển/chấm điểm. Cơ sở dữ liệu `content/` ở chế độ đọc công khai cho toàn bộ thiết bị dự thi.
+### Quản trị tài khoản trên trang Cấu hình nội dung (`content.html`)
+Dẫn chương trình (`host`) có toàn quyền quản lý tài khoản tại tab **"Tài khoản"**:
+1. **Xem danh sách**: Hiển thị toàn bộ tài khoản đã được cấp quyền, vai trò và đối tượng liên kết.
+2. **Tạo 1 tài khoản**: Nhập tên đăng nhập, mật khẩu (tối thiểu 6 ký tự), vai trò và đối tượng liên kết. Hệ thống sử dụng ứng dụng phụ để tạo người dùng trên Firebase Auth mà không làm gián đoạn phiên làm việc của Host, sau đó ghi bản ghi phân quyền `roles/<uid>`.
+3. **📁 Tạo hàng loạt từ CSV**: Tải lên hoặc dán nội dung CSV với cấu trúc các cột `username,password,role,ref_id,display_name`. Hệ thống lần lượt tạo tài khoản và hiển thị bảng kết quả chi tiết từng dòng (Thành công / Đã tồn tại / Lỗi) bằng tiếng Việt.
+4. **Chỉnh sửa & Thu hồi quyền**:
+   - Host có thể cập nhật vai trò, đối tượng liên kết hoặc tên hiển thị của tài khoản.
+   - Nút **"Thu hồi quyền"** sẽ xóa bản ghi `roles/<uid>`, lập tức chặn truy cập của tài khoản đó. Để xóa vĩnh viễn tài khoản Auth, thực hiện trên Firebase Console.
+5. **Đổi mật khẩu & Đặt lại mật khẩu**:
+   - Mọi người dùng đã đăng nhập đều có thể tự đổi mật khẩu của mình bằng nút **"🔑 Đổi mật khẩu"** trên thanh bên (sidebar) hoặc thanh tiêu đề (header).
+   - Host **không thể xem hay đặt lại mật khẩu của người khác**. Để đặt lại mật khẩu cho một tài khoản bị quên, hãy xóa tài khoản đó trong Firebase Console (Authentication) rồi tạo lại trong ứng dụng.
 
-### Tài khoản mặc định (khi cơ sở dữ liệu trống hoặc bấm tạo lại)
-Hệ thống tự động khởi tạo các tài khoản mặc định sau với mật khẩu chung là `122345678910`:
-- **Dẫn chương trình:** `mc`
-- **Ban Giám khảo:** `gk1`, `gk2`, `gk3`... (tự động liên kết tương ứng từng giám khảo)
-- **Giám khảo tổng:** `gktong` (vai trò `head_judge`)
-- **Đội thi đấu:** `doi01`..`doi35` (tự động liên kết tương ứng từng đội)
-
-### Cơ chế ghi nhớ phiên và đồng bộ
-- Người dùng chỉ cần đăng nhập một lần trên thiết bị; thông tin đăng nhập được lưu an toàn trên máy cho đến khi bấm **"Đăng xuất"** (nút đăng xuất hiển thị rõ tên tài khoản hiện tại).
-- Giám khảo, giám khảo tổng và đội thi khi đăng nhập sẽ vào thẳng giao diện của mình, loại bỏ hoàn toàn bước chọn danh tính thủ công.
-- Bất kỳ ai truy cập trực tiếp vào trang của cổng thi mà chưa đăng nhập đúng vai trò sẽ tự động được chuyển hướng về trang chủ `index.html`.
-- Khi Ban tổ chức chỉnh sửa tài khoản hoặc đổi mật khẩu trong trang cấu hình nội dung, thay đổi sẽ có hiệu lực ngay lập tức.
+### Chế độ thử trên 1 máy (Local Mode)
+- Khi `databaseURL` để trống hoặc chưa cấu hình Firebase, hệ thống tự động chạy ở chế độ **Local Mode** lưu dữ liệu trong `localStorage` và đồng bộ qua `BroadcastChannel`.
+- Mật khẩu mẫu trong file `data/sample/accounts.csv` (như `122345678910`) **chỉ áp dụng cho chế độ Local Mode** phục vụ chạy thử nghiệm. Khi triển khai trên Firebase thật, Ban tổ chức tự đặt mật khẩu thực tế khi tạo tài khoản.
 
 ---
 
 ## 5. Quy Tắc Chấm Điểm & Xếp Hạng (Điều 21 & Điều 22)
 
-Hệ thống tự động thực hiện đầy đủ các quy định theo Thể lệ hội thi:
+Hệ thống tự động thực hiện đầy đủ các quy định theo Thể lệ hội thi (xem bảng đối chiếu chi tiết toàn bộ 27 điều khoản tại [`docs/doi-chieu-dieu-le.md`](./docs/doi-chieu-dieu-le.md)):
 
-1. **Vòng 1 & Vòng 3 (Điểm Giám Khảo & Điểm Trừ - Điều 19 & 21)**:
+1. **Vòng 1 & Vòng 3 (Điểm Giám Khảo & Điểm Phạt - Điều 19, 20 & 21)**:
    - Điểm của đội là trung bình cộng điểm chấm của các Giám khảo (Nội dung + Hình thức) trừ đi Điểm phạt do vi phạm quy chế hoặc quá thời gian quy định.
+   - Thang điểm: Vòng 1 tối đa 50 điểm (45 điểm nội dung + 5 điểm hình thức), thời gian 15 phút. Vòng 3 tối đa 30 điểm (25 điểm nội dung + 5 điểm hình thức), thời gian suy nghĩ 2 phút + trả lời 5 phút.
+   - Trừ điểm thời gian (Điều 19): Quá từ 01s đến 30s trừ 0.5 điểm; quá từ 31s đến 60s trừ 1.0 điểm; quá trên 60s trừ 2.0 điểm (được hỗ trợ tính và nhập tại trang `scores.html`).
+   - Xử lý vi phạm (Điều 20): Trừ 2.0 điểm nếu dùng tài liệu không được phép; hủy kết quả phần thi (0 điểm) nếu có hành vi gian lận.
    - Các giám khảo chưa bấm gửi điểm sẽ tự động bị loại khỏi mẫu số tính trung bình.
    - Khi có các đội bằng điểm nhau ở Vòng 1 hoặc Vòng 3: Đội có điểm trung bình phần **Nội dung** cao hơn sẽ được xếp trên.
 
-2. **Vòng 2 (Trắc nghiệm tương tác - Điều 15)**:
+2. **Vòng 2 (Trắc nghiệm tương tác - Điều 15 & Điều 21.2.b)**:
    - Mỗi câu trả lời đúng trong thời gian quy định (mặc định 30 giây) nhận điểm cố định (mặc định 2 điểm/câu, cấu hình qua `round2_points_per_correct`).
    - Trả lời sai, quá thời gian quy định hoặc không trả lời nhận 0 điểm.
    - Tổng điểm Vòng 2 là tổng điểm của các câu trả lời đúng (tối đa 20 điểm với bộ đề 10 câu).
-   - **Thống kê & Xếp hạng Vòng 2**: Bảng thống kê xếp hạng Vòng 2 được sắp xếp theo các tiêu chí ưu tiên:
-     1. Điểm số Vòng 2 cao hơn (nhiều điểm hơn xếp trên).
-     2. Tổng thời gian trả lời của các câu trả lời đúng ngắn hơn (trả lời đúng nhanh hơn xếp trên).
-     3. Thứ tự đội thi / bốc thăm ban đầu.
+   - **Thống kê & Xếp hạng Vòng 2 (Điều 21.2.b)**: Bảng thống kê xếp hạng Vòng 2 được sắp xếp theo các tiêu chí ưu tiên:
+     1. Điểm số Vòng 2 cao hơn (nhiều câu đúng hơn xếp trên).
+     2. Số lần đưa ra câu trả lời đúng nhanh nhất nhiều hơn (`fastestCount` cao hơn xếp trên).
+     3. Tổng thời gian trả lời của các câu trả lời đúng ngắn hơn (trả lời đúng nhanh hơn xếp trên).
+     4. Thứ tự đội thi / bốc thăm ban đầu.
    - Bảng thống kê hiển thị sau khi MC công bố đáp án và có thể mở lại bất cứ lúc nào qua nút "📊 Thống kê Vòng 2" trên màn hình `round2.html`, đồng thời xuất hiện trên trang "Điểm số" (`scores.html`) và trong file báo cáo CSV xuất ra.
 
 3. **Bảng tổng sắp toàn đoàn (Điều 22)**:

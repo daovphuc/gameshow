@@ -1,0 +1,5 @@
+id,name,venue,date,subtitle,team_ids
+cum-1,Cụm 1,Học viện PCCC và CNCH (T06),26-27/11/2026,Cụm 1 – Ngày 26-27/11/2026 tại Học viện PCCC và CNCH (T06),"doi-09,doi-08,doi-07,doi-10,doi-11,doi-12,doi-13,doi-01,doi-15,doi-16,doi-14,doi-35"
+cum-2,Cụm 2,Công an tỉnh Quảng Ngãi,19-20/11/2026,Cụm 2 – Ngày 19-20/11/2026 tại Công an tỉnh Quảng Ngãi,"doi-18,doi-17,doi-02,doi-19,doi-21,doi-22,doi-20,doi-23,doi-03,doi-26,doi-24,doi-04"
+cum-3,Cụm 3,Công an tỉnh Tây Ninh,30/11-01/12/2026,Cụm 3 – Ngày 30/11-01/12/2026 tại Công an tỉnh Tây Ninh,"doi-29,doi-27,doi-28,doi-25,doi-05,doi-33,doi-34,doi-30,doi-32,doi-31,doi-06"
+chung-ket,Chung kết,Công an tỉnh Khánh Hòa,10-11/12/2026,Vòng Chung kết – Ngày 10-11/12/2026 tại Công an tỉnh Khánh Hòa,

@@ -3,10 +3,44 @@ import assert from "node:assert/strict";
 import {
   normaliseJudges,
   clampScore,
+  calculateOvertimePenalty,
   calculateTeamRoundScore,
   compareRound1Or3Teams,
   buildPerJudgeScoreWrites
 } from "../js/judges.js";
+
+test("calculateOvertimePenalty calculates penalties and disqualification per Điều 19 & Điều 20", () => {
+  // Round 1:
+  // <30s: 0 penalty, not disqualified
+  assert.deepEqual(calculateOvertimePenalty("1", 0), { penalty: 0, disqualified: false });
+  assert.deepEqual(calculateOvertimePenalty("round1", 29), { penalty: 0, disqualified: false });
+  // 30..60s: -0.5
+  assert.deepEqual(calculateOvertimePenalty("round1", 30), { penalty: 0.5, disqualified: false });
+  assert.deepEqual(calculateOvertimePenalty("1", 60), { penalty: 0.5, disqualified: false });
+  // 61..120s: -1.0
+  assert.deepEqual(calculateOvertimePenalty("1", 61), { penalty: 1.0, disqualified: false });
+  assert.deepEqual(calculateOvertimePenalty("1", 120), { penalty: 1.0, disqualified: false });
+  // 121..180s: -3.0
+  assert.deepEqual(calculateOvertimePenalty("round1", 121), { penalty: 3.0, disqualified: false });
+  assert.deepEqual(calculateOvertimePenalty("1", 180), { penalty: 3.0, disqualified: false });
+  // >180s: disqualified (Điều 20)
+  assert.deepEqual(calculateOvertimePenalty("1", 181), { penalty: 0, disqualified: true });
+
+  // Round 3:
+  // <15s: 0 penalty
+  assert.deepEqual(calculateOvertimePenalty("3", 14), { penalty: 0, disqualified: false });
+  // 15..30s: -0.5
+  assert.deepEqual(calculateOvertimePenalty("3", 15), { penalty: 0.5, disqualified: false });
+  assert.deepEqual(calculateOvertimePenalty("round3", 30), { penalty: 0.5, disqualified: false });
+  // 31..60s: -1.0
+  assert.deepEqual(calculateOvertimePenalty("3", 31), { penalty: 1.0, disqualified: false });
+  assert.deepEqual(calculateOvertimePenalty("3", 60), { penalty: 1.0, disqualified: false });
+  // 61..90s: -2.0
+  assert.deepEqual(calculateOvertimePenalty("round3", 61), { penalty: 2.0, disqualified: false });
+  assert.deepEqual(calculateOvertimePenalty("3", 90), { penalty: 2.0, disqualified: false });
+  // >90s: disqualified (Điều 20)
+  assert.deepEqual(calculateOvertimePenalty("3", 91), { penalty: 0, disqualified: true });
+});
 
 test("Judge scores: average of judges' content+manner minus penalty; judges who have not scored are excluded; values outside 0..max are clamped; round 1/3 tie broken by content", () => {
   // 1. Clamping check: values outside 0..max are clamped

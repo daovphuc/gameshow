@@ -51,6 +51,63 @@ export function normaliseJudges(input = []) {
 }
 
 /**
+ * Calculates overtime penalty and qualification status per Điều 19 & Điều 20.
+ * Round 1:
+ * - 30s..60s: -0.5 points
+ * - 61s..120s: -1.0 point
+ * - 121s..180s: -3.0 points
+ * - >180s: disqualified (Điều 20)
+ *
+ * Round 3:
+ * - 15s..30s: -0.5 points
+ * - 31s..60s: -1.0 point
+ * - 61s..90s: -2.0 points
+ * - >90s: disqualified (Điều 20)
+ *
+ * @param {string|number} round
+ * @param {number} overtimeSeconds
+ * @returns {{ penalty: number, disqualified: boolean }}
+ */
+export function calculateOvertimePenalty(round, overtimeSeconds) {
+  const r = String(round || "").toLowerCase();
+  const ot = Math.max(0, Number(overtimeSeconds) || 0);
+
+  if (r === "1" || r === "round1") {
+    if (ot > 180) {
+      return { penalty: 0, disqualified: true };
+    }
+    if (ot >= 121) {
+      return { penalty: 3.0, disqualified: false };
+    }
+    if (ot >= 61) {
+      return { penalty: 1.0, disqualified: false };
+    }
+    if (ot >= 30) {
+      return { penalty: 0.5, disqualified: false };
+    }
+    return { penalty: 0, disqualified: false };
+  }
+
+  if (r === "3" || r === "round3") {
+    if (ot > 90) {
+      return { penalty: 0, disqualified: true };
+    }
+    if (ot >= 61) {
+      return { penalty: 2.0, disqualified: false };
+    }
+    if (ot >= 31) {
+      return { penalty: 1.0, disqualified: false };
+    }
+    if (ot >= 15) {
+      return { penalty: 0.5, disqualified: false };
+    }
+    return { penalty: 0, disqualified: false };
+  }
+
+  return { penalty: 0, disqualified: false };
+}
+
+/**
  * Calculates a team's Round 1 or Round 3 score:
  * - Average of judges' (content + manner) across judges who scored.
  * - Judges who have not scored are excluded.

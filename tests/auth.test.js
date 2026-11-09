@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import "./rules.test.js";
 import {
   DEFAULT_PASSWORD,
   PORTALS,
@@ -11,8 +12,14 @@ import {
   normaliseAccounts,
   resolveAccounts,
   saveActiveSession,
-  validateSession
+  validateSession,
+  usernameToEmail,
+  emailToUsername,
+  isRoleAllowedForPortal,
+  checkPortalAccess,
+  parseBulkAccountsCsv
 } from "../js/auth.js";
+import { serializeContentForSave } from "../js/content.js";
 
 const sampleJudges = [
   { id: "gk-01", name: "Ban Giám khảo 1" },
@@ -294,3 +301,206 @@ test("Each role keeps its own login slot so one browser can hold host, judge and
   assert.equal(getActiveSession(storage), null);
   assert.equal(getActiveSession(storage, "host").username, "mc");
 });
+
+test("usernameToEmail maps username to lowercase @hoithi.local email, trims, and rejects empty or invalid chars", () => {
+  // Trimming and lowercase
+  assert.equal(usernameToEmail("mc"), "mc@hoithi.local");
+  assert.equal(usernameToEmail("  mc  "), "mc@hoithi.local");
+  assert.equal(usernameToEmail("MC"), "mc@hoithi.local");
+  assert.equal(usernameToEmail("GK1"), "gk1@hoithi.local");
+  assert.equal(usernameToEmail("  Doi01  "), "doi01@hoithi.local");
+  assert.equal(usernameToEmail("gk_truong-01.a"), "gk_truong-01.a@hoithi.local");
+
+  // Rejection of empty or non-string
+  assert.throws(() => usernameToEmail(""), /trống|không hợp lệ/i);
+  assert.throws(() => usernameToEmail("   "), /trống|không hợp lệ/i);
+  assert.throws(() => usernameToEmail(null), /không hợp lệ/i);
+  assert.throws(() => usernameToEmail(undefined), /không hợp lệ/i);
+
+  // Rejection of invalid characters
+  assert.throws(() => usernameToEmail("user name"), /không hợp lệ/i);
+  assert.throws(() => usernameToEmail("user@host"), /không hợp lệ/i);
+  assert.throws(() => usernameToEmail("user#123"), /không hợp lệ/i);
+  assert.throws(() => usernameToEmail("user$"), /không hợp lệ/i);
+  assert.throws(() => usernameToEmail("user/test"), /không hợp lệ/i);
+
+  // emailToUsername helper
+  assert.equal(emailToUsername("mc@hoithi.local"), "mc");
+  assert.equal(emailToUsername("GK1@HOITHI.LOCAL"), "gk1");
+});
+
+test("Portal access check per role: host, judge, head_judge, team; unknown role rejected", () => {
+  // Host portal
+  assert.equal(isRoleAllowedForPortal("host", "host"), true);
+  assert.equal(isRoleAllowedForPortal("HOST", "host"), true);
+  assert.equal(isRoleAllowedForPortal("judge", "host"), false);
+  assert.equal(isRoleAllowedForPortal("head_judge", "host"), false);
+  assert.equal(isRoleAllowedForPortal("team", "host"), false);
+
+  // Judge portal: judge and head_judge allowed
+  assert.equal(isRoleAllowedForPortal("judge", "judge"), true);
+  assert.equal(isRoleAllowedForPortal("JUDGE", "judge"), true);
+  assert.equal(isRoleAllowedForPortal("head_judge", "judge"), true);
+  assert.equal(isRoleAllowedForPortal("HEAD_JUDGE", "judge"), true);
+  assert.equal(isRoleAllowedForPortal("host", "judge"), false);
+  assert.equal(isRoleAllowedForPortal("team", "judge"), false);
+
+  // Team portal: team only
+  assert.equal(isRoleAllowedForPortal("team", "team"), true);
+  assert.equal(isRoleAllowedForPortal("TEAM", "team"), true);
+  assert.equal(isRoleAllowedForPortal("host", "team"), false);
+  assert.equal(isRoleAllowedForPortal("judge", "team"), false);
+  assert.equal(isRoleAllowedForPortal("head_judge", "team"), false);
+
+  // Unknown role or unknown portal rejected
+  assert.equal(isRoleAllowedForPortal("unknown", "host"), false);
+  assert.equal(isRoleAllowedForPortal("guest", "judge"), false);
+  assert.equal(isRoleAllowedForPortal("", "team"), false);
+  assert.equal(isRoleAllowedForPortal("host", "unknown"), false);
+
+  // checkPortalAccess helper
+  assert.equal(checkPortalAccess("host", "host").ok, true);
+  assert.equal(checkPortalAccess("judge", "judge").ok, true);
+  assert.equal(checkPortalAccess("head_judge", "judge").ok, true);
+  assert.equal(checkPortalAccess("team", "team").ok, true);
+  assert.equal(checkPortalAccess("guest", "host").ok, false);
+  assert.equal(checkPortalAccess("team", "host").ok, false);
+});
+
+test("Bulk-create CSV parsing/validation with Vietnamese error messages", () => {
+  const context = {
+    judges: [
+      { id: "gk-01", name: "Ban Giám khảo 1" },
+      { id: "gk-02", name: "Ban Giám khảo 2" }
+    ],
+    teams: [
+      { id: "doi-01", name: "Đội 1" },
+      { id: "doi-02", name: "Đội 2" }
+    ],
+    existingUsernames: ["mc"]
+  };
+
+  // 1. Missing password
+  const csvMissingPass = `username,password,role,ref_id,display_name
+gk1,,judge,gk-01,Ban Giám khảo 1`;
+  const resMissingPass = parseBulkAccountsCsv(csvMissingPass, context);
+  assert.equal(resMissingPass.ok, false);
+  assert.ok(
+    resMissingPass.errors.some((e) => e.includes("Thiếu mật khẩu")),
+    `Expected Vietnamese missing password error, got: ${JSON.stringify(resMissingPass.errors)}`
+  );
+
+  // 2. Password < 6 chars
+  const csvShortPass = `username,password,role,ref_id,display_name
+gk1,12345,judge,gk-01,Ban Giám khảo 1`;
+  const resShortPass = parseBulkAccountsCsv(csvShortPass, context);
+  assert.equal(resShortPass.ok, false);
+  assert.ok(
+    resShortPass.errors.some((e) => e.includes("ít nhất 6 ký tự")),
+    `Expected Vietnamese short password error, got: ${JSON.stringify(resShortPass.errors)}`
+  );
+
+  // 3. Unknown role
+  const csvUnknownRole = `username,password,role,ref_id,display_name
+user1,password123,moderator,,Người điều phối`;
+  const resUnknownRole = parseBulkAccountsCsv(csvUnknownRole, context);
+  assert.equal(resUnknownRole.ok, false);
+  assert.ok(
+    resUnknownRole.errors.some((e) => e.includes("không hợp lệ") && e.includes("moderator")),
+    `Expected Vietnamese unknown role error, got: ${JSON.stringify(resUnknownRole.errors)}`
+  );
+
+  // 4. Judge without ref_id
+  const csvJudgeNoRef = `username,password,role,ref_id,display_name
+gk1,password123,judge,,Ban Giám khảo 1`;
+  const resJudgeNoRef = parseBulkAccountsCsv(csvJudgeNoRef, context);
+  assert.equal(resJudgeNoRef.ok, false);
+  assert.ok(
+    resJudgeNoRef.errors.some((e) => e.includes("ref_id") || e.includes("liên kết")),
+    `Expected Vietnamese judge ref_id required error, got: ${JSON.stringify(resJudgeNoRef.errors)}`
+  );
+
+  // 5. Team without ref_id
+  const csvTeamNoRef = `username,password,role,ref_id,display_name
+doi01,password123,team,,Đội 1`;
+  const resTeamNoRef = parseBulkAccountsCsv(csvTeamNoRef, context);
+  assert.equal(resTeamNoRef.ok, false);
+  assert.ok(
+    resTeamNoRef.errors.some((e) => e.includes("ref_id") || e.includes("liên kết")),
+    `Expected Vietnamese team ref_id required error, got: ${JSON.stringify(resTeamNoRef.errors)}`
+  );
+
+  // 6. Duplicate username within CSV
+  const csvDuplicateWithin = `username,password,role,ref_id,display_name
+gk1,password123,judge,gk-01,Ban Giám khảo 1
+GK1,password456,judge,gk-02,Ban Giám khảo 2`;
+  const resDuplicateWithin = parseBulkAccountsCsv(csvDuplicateWithin, context);
+  assert.equal(resDuplicateWithin.ok, false);
+  assert.ok(
+    resDuplicateWithin.errors.some((e) => e.includes("trùng lặp")),
+    `Expected Vietnamese duplicate username error, got: ${JSON.stringify(resDuplicateWithin.errors)}`
+  );
+
+  // 7. Duplicate with existing username
+  const csvDuplicateExisting = `username,password,role,ref_id,display_name
+mc,password123,host,,Dẫn chương trình`;
+  const resDuplicateExisting = parseBulkAccountsCsv(csvDuplicateExisting, context);
+  assert.equal(resDuplicateExisting.ok, false);
+  assert.ok(
+    resDuplicateExisting.errors.some((e) => e.includes("trùng lặp")),
+    `Expected Vietnamese existing duplicate error, got: ${JSON.stringify(resDuplicateExisting.errors)}`
+  );
+
+  // 8. Valid bulk CSV parsing
+  const validCsv = `username,password,role,ref_id,display_name
+gk1,password123,judge,gk-01,Ban Giám khảo 1
+gktong,password123,head_judge,,Giám khảo tổng
+doi01,password123,team,doi-01,Đội 1`;
+  const resValid = parseBulkAccountsCsv(validCsv, context);
+  assert.equal(resValid.ok, true);
+  assert.equal(resValid.validAccounts.length, 3);
+  assert.equal(resValid.errors.length, 0);
+  assert.deepEqual(resValid.validAccounts[0], {
+    username: "gk1",
+    password: "password123",
+    role: "judge",
+    ref_id: "gk-01",
+    display_name: "Ban Giám khảo 1"
+  });
+  assert.deepEqual(resValid.validAccounts[1], {
+    username: "gktong",
+    password: "password123",
+    role: "head_judge",
+    ref_id: "",
+    display_name: "Giám khảo tổng"
+  });
+});
+
+test("content serialisation for save no longer includes accounts", () => {
+  const content = {
+    teams: [{ id: "doi-01", name: "Đội 1" }],
+    round_order: { contest: ["doi-01"] },
+    round1: [],
+    round2: [],
+    round3: [],
+    judges: [{ id: "gk-01", name: "Giám khảo 1" }],
+    accounts: [
+      { username: "mc", password: "plaintext_secret_password", role: "host", ref_id: "", display_name: "MC" },
+      { username: "gk1", password: "plaintext_secret_password", role: "judge", ref_id: "gk-01", display_name: "GK1" }
+    ],
+    config: { show_title: "Hội thi PCCC" }
+  };
+
+  const serialized = serializeContentForSave(content);
+
+  // accounts property must NOT exist in the serialized object for save
+  assert.equal("accounts" in serialized, false, "Serialized content must not contain 'accounts'");
+  assert.equal(serialized.accounts, undefined);
+
+  // Other properties must be preserved
+  assert.deepEqual(serialized.teams, content.teams);
+  assert.deepEqual(serialized.round_order, content.round_order);
+  assert.deepEqual(serialized.judges, content.judges);
+  assert.deepEqual(serialized.config, content.config);
+});
+

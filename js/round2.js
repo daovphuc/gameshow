@@ -97,6 +97,7 @@ export function computeRound2Ranking(teams = [], teamStats = {}) {
     const stats = teamStats[team.id] || {};
     const points = Number(stats.points !== undefined ? stats.points : stats.softwarePoints) || 0;
     const correctCount = Number(stats.correctCount) || 0;
+    const fastestCount = Number(stats.fastestCount) || 0;
     const totalCorrectTimeMs = Number(stats.totalCorrectTimeMs) || 0;
     const totalCorrectTimeSeconds = Math.round((totalCorrectTimeMs / 1000) * 100) / 100;
     const round2Score = calculateRound2Score(points);
@@ -108,6 +109,7 @@ export function computeRound2Ranking(teams = [], teamStats = {}) {
       softwarePoints: points, // For backwards compatibility
       round2Score,
       correctCount,
+      fastestCount,
       totalCorrectTimeMs,
       totalCorrectTimeSeconds,
       rank: 1,
@@ -118,6 +120,10 @@ export function computeRound2Ranking(teams = [], teamStats = {}) {
   entries.sort((a, b) => {
     if (b.points !== a.points) {
       return b.points - a.points;
+    }
+    // Điều 21.2.b: đội có nhiều câu trả lời nhanh nhất xếp trên
+    if (b.fastestCount !== a.fastestCount) {
+      return b.fastestCount - a.fastestCount;
     }
     if (a.totalCorrectTimeMs !== b.totalCorrectTimeMs) {
       return a.totalCorrectTimeMs - b.totalCorrectTimeMs;
@@ -144,13 +150,14 @@ export function filterQuestionForTablet(question = {}) {
   if (!question || typeof question !== "object") {
     return null;
   }
-  const { correct: _omittedCorrect, ...safeQuestion } = question;
+  const { correct: _omittedCorrect, explanation: _omittedExplanation, ...safeQuestion } = question;
   return { ...safeQuestion };
 }
 
 /**
  * Normalises rows from the `round2` sheet tab.
- * Required: question, option_a, option_b, option_c, option_d, correct (A-D).
+ * Required: question, option_a, option_b, correct (valid letter among available options).
+ * Optional: option_c, option_d, category, explanation.
  *
  * @param {Array<Record<string, any>>|string} input
  * @param {Record<string, any>} [config]
@@ -165,7 +172,9 @@ export function filterQuestionForTablet(question = {}) {
  *   option_d: string,
  *   correct: "A"|"B"|"C"|"D",
  *   time_seconds: number,
- *   image_url: string
+ *   image_url: string,
+ *   category: string,
+ *   explanation: string
  * }>}
  */
 export function normaliseRound2(input = [], config = DEFAULT_CONFIG) {
@@ -176,7 +185,6 @@ export function normaliseRound2(input = [], config = DEFAULT_CONFIG) {
   );
 
   const results = [];
-  const validLetters = new Set(["A", "B", "C", "D"]);
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -187,9 +195,19 @@ export function normaliseRound2(input = [], config = DEFAULT_CONFIG) {
     const option_d = row?.option_d !== undefined && row?.option_d !== null ? String(row.option_d).trim() : "";
     const rawCorrect = row?.correct !== undefined && row?.correct !== null ? String(row.correct).trim().toUpperCase() : "";
 
-    if (!question || !option_a || !option_b || !option_c || !option_d) {
+    if (!question || !option_a || !option_b) {
       continue;
     }
+
+    // Must be 4 options (A-D) or 2 options (A-B only)
+    if ((option_c && !option_d) || (!option_c && option_d)) {
+      continue;
+    }
+
+    const validLetters = new Set(["A", "B"]);
+    if (option_c) validLetters.add("C");
+    if (option_d) validLetters.add("D");
+
     if (!validLetters.has(rawCorrect)) {
       continue;
     }
@@ -200,6 +218,8 @@ export function normaliseRound2(input = [], config = DEFAULT_CONFIG) {
     const number = parsePositiveNumber(row?.number, results.length + 1);
     const time_seconds = parsePositiveNumber(row?.time_seconds, defaultTime);
     const image_url = resolveImageUrl(row?.image_url);
+    const category = row?.category !== undefined && row?.category !== null ? String(row.category).trim() : "";
+    const explanation = row?.explanation !== undefined && row?.explanation !== null ? String(row.explanation).trim() : "";
 
     results.push({
       id: `r2_${set}_${number}`,
@@ -212,7 +232,9 @@ export function normaliseRound2(input = [], config = DEFAULT_CONFIG) {
       option_d,
       correct: rawCorrect,
       time_seconds,
-      image_url
+      image_url,
+      category,
+      explanation
     });
   }
 
@@ -435,7 +457,7 @@ export function recomputeRound2FromAnswers({
   const teamStats = {};
   for (const t of teams) {
     if (t?.id) {
-      teamStats[t.id] = { points: 0, softwarePoints: 0, correctCount: 0, totalCorrectTimeMs: 0 };
+      teamStats[t.id] = { points: 0, softwarePoints: 0, correctCount: 0, fastestCount: 0, totalCorrectTimeMs: 0 };
     }
   }
 
@@ -461,7 +483,7 @@ export function recomputeRound2FromAnswers({
 
     for (const [teamId, ansRecord] of Object.entries(answersForQ)) {
       if (!teamStats[teamId]) {
-        teamStats[teamId] = { points: 0, softwarePoints: 0, correctCount: 0, totalCorrectTimeMs: 0 };
+        teamStats[teamId] = { points: 0, softwarePoints: 0, correctCount: 0, fastestCount: 0, totalCorrectTimeMs: 0 };
       }
       const rawAns = String(ansRecord?.answer || "").trim().toUpperCase();
       const isCorrect = rawAns === String(q.correct || "").trim().toUpperCase();
@@ -490,6 +512,26 @@ export function recomputeRound2FromAnswers({
         teamStats[teamId].points += points;
         teamStats[teamId].softwarePoints += points;
         teamStats[teamId].totalCorrectTimeMs += responseTimeMs;
+      }
+    }
+
+    // Determine the fastest correct answer(s) for this question (Điều 21.2.b)
+    let minTime = Infinity;
+    const fastestTeams = [];
+    for (const [tId, res] of Object.entries(results)) {
+      if (res.isCorrect && Number.isFinite(res.responseTimeMs)) {
+        if (res.responseTimeMs < minTime) {
+          minTime = res.responseTimeMs;
+          fastestTeams.length = 0;
+          fastestTeams.push(tId);
+        } else if (res.responseTimeMs === minTime) {
+          fastestTeams.push(tId);
+        }
+      }
+    }
+    for (const fId of fastestTeams) {
+      if (teamStats[fId]) {
+        teamStats[fId].fastestCount = (teamStats[fId].fastestCount || 0) + 1;
       }
     }
 

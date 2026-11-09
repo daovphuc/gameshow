@@ -1,5 +1,7 @@
 // Account-based authentication and portal session management (DOM-free).
 
+import { parseCsv } from "./csv.js";
+
 export const DEFAULT_PASSWORD = "122345678910";
 
 export const PORTALS = {
@@ -19,6 +21,226 @@ export const PORTAL_URLS = {
 };
 
 export const AUTH_STORAGE_KEY = "gameshow_auth_session";
+
+/**
+ * Maps a username to its internal hoithi.local email address.
+ * Trims and lowercases. Rejects empty, non-string, or invalid characters.
+ * @param {string} username
+ * @returns {string}
+ */
+export function usernameToEmail(username) {
+  if (typeof username !== "string") {
+    throw new Error("Tên đăng nhập không hợp lệ.");
+  }
+  const clean = username.trim().toLowerCase();
+  if (!clean) {
+    throw new Error("Tên đăng nhập không được để trống.");
+  }
+  if (!/^[a-z0-9._-]+$/.test(clean)) {
+    throw new Error("Tên đăng nhập chứa ký tự không hợp lệ (chỉ chấp nhận chữ cái, số, dấu chấm, gạch dưới và gạch ngang).");
+  }
+  return `${clean}@hoithi.local`;
+}
+
+/**
+ * Extracts username from internal hoithi.local email.
+ * @param {string} email
+ * @returns {string}
+ */
+export function emailToUsername(email) {
+  if (typeof email !== "string") return "";
+  const clean = email.trim().toLowerCase();
+  const domain = "@hoithi.local";
+  if (clean.endsWith(domain)) {
+    return clean.slice(0, -domain.length);
+  }
+  return clean;
+}
+
+/**
+ * Checks whether an account role is authorized to access a given portal.
+ * - host portal: host only
+ * - judge portal: judge and head_judge
+ * - team portal: team only
+ * Unknown roles or portals are rejected.
+ * @param {string} role
+ * @param {string} portal
+ * @returns {boolean}
+ */
+export function isRoleAllowedForPortal(role, portal) {
+  const cleanRole = String(role || "").trim().toLowerCase();
+  const cleanPortal = String(portal || "").trim().toLowerCase();
+  if (!cleanRole || !VALID_ROLES.has(cleanRole)) {
+    return false;
+  }
+  if (cleanPortal === "host") {
+    return cleanRole === "host";
+  }
+  if (cleanPortal === "judge") {
+    return cleanRole === "judge" || cleanRole === "head_judge";
+  }
+  if (cleanPortal === "team") {
+    return cleanRole === "team";
+  }
+  return false;
+}
+
+/**
+ * Checks portal access returning an object with ok flag and Vietnamese error if rejected.
+ * @param {string} role
+ * @param {string} portal
+ * @returns {{ ok: boolean, error?: string }}
+ */
+export function checkPortalAccess(role, portal) {
+  const cleanRole = String(role || "").trim().toLowerCase();
+  if (!cleanRole || !VALID_ROLES.has(cleanRole)) {
+    return { ok: false, error: "Vai trò tài khoản không hợp lệ hoặc chưa được cấp quyền." };
+  }
+  if (isRoleAllowedForPortal(cleanRole, portal)) {
+    return { ok: true };
+  }
+  return { ok: false, error: "Tài khoản không có quyền truy cập vào cổng này." };
+}
+
+/**
+ * Parses and validates bulk account creation data from CSV or row objects.
+ * Validates:
+ * - missing username
+ * - invalid username characters
+ * - missing password
+ * - password < 6 characters
+ * - unknown role
+ * - judge/team without ref_id (and optional context check)
+ * - duplicate username (within batch or existingUsernames)
+ *
+ * @param {string|Array<any>} input CSV string or parsed rows
+ * @param {{ judges?: Array<any>, teams?: Array<any>, existingUsernames?: Array<string>|Set<string> }} [context]
+ * @returns {{ ok: boolean, validAccounts: Array<any>, errors: Array<string>, results: Array<any> }}
+ */
+export function parseBulkAccountsCsv(input, { judges = [], teams = [], existingUsernames = [] } = {}) {
+  const rows = typeof input === "string" ? parseCsv(input) : (Array.isArray(input) ? input : []);
+  const validJudges = new Set((judges || []).map((j) => String(j?.id || "").trim()).filter(Boolean));
+  const validTeams = new Set((teams || []).map((t) => String(t?.id || "").trim()).filter(Boolean));
+  const judgeNames = new Map((judges || []).map((j) => [String(j?.id || "").trim(), String(j?.name || "").trim()]));
+  const teamNames = new Map((teams || []).map((t) => [String(t?.id || "").trim(), String(t?.name || "").trim()]));
+
+  const existingSet = new Set(
+    Array.from(existingUsernames || []).map((u) => String(u || "").trim().toLowerCase()).filter(Boolean)
+  );
+  const batchUsernames = new Set();
+
+  const validAccounts = [];
+  const errors = [];
+  const results = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 1;
+    if (!row || typeof row !== "object") continue;
+
+    const rawUsername = row.username !== undefined && row.username !== null ? String(row.username).trim() : "";
+    const rawPassword = row.password !== undefined && row.password !== null ? String(row.password).trim() : "";
+    const rawRole = row.role !== undefined && row.role !== null ? String(row.role).trim().toLowerCase() : "";
+    const rawRefId = row.ref_id !== undefined && row.ref_id !== null ? String(row.ref_id).trim() : "";
+    const rawDisplayName = row.display_name !== undefined && row.display_name !== null ? String(row.display_name).trim() : "";
+
+    const rowErrors = [];
+
+    // Username checks
+    if (!rawUsername) {
+      rowErrors.push(`Dòng ${rowNum}: Thiếu tên đăng nhập.`);
+    } else if (!/^[a-zA-Z0-9._-]+$/.test(rawUsername)) {
+      rowErrors.push(`Dòng ${rowNum}: Tên đăng nhập "${rawUsername}" chứa ký tự không hợp lệ.`);
+    } else {
+      const lower = rawUsername.toLowerCase();
+      if (batchUsernames.has(lower) || existingSet.has(lower)) {
+        rowErrors.push(`Dòng ${rowNum}: Tên đăng nhập "${rawUsername}" bị trùng lặp.`);
+      } else {
+        batchUsernames.add(lower);
+      }
+    }
+
+    // Password checks
+    if (!rawPassword) {
+      rowErrors.push(`Dòng ${rowNum}: Thiếu mật khẩu.`);
+    } else if (rawPassword.length < 6) {
+      rowErrors.push(`Dòng ${rowNum}: Mật khẩu của tài khoản "${rawUsername || rowNum}" phải có ít nhất 6 ký tự.`);
+    }
+
+    // Role checks
+    if (!rawRole) {
+      rowErrors.push(`Dòng ${rowNum}: Thiếu vai trò.`);
+    } else if (!VALID_ROLES.has(rawRole)) {
+      rowErrors.push(`Dòng ${rowNum}: Vai trò "${rawRole}" không hợp lệ (phải là host, judge, head_judge hoặc team).`);
+    } else {
+      // ref_id checks
+      if (rawRole === "judge") {
+        if (!rawRefId) {
+          rowErrors.push(`Dòng ${rowNum}: Tài khoản giám khảo "${rawUsername || rowNum}" thiếu mã giám khảo liên kết (ref_id).`);
+        } else if (validJudges.size > 0 && !validJudges.has(rawRefId)) {
+          rowErrors.push(`Dòng ${rowNum}: Mã giám khảo "${rawRefId}" không tồn tại trong danh sách ban giám khảo.`);
+        }
+      } else if (rawRole === "team") {
+        if (!rawRefId) {
+          rowErrors.push(`Dòng ${rowNum}: Tài khoản đội thi "${rawUsername || rowNum}" thiếu mã đội liên kết (ref_id).`);
+        } else if (validTeams.size > 0 && !validTeams.has(rawRefId)) {
+          rowErrors.push(`Dòng ${rowNum}: Mã đội thi "${rawRefId}" không tồn tại trong danh sách đội thi.`);
+        }
+      }
+    }
+
+    if (rowErrors.length > 0) {
+      errors.push(...rowErrors);
+      results.push({
+        rowNumber: rowNum,
+        username: rawUsername,
+        role: rawRole,
+        ref_id: rawRefId,
+        display_name: rawDisplayName,
+        ok: false,
+        error: rowErrors.join("; "),
+        account: null
+      });
+    } else {
+      let displayName = rawDisplayName;
+      if (!displayName) {
+        if (rawRole === "host") displayName = "Dẫn chương trình";
+        else if (rawRole === "head_judge") displayName = "Giám khảo tổng";
+        else if (rawRole === "judge") displayName = judgeNames.get(rawRefId) || "Ban Giám khảo";
+        else if (rawRole === "team") displayName = teamNames.get(rawRefId) || "Đội thi";
+      }
+
+      const acc = {
+        username: rawUsername.toLowerCase(),
+        password: rawPassword,
+        role: rawRole,
+        ref_id: (rawRole === "host" || rawRole === "head_judge") ? "" : rawRefId,
+        display_name: displayName
+      };
+      validAccounts.push(acc);
+      results.push({
+        rowNumber: rowNum,
+        username: acc.username,
+        role: acc.role,
+        ref_id: acc.ref_id,
+        display_name: acc.display_name,
+        ok: true,
+        error: null,
+        account: acc
+      });
+    }
+  }
+
+  return {
+    ok: errors.length === 0,
+    validAccounts,
+    rows: validAccounts,
+    errors,
+    results
+  };
+}
+
+export const validateBulkAccounts = parseBulkAccountsCsv;
 
 /**
  * Maps an account role to its corresponding portal entry URL.

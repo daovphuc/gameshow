@@ -71,6 +71,7 @@
     <main class="stage-main">
       <div class="scores-control-header">
         <div>
+          <div id="scores-subtitle" class="stage-cluster-subtitle" style="font-size: 1rem; color: var(--accent); font-weight: 700; margin-bottom: 0.35rem; display: none;"></div>
           <h1 class="section-title">Quản Lý Điểm Số &amp; Điều Khiển Trận Đấu</h1>
           <p class="section-subtitle">
             Tổng hợp điểm Vòng 1, Vòng 2, Vòng 3; xem chi tiết chấm điểm Ban Giám khảo; trừ điểm lỗi và ghi đè sự cố.
@@ -797,6 +798,12 @@
 
       setupToolbar();
       renderScoresPage();
+
+      const subEl = document.getElementById("scores-subtitle");
+      if (subEl && quizData?.config?.show_subtitle) {
+        subEl.textContent = quizData.config.show_subtitle;
+        subEl.style.display = "block";
+      }
 
       wireStageLayout({
         activePage: "scores",
