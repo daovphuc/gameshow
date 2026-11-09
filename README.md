@@ -18,15 +18,14 @@ Hệ thống được thiết kế tối ưu cho 3 vai trò sử dụng tại h�
      - `round1.html`: Vòng 1 — Tuyên truyền PCCC (chọn đội theo số thứ tự thi, mỗi đội chọn 1 gói câu hỏi riêng).
      - `round2.html`: Vòng 2 — Trắc nghiệm kiến thức (chọn bộ đề, mở câu hỏi, đếm ngược đồng bộ tới tất cả iPad, tự động khóa khi hết giờ, công bố đáp án và thống kê bảng xếp hạng Vòng 2).
      - `round3.html`: Vòng 3 — Xử lý tình huống truyền thông (bảng ô số tương tác).
-     - `leaderboard.html`: Bảng xếp hạng vinh danh Top 5 trên bục cúp chiến thắng với hoạt họa ánh kim sang trọng.
-     - `scores.html`: Quản lý điểm số chi tiết từng giám khảo, bảng thống kê Vòng 2, trừ điểm vi phạm/quá giờ, ghi đè điểm sự cố và xuất báo cáo Excel CSV.
-     - `content.html`: Trình soạn thảo và quản trị nội dung trực tiếp dành cho MC.
+     - `leaderboard.html`: Bảng xếp hạng vinh danh Top 5 trên bục cúp chiến thắng với hoạt họa ánh kim và pháo hoa chúc mừng; hỗ trợ xuất báo cáo kết quả cuộc thi (CSV).
+     - `content.html`: Trình soạn thảo và quản trị nội dung trực tiếp dành cho MC, quản lý tài khoản, xuất báo cáo kết quả cuộc thi (CSV) và đặt lại trận đấu.
    - **Thanh bảng điểm trực tiếp (Live Leaderboard Drawer)**: Xuất hiện ở cạnh phải của mọi màn hình MC, hỗ trợ mở/đóng nhanh bằng nút `★ Bảng điểm`, tích hợp hiệu ứng chuyển động mượt mà (FLIP animation) tự động tráo đổi vị trí các đội khi điểm số thay đổi.
 
 2. **Cổng Ban Giám khảo (`judge.html`)**:
    - Vận hành trên iPad của các thành viên Ban Giám khảo và Giám khảo tổng.
    - Đăng nhập bằng tài khoản giám khảo (vd: `gk1`..`gk3`) sẽ vào thẳng danh tính của giám khảo đó, không cần chọn thủ công.
-   - **Giám khảo tổng (`gktong`)**: Có quyền xem và nhập đồng thời điểm số cho toàn bộ các giám khảo đối với từng đội thi, lưu điểm hàng loạt với 1 nút bấm (chỉ chỉnh sửa khi đội chưa bị khóa).
+   - **Giám khảo tổng (`gktong`)**: Có quyền xem và nhập đồng thời điểm số cho toàn bộ các giám khảo đối với từng đội thi, lưu điểm hàng loạt với 1 nút bấm (chỉ chỉnh sửa khi đội chưa bị khóa), đồng thời nhập thời gian quá giờ để hệ thống tự động trừ điểm vi phạm thời gian theo Điều 19.
    - Giao diện chấm điểm Vòng 1 & Vòng 3 thân thiện cho iPad cảm ứng: hiển thị đội đang thi và chủ đề/tình huống nổi bật ở trên, các nút tăng/giảm to `+0.5`, `-0.5`, `+1`, `-1`, `+5`, `-5` và thanh trượt để chấm riêng phần **Nội dung** (tối đa 45đ ở V1 / 25đ ở V3) và **Hình thức** (tối đa 5đ), hiển thị tổng điểm trực tiếp và trạng thái đã lưu rõ ràng.
    - Phía dưới có bảng tổng quan tiến độ chấm tất cả các đội trong vòng thi theo đúng thứ tự thi đã cấu hình; giám khảo có thể chạm vào đội bất kỳ để xem lại hoặc điều chỉnh điểm trước khi MC khóa phần thi.
    - Ở Vòng 2: Màn hình tự động cập nhật câu hỏi đang thi và hiển thị bảng theo dõi tiến độ trả lời trực tiếp của các đội thi.
@@ -89,6 +88,13 @@ Hệ thống sử dụng cơ sở dữ liệu thời gian thực **Firebase Real
     "live": {
       ".read": "auth != null && root.child('roles').child(auth.uid).exists()",
       ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'host'",
+      "penalties": {
+        "$round": {
+          "$team": {
+            ".write": "auth != null && (root.child('roles').child(auth.uid).child('role').val() === 'host' || root.child('roles').child(auth.uid).child('role').val() === 'head_judge')"
+          }
+        }
+      },
       "judgeScores": {
         "$round": {
           "$team": {
@@ -115,7 +121,7 @@ Hệ thống sử dụng cơ sở dữ liệu thời gian thực **Firebase Real
    > **Tác dụng của quy tắc bảo mật:**
    > - Chặn đọc/ghi công khai tại gốc (`.read: false`, `.write: false`). Chỉ người dùng đã đăng nhập và được cấp quyền (`roles/<uid>`) mới đọc được dữ liệu hội thi.
    > - Phân quyền ghi tuyệt đối: Chỉ Dẫn chương trình (`host`) mới được chỉnh sửa cấu hình nội dung (`content`) và điều khiển trận đấu (`live`).
-   > - Ban Giám khảo (`judge`) chỉ có quyền ghi phiếu điểm của chính mình (`live/judgeScores/.../$judgeId`); Giám khảo tổng (`head_judge`) và Host có quyền ghi điểm cho mọi giám khảo.
+   > - Ban Giám khảo (`judge`) chỉ có quyền ghi phiếu điểm của chính mình (`live/judgeScores/.../$judgeId`); Giám khảo tổng (`head_judge`) và Host có quyền ghi điểm cho mọi giám khảo và ghi điểm trừ quá giờ (`live/penalties`).
    > - Đội thi (`team`) chỉ được phép gửi duy nhất 1 lần đáp án của chính đội mình ở câu hỏi đang mở trước thời hạn đếm ngược (`now <= deadline`).
    > - Chỉ Dẫn chương trình mới có quyền xóa (`reset`) dữ liệu câu trả lời cũ (`answers`).
 
@@ -153,7 +159,7 @@ Toàn bộ dữ liệu được lưu trữ tại nút `content/` trên Firebase 
 2. **Thứ tự thi & Phân cụm thi đấu (Clusters)**:
    - Cấu hình danh sách đội tham gia và số thứ tự thi riêng biệt cho toàn bộ hội thi (`contest`) và từng vòng thi (`round1`, `round2`, `round3`).
    - Tích hợp sẵn nút chọn cụm nhanh: **Cụm 1** (12 đội — Học viện CSND, Hà Nội), **Cụm 2** (12 đội — Công an tỉnh Quảng Ngãi), **Cụm 3** (11 đội — Công an tỉnh Tây Ninh), và **Chung kết** (Khánh Hòa) theo đúng Kế hoạch số 204/KH-BCA-C07.
-   - Khi chọn cụm, hệ thống tự động thiết lập danh sách thứ tự thi của tất cả các vòng và tự động đồng bộ dòng phụ đề hội thi (`show_subtitle`) hiển thị thời gian, địa điểm thi đấu lên đầu các màn hình máy chiếu (`host.html`, `round1.html`, `round2.html`, `round3.html`, `leaderboard.html`, `scores.html`). Dữ liệu cấu hình cụm được lưu tại `data/sample/clusters.csv`.
+   - Khi chọn cụm, hệ thống tự động thiết lập danh sách thứ tự thi của tất cả các vòng và tự động đồng bộ dòng phụ đề hội thi (`show_subtitle`) hiển thị thời gian, địa điểm thi đấu lên đầu các màn hình máy chiếu (`host.html`, `round1.html`, `round2.html`, `round3.html`, `leaderboard.html`). Dữ liệu cấu hình cụm được lưu tại `data/sample/clusters.csv`.
 3. **Vòng 1 (Tuyên truyền)**: Chỉnh sửa các gói câu hỏi (tên gói, đội sở hữu, nội dung câu hỏi, thời gian 15 phút và thang điểm tối đa 50đ gồm 45đ nội dung + 5đ hình thức).
 4. **Vòng 2 (Trắc nghiệm)**:
    - Chỉnh sửa ngân hàng câu hỏi trắc nghiệm chia theo từng bộ đề, bao gồm bộ **"Chạy thử"** (10 câu: 4 Kiểm tra, 3 Tuyên truyền, 2 Xử phạt, 1 Điều tra) và các bộ đề chính thức.
@@ -163,11 +169,11 @@ Toàn bộ dữ liệu được lưu trữ tại nút `content/` trên Firebase 
 5. **Vòng 3 (Xử lý tình huống)**: Quản lý danh sách các ô tình huống truyền thông (số thứ tự ô, nội dung tình huống, thời gian suy nghĩ 2 phút + trả lời 5 phút và điểm số tối đa 30đ gồm 25đ nội dung + 5đ hình thức).
 6. **Ban Giám khảo**: Thêm, sửa họ tên và mã định danh của các thành viên Ban Giám khảo.
 7. **Tài khoản**: Quản lý phân quyền tài khoản (vai trò, đối tượng liên kết, tên hiển thị) và tạo tài khoản Firebase Authentication trực tiếp trong ứng dụng. Hỗ trợ tạo từng tài khoản hoặc tạo hàng loạt từ file CSV. Ở chế độ Local Mode, hỗ trợ thêm/sửa/tạo tài khoản thử nghiệm trực tiếp.
-8. **Cài đặt chung**: Điều chỉnh tên hội thi, tiêu đề phụ, thời gian đếm ngược, điểm trắc nghiệm mỗi câu đúng Vòng 2 và thang điểm từng vòng thi.
+8. **Cài đặt chung**: Điều chỉnh tên hội thi, tiêu đề phụ, thời gian đếm ngược, điểm trắc nghiệm mỗi câu đúng Vòng 2 và thang điểm từng vòng thi. Tích hợp khu vực nguy hiểm để **Đặt lại trận đấu** (xóa dữ liệu thi đấu trực tiếp để chuẩn bị trận mới, có xác nhận an toàn) và nút **Tải báo cáo kết quả (CSV)**.
 
 ### Các nút chức năng tiện ích:
 - **💾 Lưu vào hệ thống**: Kiểm tra tính hợp lệ của toàn bộ dữ liệu (chống trùng ID, chống thiếu đáp án, kiểm tra thứ tự thi hoặc liên kết sai) rồi lưu vào cơ sở dữ liệu, đồng bộ ngay lập tức tới máy chiếu và tất cả iPad.
-- **↻ Nạp dữ liệu mẫu**: Tải lại dữ liệu mẫu chuẩn từ các file `data/sample/*.csv` vào trình soạn thảo (kèm hộp thoại xác nhận).
+- **↻ Nạp dữ liệu mẫu**: Khôi phục dữ liệu mẫu chuẩn từ các file `data/sample/*.csv` vào trình soạn thảo (kèm hộp thoại xác nhận).
 - **⬇ Xuất / ⬆ Nhập file sao lưu (JSON)**: Cho phép sao lưu toàn bộ nội dung hội thi ra file JSON về máy tính và khôi phục lại bất kỳ lúc nào mà không cần kết nối mạng.
 
 ---
@@ -211,7 +217,7 @@ Hệ thống tự động thực hiện đầy đủ các quy định theo Thể
 1. **Vòng 1 & Vòng 3 (Điểm Giám Khảo & Điểm Phạt - Điều 19, 20 & 21)**:
    - Điểm của đội là trung bình cộng điểm chấm của các Giám khảo (Nội dung + Hình thức) trừ đi Điểm phạt do vi phạm quy chế hoặc quá thời gian quy định.
    - Thang điểm: Vòng 1 tối đa 50 điểm (45 điểm nội dung + 5 điểm hình thức), thời gian 15 phút. Vòng 3 tối đa 30 điểm (25 điểm nội dung + 5 điểm hình thức), thời gian suy nghĩ 2 phút + trả lời 5 phút.
-   - Trừ điểm thời gian (Điều 19): Quá từ 01s đến 30s trừ 0.5 điểm; quá từ 31s đến 60s trừ 1.0 điểm; quá trên 60s trừ 2.0 điểm (được hỗ trợ tính và nhập tại trang `scores.html`).
+   - Trừ điểm thời gian (Điều 19): Quá từ 01s đến 30s trừ 0.5 điểm; quá từ 31s đến 60s trừ 1.0 điểm; quá trên 60s trừ 2.0 điểm (hỗ trợ nhập số giây quá giờ và tính tự động bởi Giám khảo tổng tại cổng Ban Giám khảo `judge.html`).
    - Xử lý vi phạm (Điều 20): Trừ 2.0 điểm nếu dùng tài liệu không được phép; hủy kết quả phần thi (0 điểm) nếu có hành vi gian lận.
    - Các giám khảo chưa bấm gửi điểm sẽ tự động bị loại khỏi mẫu số tính trung bình.
    - Khi có các đội bằng điểm nhau ở Vòng 1 hoặc Vòng 3: Đội có điểm trung bình phần **Nội dung** cao hơn sẽ được xếp trên.
@@ -225,7 +231,7 @@ Hệ thống tự động thực hiện đầy đủ các quy định theo Thể
      2. Số lần đưa ra câu trả lời đúng nhanh nhất nhiều hơn (`fastestCount` cao hơn xếp trên).
      3. Tổng thời gian trả lời của các câu trả lời đúng ngắn hơn (trả lời đúng nhanh hơn xếp trên).
      4. Thứ tự đội thi / bốc thăm ban đầu.
-   - Bảng thống kê hiển thị sau khi MC công bố đáp án và có thể mở lại bất cứ lúc nào qua nút "📊 Thống kê Vòng 2" trên màn hình `round2.html`, đồng thời xuất hiện trên trang "Điểm số" (`scores.html`) và trong file báo cáo CSV xuất ra.
+   - Bảng thống kê hiển thị sau khi MC công bố đáp án và có thể mở lại bất cứ lúc nào qua nút "📊 Thống kê Vòng 2" trên màn hình `round2.html` (hiển thị thời gian phản hồi theo giây bên cạnh điểm số), đồng thời xuất hiện trên bảng xếp hạng `leaderboard.html` (tab Vòng 2) và trong file báo cáo CSV xuất ra.
 
 3. **Bảng tổng sắp toàn đoàn (Điều 22)**:
    - Tổng điểm = Điểm Vòng 1 + Điểm Vòng 2 + Điểm Vòng 3.
@@ -235,7 +241,7 @@ Hệ thống tự động thực hiện đầy đủ các quy định theo Thể
      3. Thứ hạng ở **Vòng 2** tốt hơn.
 
 4. **Xuất báo cáo kết quả cuộc thi**:
-   - Trong trang **Điểm số (`scores.html`)**, bấm **"⬇ Tải báo cáo (Excel CSV)"** để tải về file báo cáo đầy đủ chuẩn UTF-8 BOM, mở trực tiếp bằng Microsoft Excel hiển thị tiếng Việt hoàn hảo không lỗi font.
+   - Trong trang **Cấu hình nội dung (`content.html`)** (tab Cài đặt chung) hoặc **Bảng xếp hạng (`leaderboard.html`)**, bấm **"⬇ Tải báo cáo kết quả (CSV)"** để tải về file báo cáo đầy đủ chuẩn UTF-8 BOM, mở trực tiếp bằng Microsoft Excel hiển thị tiếng Việt hoàn hảo không lỗi font.
    - Báo cáo gồm:
      1. **Bảng tổng hợp kết quả điểm các vòng thi**: Thứ hạng, Mã đội, Tên đội, Điểm từng vòng (chi tiết nội dung, hình thức, điểm phạt) và Tổng điểm.
      2. **Bảng thống kê Vòng 2 (Trắc nghiệm)**: Thứ hạng, Mã đội, Tên đội, Điểm số, Số câu đúng, Tổng thời gian câu đúng (giây).
@@ -260,13 +266,7 @@ Hệ thống tự động thực hiện đầy đủ các quy định theo Thể
 
 ---
 
-## 7. Phím Tắt Điều Khiển
-
-- `Space` (Phím cách): Bắt đầu tính giờ câu hỏi / Khóa câu hỏi.
-- `→` (Mũi tên phải): Tiếp tục (công bố đáp án, chuyển câu hỏi tiếp theo).
-- `←` (Mũi tên trái): Quay lại màn hình trước.
-
-## 8. Chạy Kiểm Thử Tự Động
+## 7. Chạy Kiểm Thử Tự Động
 
 Kiểm tra toàn bộ các bài kiểm thử logic (không phụ thuộc DOM hay mạng):
 ```bash

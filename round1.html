@@ -318,8 +318,7 @@
           offered.length === 0
             ? `<div class="panel-card">
                 <h2 class="panel-title">Không còn gói chủ đề khả dụng</h2>
-                <p class="panel-desc">Các gói của đội này đã hoàn thành. Bạn có thể mở khóa lại trong trang Điểm số.</p>
-                <a href="./scores.html" class="btn btn-primary">Mở trang Điểm số</a>
+                <p class="panel-desc">Các gói câu hỏi của đội này đã hoàn thành.</p>
               </div>`
             : `<div class="packages-grid">
                 ${offered.map((pkg, idx) => renderPkgCard(pkg, idx)).join("")}
@@ -429,15 +428,7 @@
         activePage: "round1",
         config: quizData.config,
         teams: quizData.teams,
-        onBack: handleBack,
-        onContinue: handleContinue,
-        onReload: () => initRound1(true),
-        onSpace: () => {
-          if (gameState.round1.activeSession) {
-            return triggerStartTimer();
-          }
-          return false;
-        }
+        onReload: () => initRound1(true)
       });
     }
 

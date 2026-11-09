@@ -16,6 +16,13 @@
     "live": {
       ".read": "auth != null && root.child('roles').child(auth.uid).exists()",
       ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'host'",
+      "penalties": {
+        "$round": {
+          "$team": {
+            ".write": "auth != null && (root.child('roles').child(auth.uid).child('role').val() === 'host' || root.child('roles').child(auth.uid).child('role').val() === 'head_judge')"
+          }
+        }
+      },
       "judgeScores": {
         "$round": {
           "$team": {

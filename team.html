@@ -65,15 +65,15 @@
         <header class="tablet-header">
           <div class="tablet-identity-banner">
             ${renderAvatarHtml(team, "team-avatar-sm")}
-            <div>
+            <div class="tablet-identity-text">
               <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
                 Đội Thi Đấu
               </div>
-              <div class="tablet-identity-name">${escapeHtml(team.name)}</div>
+              <div class="tablet-identity-name" title="${escapeHtml(team.name)}">${escapeHtml(team.name)}</div>
             </div>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <div class="tablet-header-actions">
             <div class="conn-status-badge ${connStatus.code || 'local'}" title="${escapeHtml(connStatus.label)}">
               <span class="conn-status-dot"></span>
               <span style="font-size: 0.8rem;">${escapeHtml(connStatus.label)}</span>
@@ -82,7 +82,7 @@
             <button type="button" id="btn-team-change-pwd" class="btn btn-sm" title="Đổi mật khẩu">
               🔑 Đổi MK
             </button>
-            <button type="button" id="btn-team-logout" class="btn btn-sm">
+            <button type="button" id="btn-team-logout" class="btn btn-sm" title="Đăng xuất (${escapeHtml(team.name)})">
               ⎋ Đăng xuất (${escapeHtml(team.name)})
             </button>
           </div>

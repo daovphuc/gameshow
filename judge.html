@@ -23,8 +23,9 @@
       logoutUser,
       openChangePasswordModal
     } from "./js/app.js";
-    import { clampScore, buildPerJudgeScoreWrites, calculateTeamRoundScore } from "./js/judges.js";
+    import { clampScore, buildPerJudgeScoreWrites, calculateTeamRoundScore, calculateOvertimePenalty } from "./js/judges.js";
     import { getRoundTeams } from "./js/content.js";
+    import { shortenTeamName } from "./js/leaderboard.js";
     import { set, listen, onStatusChange } from "./js/backend.js";
     import { getActiveSession } from "./js/auth.js";
 
@@ -46,7 +47,8 @@
       round1: {},
       round2: {},
       round3: {},
-      judgeScores: { round1: {}, round3: {} }
+      judgeScores: { round1: {}, round3: {} },
+      penalties: { round1: {}, round3: {} }
     });
     let liveState = initialLiveState();
 
@@ -65,7 +67,7 @@
             </div>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <div class="tablet-header-actions">
             <div class="conn-status-badge ${connStatus.code || 'local'}" title="${escapeHtml(connStatus.label)}">
               <span class="conn-status-dot"></span>
               <span style="font-size: 0.8rem;">${escapeHtml(connStatus.label)}</span>
@@ -74,7 +76,7 @@
             <button type="button" id="btn-judge-change-pwd" class="btn btn-sm" title="Đổi mật khẩu">
               🔑 Đổi MK
             </button>
-            <button type="button" id="btn-judge-logout" class="btn btn-sm">
+            <button type="button" id="btn-judge-logout" class="btn btn-sm" title="Đăng xuất (${escapeHtml(judgeDisplayName)})">
               ⎋ Đăng xuất (${escapeHtml(judgeDisplayName)})
             </button>
           </div>
@@ -116,6 +118,7 @@
 
       // Existing scores for active team
       const existingScores = liveState.judgeScores?.[roundKey]?.[activeTeamId] || {};
+      const currentPenalty = Number(liveState.penalties?.[roundKey]?.[activeTeamId]) || 0;
       const myExistingScore = existingScores[selectedJudgeId] || null;
 
       let contentVal = myExistingScore?.content !== undefined ? Number(myExistingScore.content) : 0;
@@ -133,10 +136,11 @@
         let score = 0;
         if (isHeadJudge) {
           const teamScores = liveState.judgeScores?.[roundKey]?.[t.id] || {};
-          const calc = calculateTeamRoundScore({ judgeScores: teamScores, maxContent, maxManner });
+          const penalty = Number(liveState.penalties?.[roundKey]?.[t.id]) || 0;
+          const calc = calculateTeamRoundScore({ judgeScores: teamScores, penalty, maxContent, maxManner });
           if (calc.judgeCount > 0) {
             hasScore = true;
-            score = calc.avgTotal;
+            score = calc.finalScore;
             scoredCount++;
           }
         } else {
@@ -266,6 +270,36 @@
                             .join("")}
                         </div>
                       </div>
+                    </div>
+
+                    <!-- Overtime Penalty Section (Điều 19) for Head Judge -->
+                    <div class="editor-card" style="margin-top: 1rem; border-color: var(--accent); background: var(--surface-elevated);">
+                      <div class="editor-card-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <strong style="font-size: 1rem; color: var(--accent); display: flex; align-items: center; gap: 0.4rem;">
+                          ⏱ Điểm Trừ Quá Giờ (Điều 19)
+                        </strong>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">
+                          ${isR1 ? "≥30s: -0.5đ | ≥61s: -1đ | ≥121s: -3đ | >180s: Hủy kết quả" : "≥15s: -0.5đ | ≥31s: -1đ | ≥61s: -2đ | >90s: Hủy kết quả"}
+                        </div>
+                      </div>
+
+                      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 0.85rem; align-items: end;">
+                        <div class="editor-field">
+                          <label class="editor-label">Số giây quá giờ thực tế (s)</label>
+                          <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="number" id="input-overtime-sec" class="editor-input" min="0" step="1" placeholder="Nhập số giây..." ${isLocked ? "disabled" : ""} />
+                            <button type="button" id="btn-calc-penalty" class="btn btn-sm btn-outline" style="white-space: nowrap;" ${isLocked ? "disabled" : ""}>
+                              ⚡ Gợi ý trừ
+                            </button>
+                          </div>
+                        </div>
+
+                        <div class="editor-field">
+                          <label class="editor-label">Điểm trừ áp dụng (điểm)</label>
+                          <input type="number" id="input-penalty-val" class="editor-input" min="0" step="0.5" value="${currentPenalty}" style="font-weight: 700; color: var(--danger); font-size: 1.1rem;" ${isLocked ? "disabled" : ""} />
+                        </div>
+                      </div>
+                      <div id="penalty-suggestion-note" style="margin-top: 0.35rem; font-size: 0.82rem; color: var(--text-muted);"></div>
                     </div>
 
                     <div class="judge-save-row" style="margin-top: 1.25rem;">
@@ -428,8 +462,8 @@
                   <div style="display: flex; align-items: center; gap: 0.65rem;">
                     ${renderAvatarHtml(t, "team-avatar-sm")}
                     <div>
-                      <div style="font-weight: 700; font-size: 0.98rem; line-height: 1.2;">
-                        ${escapeHtml(t.name)}
+                      <div style="font-weight: 700; font-size: 0.98rem; line-height: 1.25;" title="${escapeHtml(t.name)}">
+                        ${escapeHtml(shortenTeamName(t.name))}
                       </div>
                       ${
                         t.isStage
@@ -495,6 +529,33 @@
           });
         });
 
+        // Wire Overtime Penalty suggestions for Head Judge
+        const otSecInput = root.querySelector("#input-overtime-sec");
+        const penValInput = root.querySelector("#input-penalty-val");
+        const penNoteEl = root.querySelector("#penalty-suggestion-note");
+
+        const updatePenaltySuggestion = () => {
+          const sec = Number(otSecInput?.value) || 0;
+          if (sec <= 0) {
+            if (penNoteEl) penNoteEl.textContent = "";
+            return;
+          }
+          const res = calculateOvertimePenalty(roundKey, sec);
+          if (penValInput) {
+            penValInput.value = res.penalty;
+          }
+          if (penNoteEl) {
+            if (res.disqualified) {
+              penNoteEl.innerHTML = `<span style="color: var(--danger); font-weight: 700;">⚠ Quá giờ trên mức tối đa (Điều 20: Hủy kết quả phần thi).</span>`;
+            } else {
+              penNoteEl.innerHTML = `Quá ${sec}s ➔ Gợi ý trừ <strong>${res.penalty}đ</strong> theo Điều 19.`;
+            }
+          }
+        };
+
+        root.querySelector("#btn-calc-penalty")?.addEventListener("click", updatePenaltySuggestion);
+        otSecInput?.addEventListener("input", updatePenaltySuggestion);
+
         document.getElementById("btn-save-all-judges")?.addEventListener("click", async () => {
           const scoresByJudge = {};
           for (const j of quizData.judges) {
@@ -523,6 +584,13 @@
             });
           }
 
+          const penInp = root.querySelector("#input-penalty-val");
+          const penVal = penInp ? Math.max(0, Number(penInp.value) || 0) : 0;
+          await set(`live/penalties/${roundKey}/${activeTeamId}`, penVal);
+          if (!liveState.penalties) liveState.penalties = { round1: {}, round3: {} };
+          if (!liveState.penalties[roundKey]) liveState.penalties[roundKey] = {};
+          liveState.penalties[roundKey][activeTeamId] = penVal;
+
           const timeStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
           lastSavedTimestamps[activeTeamId] = timeStr;
 
@@ -532,7 +600,7 @@
             statusEl.innerHTML = `✓ Đã lưu lúc ${timeStr}`;
           }
 
-          showToast(`✓ Đã lưu điểm tất cả giám khảo cho ${activeTeam.name}!`);
+          showToast(`✓ Đã lưu điểm và điểm trừ cho ${activeTeam.name}!`);
         });
       } else {
         // Individual judge controls
@@ -635,7 +703,7 @@
           <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0.95rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background-color: var(--surface-elevated);">
             <div style="display: flex; align-items: center; gap: 0.65rem;">
               ${renderAvatarHtml(team, "team-avatar-sm")}
-              <span style="font-weight: 700; font-size: 0.95rem;">${escapeHtml(team.name)}</span>
+              <span style="font-weight: 700; font-size: 0.95rem;" title="${escapeHtml(team.name)}">${escapeHtml(shortenTeamName(team.name))}</span>
             </div>
             <div>
               ${
