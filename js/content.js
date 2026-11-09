@@ -11,8 +11,9 @@ import {
 import { normaliseRound2, groupRound2BySet } from "./round2.js";
 import { normaliseJudges } from "./judges.js";
 import { normaliseAccounts, resolveAccounts, generateDefaultAccounts } from "./auth.js";
+import { normaliseClusters } from "./clusters.js";
 
-export const CONTENT_TABS = ["teams", "round1", "round2", "round3", "judges", "accounts", "config"];
+export const CONTENT_TABS = ["teams", "round1", "round2", "round3", "judges", "accounts", "config", "clusters"];
 
 function toRows(input) {
   if (typeof input === "string") {
@@ -85,6 +86,7 @@ export function csvToContent({
   judgesCsv = "",
   accountsCsv = "",
   configCsv = "",
+  clustersCsv = "",
   round_order = {}
 } = {}) {
   const teams = toRows(teamsCsv);
@@ -93,6 +95,7 @@ export function csvToContent({
   const round3 = toRows(round3Csv);
   const judges = toRows(judgesCsv);
   const accounts = toRows(accountsCsv);
+  const clusters = normaliseClusters(clustersCsv);
   const config = normaliseConfig(configCsv);
 
   return {
@@ -102,6 +105,7 @@ export function csvToContent({
     round3,
     judges,
     accounts,
+    clusters,
     round_order: round_order || {},
     config
   };
@@ -131,6 +135,7 @@ export function contentToQuizData(content = {}, sampleFallback = null) {
   const round2Questions = normaliseRound2(content?.round2 || [], config);
   const round3Questions = normaliseRound3(content?.round3 || [], config);
   const judges = normaliseJudges(content?.judges || []);
+  const clusters = normaliseClusters(content?.clusters || []);
 
   const rawAccounts = content?.accounts;
   const accounts = resolveAccounts(Array.isArray(rawAccounts) ? rawAccounts : [], { judges, teams: allTeams });
@@ -144,6 +149,7 @@ export function contentToQuizData(content = {}, sampleFallback = null) {
     round3Questions,
     judges,
     accounts,
+    clusters,
     round_order,
     scores: {}
   };
@@ -393,7 +399,6 @@ export function validateContent(content = {}) {
 
   // 4. Round 2 validation
   const round2 = Array.isArray(content.round2) ? content.round2 : [];
-  const validAnswers = new Set(["A", "B", "C", "D"]);
 
   round2.forEach((q, index) => {
     const set = q?.set !== undefined && q?.set !== null ? String(q.set).trim() : "1";
@@ -411,11 +416,19 @@ export function validateContent(content = {}) {
     if (!qText) {
       errors.push(`${label} thiếu nội dung câu hỏi.`);
     }
-    if (!optA || !optB || !optC || !optD) {
-      errors.push(`${label} có phương án lựa chọn bị để trống (yêu cầu đủ 4 phương án A, B, C, D).`);
+
+    if (!optA || !optB) {
+      errors.push(`${label} có phương án lựa chọn bị để trống (yêu cầu tối thiểu 2 phương án A và B).`);
+    } else if (optD && !optC) {
+      errors.push(`${label} có phương án lựa chọn bị để trống (phương án C bị trống khi có D).`);
     }
+
+    const validAnswers = new Set(["A", "B"]);
+    if (optC) validAnswers.add("C");
+    if (optD) validAnswers.add("D");
+
     if (!validAnswers.has(correct)) {
-      errors.push(`${label} có đáp án đúng "${correct || q?.correct || ''}" không hợp lệ (phải là A, B, C hoặc D).`);
+      errors.push(`${label} có đáp án đúng "${correct || q?.correct || ''}" không hợp lệ (phải là một trong các phương án có nội dung).`);
     }
 
     if (isDataUrl(q?.image_url)) {
@@ -528,6 +541,35 @@ export function validateContent(content = {}) {
         });
       }
     }
+  }
+
+  // 8. Clusters validation
+  if (Array.isArray(content.clusters)) {
+    const seenClusterIds = new Set();
+    content.clusters.forEach((c, index) => {
+      const cId = c?.id !== undefined && c?.id !== null ? String(c.id).trim() : "";
+      const cName = c?.name !== undefined && c?.name !== null ? String(c.name).trim() : "";
+      if (!cId) {
+        errors.push(`Cụm thi thứ ${index + 1} thiếu mã định danh (ID).`);
+        return;
+      }
+      if (!cName) {
+        errors.push(`Cụm thi "${cId}" thiếu tên cụm.`);
+      }
+      if (seenClusterIds.has(cId)) {
+        errors.push(`Mã cụm thi "${cId}" bị trùng lặp.`);
+      } else {
+        seenClusterIds.add(cId);
+      }
+      if (Array.isArray(c.team_ids)) {
+        c.team_ids.forEach((tId) => {
+          const cleanTId = String(tId || "").trim();
+          if (cleanTId && !validTeamIds.has(cleanTId)) {
+            errors.push(`Cụm thi "${cName || cId}" chứa đội thi không tồn tại ("${cleanTId}").`);
+          }
+        });
+      }
+    });
   }
 
   return {

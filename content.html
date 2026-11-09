@@ -98,6 +98,21 @@
           <strong>📋 Thứ tự thi:</strong> Chọn danh sách đội tham gia hội thi và thiết lập thứ tự bốc thăm thi đấu từng vòng; các đội không chọn sẽ được ẩn trên toàn hệ thống.
         </div>
 
+        <!-- Quick Cluster Picker -->
+        <div class="editor-card" style="margin-bottom: 1.5rem; border-color: var(--accent); background: var(--surface-2, rgba(255,255,255,0.02));">
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem;">
+            <div>
+              <h3 style="font-size: 1.1rem; font-family: var(--font-serif); margin: 0; color: var(--accent);">
+                🏢 Chọn nhanh cụm thi theo Kế hoạch Hội thi
+              </h3>
+              <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+                Chọn cụm để nạp ngay danh sách và thứ tự thi đấu của cụm đó, đồng thời cập nhật tiêu đề phụ hiển thị trên các màn hình máy chiếu.
+              </div>
+            </div>
+            <div id="cluster-buttons-wrap" style="display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>
+          </div>
+        </div>
+
         <!-- Section 1: Contest-level Team Selection -->
         <div class="editor-card" style="margin-bottom: 1.5rem; border-color: var(--accent);">
           <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
@@ -189,6 +204,13 @@
           <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;">
             <select id="r2-filter-set" class="editor-select" style="min-width: 170px; font-weight: 600;">
               <option value="">Tất cả bộ đề</option>
+            </select>
+            <select id="r2-filter-category" class="editor-select" style="min-width: 160px; font-weight: 600;">
+              <option value="">Tất cả lĩnh vực</option>
+              <option value="Kiểm tra">Kiểm tra</option>
+              <option value="Tuyên truyền">Tuyên truyền</option>
+              <option value="Xử phạt">Xử phạt</option>
+              <option value="Điều tra">Điều tra</option>
             </select>
             <input
               type="text"
@@ -336,6 +358,12 @@
   </div>
 
   <datalist id="preset-team-names"></datalist>
+  <datalist id="r2-category-list">
+    <option value="Kiểm tra"></option>
+    <option value="Tuyên truyền"></option>
+    <option value="Xử phạt"></option>
+    <option value="Điều tra"></option>
+  </datalist>
 
   <script type="module">
     import {
@@ -346,6 +374,7 @@
       wireStageLayout
     } from "./js/app.js";
     import { TEAM_PALETTE, PRESET_TEAM_NAMES } from "./js/config.js";
+    import { applyCluster } from "./js/clusters.js";
     import {
       validateContent,
       exportContentToJson,
@@ -377,7 +406,8 @@
       round3: [],
       judges: [],
       accounts: [],
-      config: {}
+      config: {},
+      clusters: []
     };
 
     let firebaseRoles = {};
@@ -390,6 +420,7 @@
     let r1FilterTeamId = "";
     let r1SearchQuery = "";
     let r2FilterSet = "";
+    let r2FilterCategory = "";
     let r2SearchQuery = "";
     let r3SearchQuery = "";
 
@@ -627,6 +658,54 @@
 
     function renderRoundOrder() {
       ensureRoundOrderStructure();
+
+      // Render Cluster Preset Selection Buttons
+      const clusterWrap = document.getElementById("cluster-buttons-wrap");
+      if (clusterWrap) {
+        const clusterList = Array.isArray(content.clusters) && content.clusters.length > 0
+          ? content.clusters
+          : [
+              { id: "cum-1", name: "Cụm 1", venue: "Học viện PCCC và CNCH (T06)", date: "26-27/11/2026", subtitle: "Cụm 1 – Ngày 26-27/11/2026 tại Học viện PCCC và CNCH (T06)" },
+              { id: "cum-2", name: "Cụm 2", venue: "Công an tỉnh Quảng Ngãi", date: "19-20/11/2026", subtitle: "Cụm 2 – Ngày 19-20/11/2026 tại Công an tỉnh Quảng Ngãi" },
+              { id: "cum-3", name: "Cụm 3", venue: "Công an tỉnh Tây Ninh", date: "30/11-01/12/2026", subtitle: "Cụm 3 – Ngày 30/11-01/12/2026 tại Công an tỉnh Tây Ninh" },
+              { id: "chung-ket", name: "Chung kết", venue: "Công an tỉnh Khánh Hòa", date: "10-11/12/2026", subtitle: "Vòng Chung kết – Ngày 10-11/12/2026 tại Công an tỉnh Khánh Hòa" }
+            ];
+
+        const curSubtitle = String(content.config?.show_subtitle || "").trim();
+
+        clusterWrap.innerHTML = clusterList
+          .map((c) => {
+            const isActive = c.subtitle && curSubtitle === c.subtitle.trim();
+            return `
+              <button
+                type="button"
+                class="btn btn-sm ${isActive ? 'btn-primary' : ''}"
+                data-cluster-id="${escapeHtml(c.id)}"
+                title="${escapeHtml(c.subtitle || c.name)}"
+              >
+                ${isActive ? '✓ ' : ''}${escapeHtml(c.name)}
+              </button>
+            `;
+          })
+          .join("");
+
+        clusterWrap.querySelectorAll("[data-cluster-id]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const clusterId = btn.dataset.clusterId;
+            const res = applyCluster(clusterId, {
+              round_order: content.round_order,
+              config: content.config,
+              clusters: content.clusters
+            });
+            content.round_order = res.round_order;
+            content.config = res.config;
+            markUnsaved();
+            renderRoundOrder();
+            renderConfig();
+            showToast(`Đã áp dụng ${res.appliedCluster?.name || clusterId}!`);
+          });
+        });
+      }
 
       const contestChecklistEl = document.getElementById("contest-teams-checklist");
       const contestCountEl = document.getElementById("contest-selected-count");
@@ -1033,6 +1112,7 @@
     function renderRound2() {
       const container = document.getElementById("round2-list");
       const filterSelect = document.getElementById("r2-filter-set");
+      const catSelect = document.getElementById("r2-filter-category");
       if (!container) return;
 
       const sets = Array.from(new Set(content.round2.map((q) => String(q.set || '1'))));
@@ -1044,6 +1124,18 @@
             const count = content.round2.filter((q) => String(q.set || '1') === s).length;
             return `<option value="${escapeHtml(s)}" ${r2FilterSet === s ? 'selected' : ''}>Bộ đề #${escapeHtml(s)} (${count} câu)</option>`;
           }).join("");
+      }
+
+      if (catSelect) {
+        const availableCategories = ["Kiểm tra", "Tuyên truyền", "Xử phạt", "Điều tra"];
+        content.round2.forEach((q) => {
+          const cat = (q.category || "").trim();
+          if (cat && !availableCategories.includes(cat)) {
+            availableCategories.push(cat);
+          }
+        });
+        catSelect.innerHTML = `<option value="">Tất cả lĩnh vực</option>` +
+          availableCategories.map((c) => `<option value="${escapeHtml(c)}" ${r2FilterCategory === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join("");
       }
 
       if (!content.round2 || content.round2.length === 0) {
@@ -1062,13 +1154,16 @@
         const setQuestionsWithIndex = [];
         content.round2.forEach((q, originalIdx) => {
           if (String(q.set || '1') === setVal) {
+            const matchesCat = !r2FilterCategory || (q.category || "").trim() === r2FilterCategory;
             const matchesText = !r2SearchQuery ||
               matchesSearch(q.question, r2SearchQuery) ||
+              matchesSearch(q.category, r2SearchQuery) ||
+              matchesSearch(q.explanation, r2SearchQuery) ||
               matchesSearch(q.option_a, r2SearchQuery) ||
               matchesSearch(q.option_b, r2SearchQuery) ||
               matchesSearch(q.option_c, r2SearchQuery) ||
               matchesSearch(q.option_d, r2SearchQuery);
-            if (matchesText) {
+            if (matchesCat && matchesText) {
               setQuestionsWithIndex.push({ q, idx: originalIdx });
             }
           }
@@ -1100,8 +1195,9 @@
                 return `
                   <div class="editor-card" data-r2-index="${idx}">
                     <div class="editor-card-header">
-                      <div style="display: flex; align-items: center; gap: 0.75rem;">
+                      <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                         <span class="meta-pill accent">Câu ${qInSetIdx + 1} / ${setQuestionsWithIndex.length} (Bộ #${escapeHtml(setVal)})</span>
+                        ${q.category ? `<span class="meta-pill" style="background: var(--surface-2, rgba(255,255,255,0.05)); border: 1px solid var(--border); font-size: 0.78rem; font-weight: 600;">${escapeHtml(q.category)}</span>` : ""}
                         <h3 class="editor-card-title">Câu số ${escapeHtml(q.number || qInSetIdx + 1)}</h3>
                       </div>
                       <button type="button" class="btn btn-sm btn-danger" data-remove-r2="${idx}">Xóa câu</button>
@@ -1119,13 +1215,8 @@
                       </div>
 
                       <div class="editor-field">
-                        <label class="editor-label">Đáp án đúng</label>
-                        <select class="editor-select" data-r2-field="correct" data-index="${idx}" style="font-weight: 800; color: var(--success);">
-                          <option value="A" ${correctOpt === 'A' ? 'selected' : ''}>A</option>
-                          <option value="B" ${correctOpt === 'B' ? 'selected' : ''}>B</option>
-                          <option value="C" ${correctOpt === 'C' ? 'selected' : ''}>C</option>
-                          <option value="D" ${correctOpt === 'D' ? 'selected' : ''}>D</option>
-                        </select>
+                        <label class="editor-label">Lĩnh vực / Chuyên đề</label>
+                        <input type="text" class="editor-input" list="r2-category-list" data-r2-field="category" data-index="${idx}" value="${escapeHtml(q.category || '')}" placeholder="vd: Kiểm tra, Tuyên truyền..." />
                       </div>
                     </div>
 
@@ -1134,7 +1225,7 @@
                       <textarea class="editor-textarea" data-r2-field="question" data-index="${idx}" rows="2" placeholder="Nhập nội dung câu hỏi...">${escapeHtml(q.question || '')}</textarea>
                     </div>
 
-                    <!-- 4 Options with Correct Highlight -->
+                    <!-- Options with Correct Highlight -->
                     <div class="editor-grid-2" style="margin-top: 0.5rem;">
                       <div class="editor-field ${correctOpt === 'A' ? 'r2-correct-highlight' : ''}" style="padding: 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
                         <label class="editor-label">
@@ -1154,18 +1245,28 @@
                         <label class="editor-label">
                           Phương án C ${correctOpt === 'C' ? '<span class="r2-correct-badge">✓ Đáp án đúng</span>' : ''}
                         </label>
-                        <input type="text" class="editor-input" data-r2-field="option_c" data-index="${idx}" value="${escapeHtml(q.option_c || '')}" placeholder="Phương án C" />
+                        <input type="text" class="editor-input" data-r2-field="option_c" data-index="${idx}" value="${escapeHtml(q.option_c || '')}" placeholder="Phương án C (để trống nếu câu 2 phương án)" />
                       </div>
 
                       <div class="editor-field ${correctOpt === 'D' ? 'r2-correct-highlight' : ''}" style="padding: 0.5rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
                         <label class="editor-label">
                           Phương án D ${correctOpt === 'D' ? '<span class="r2-correct-badge">✓ Đáp án đúng</span>' : ''}
                         </label>
-                        <input type="text" class="editor-input" data-r2-field="option_d" data-index="${idx}" value="${escapeHtml(q.option_d || '')}" placeholder="Phương án D" />
+                        <input type="text" class="editor-input" data-r2-field="option_d" data-index="${idx}" value="${escapeHtml(q.option_d || '')}" placeholder="Phương án D (để trống nếu câu 2 phương án)" />
                       </div>
                     </div>
 
-                    <div class="editor-grid-2" style="margin-top: 0.5rem;">
+                    <div class="editor-grid-3" style="margin-top: 0.5rem;">
+                      <div class="editor-field">
+                        <label class="editor-label">Đáp án đúng</label>
+                        <select class="editor-select" data-r2-field="correct" data-index="${idx}" style="font-weight: 800; color: var(--success);">
+                          <option value="A" ${correctOpt === 'A' ? 'selected' : ''}>A</option>
+                          <option value="B" ${correctOpt === 'B' ? 'selected' : ''}>B</option>
+                          <option value="C" ${correctOpt === 'C' ? 'selected' : ''}>C</option>
+                          <option value="D" ${correctOpt === 'D' ? 'selected' : ''}>D</option>
+                        </select>
+                      </div>
+
                       <div class="editor-field">
                         <label class="editor-label">Thời gian trả lời (giây)</label>
                         <input type="number" class="editor-input" data-r2-field="time_seconds" data-index="${idx}" value="${q.time_seconds || 30}" min="5" />
@@ -1178,6 +1279,11 @@
                           <div id="r2-preview-box-${idx}">${renderImagePreviewHtml(q.image_url)}</div>
                         </div>
                       </div>
+                    </div>
+
+                    <div class="editor-field" style="margin-top: 0.5rem;">
+                      <label class="editor-label">Giải thích đáp án &amp; Căn cứ pháp lý (hiển thị trên màn hình khi công bố đáp án)</label>
+                      <textarea class="editor-textarea" data-r2-field="explanation" data-index="${idx}" rows="2" placeholder="Căn cứ theo Điều...">${escapeHtml(q.explanation || '')}</textarea>
                     </div>
                   </div>
                 `;
@@ -1235,7 +1341,9 @@
             option_d: "",
             correct: "A",
             time_seconds: Number(content.config?.round2_time_seconds) || 30,
-            image_url: ""
+            image_url: "",
+            category: "",
+            explanation: ""
           });
           markUnsaved();
           renderRound2();
@@ -1976,7 +2084,8 @@
           round3: remoteContent.round3 || [],
           judges: remoteContent.judges || [],
           accounts: remoteContent.accounts || [],
-          config: remoteContent.config || {}
+          config: remoteContent.config || {},
+          clusters: remoteContent.clusters || []
         };
       } else {
         const sampleData = await fetchSampleQuizData();
@@ -2001,7 +2110,9 @@
             option_d: q.option_d,
             correct: q.correct,
             time_seconds: q.time_seconds,
-            image_url: q.image_url
+            image_url: q.image_url,
+            category: q.category || "",
+            explanation: q.explanation || ""
           })),
           round3: sampleData.round3Questions.map((tile) => ({
             number: tile.number,
@@ -2012,7 +2123,8 @@
           })),
           judges: sampleData.judges || [],
           accounts: sampleData.accounts || [],
-          config: sampleData.config || {}
+          config: sampleData.config || {},
+          clusters: sampleData.clusters || []
         };
       }
 
@@ -2108,6 +2220,11 @@
         renderRound2();
       });
 
+      document.getElementById("r2-filter-category")?.addEventListener("change", (e) => {
+        r2FilterCategory = e.target.value;
+        renderRound2();
+      });
+
       document.getElementById("r2-filter-search")?.addEventListener("input", (e) => {
         r2SearchQuery = e.target.value;
         renderRound2();
@@ -2172,7 +2289,9 @@
           option_d: "",
           correct: "A",
           time_seconds: Number(content.config?.round2_time_seconds) || 30,
-          image_url: ""
+          image_url: "",
+          category: r2FilterCategory || "",
+          explanation: ""
         });
         markUnsaved();
         renderRound2();
@@ -2194,7 +2313,9 @@
           option_d: "",
           correct: "A",
           time_seconds: Number(content.config?.round2_time_seconds) || 30,
-          image_url: ""
+          image_url: "",
+          category: r2FilterCategory || "",
+          explanation: ""
         });
         markUnsaved();
         renderRound2();
@@ -2591,7 +2712,9 @@
               option_d: q.option_d,
               correct: q.correct,
               time_seconds: q.time_seconds,
-              image_url: q.image_url
+              image_url: q.image_url,
+              category: q.category || "",
+              explanation: q.explanation || ""
             })),
             round3: sampleData.round3Questions.map((tile) => ({
               number: tile.number,
@@ -2602,7 +2725,8 @@
             })),
             judges: sampleData.judges || [],
             accounts: sampleData.accounts || [],
-            config: sampleData.config || {}
+            config: sampleData.config || {},
+            clusters: sampleData.clusters || []
           };
           ensureRoundOrderStructure();
           renderAllPanels();

@@ -522,6 +522,7 @@ export function wireStageLayout({
     ];
 
     const showTitle = escapeHtml(config.show_title || "Hội thi PCCC và CNCH");
+    const showSubtitle = escapeHtml(config.show_subtitle || "");
     const session = getActiveSession(undefined, "host");
     const displayName = session?.display_name || session?.username || "Dẫn chương trình";
 
@@ -530,6 +531,7 @@ export function wireStageLayout({
         <div class="sidebar-brand-row">
           <div id="sidebar-show-title" class="sidebar-show-title" title="${showTitle}">
             ${showTitle}
+            ${showSubtitle ? `<div class="sidebar-show-subtitle" style="font-size: 0.76rem; font-weight: normal; color: var(--accent); margin-top: 0.25rem; line-height: 1.3; font-family: var(--font-sans);" title="${showSubtitle}">${showSubtitle}</div>` : ""}
           </div>
           <button
             type="button"

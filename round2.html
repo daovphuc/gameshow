@@ -348,6 +348,7 @@
       container.innerHTML = `
         <div class="section-header">
           <div>
+            ${quizData.config?.show_subtitle ? `<div class="stage-cluster-subtitle" style="font-size: 1rem; color: var(--accent); font-weight: 700; margin-bottom: 0.35rem;">${escapeHtml(quizData.config.show_subtitle)}</div>` : ""}
             <h1 class="section-title">${escapeHtml(quizData.config.round2_name)}</h1>
             <p class="section-subtitle">
               Chọn bộ đề 10 câu hỏi trắc nghiệm hoặc bấm "Chọn ngẫu nhiên".
@@ -437,12 +438,13 @@
       const isRevealed = liveR2.status === "revealed";
       const isLocked = liveR2.status === "locked" || isRevealed;
 
-      const options = [
+      const allOptions = [
         { letter: "A", text: q.option_a },
         { letter: "B", text: q.option_b },
         { letter: "C", text: q.option_c },
         { letter: "D", text: q.option_d }
       ];
+      const options = allOptions.filter((opt) => opt.text !== undefined && opt.text !== null && String(opt.text).trim() !== "");
 
       const optionsHtml = options
         .map((opt) => {
@@ -473,23 +475,41 @@
         });
 
         resultsHtml = `
-          <div class="panel-card" style="margin-top: 2rem;">
-            <h2 class="panel-title">Kết quả trả lời của các đội câu #${q.number}:</h2>
+          ${
+            q.explanation
+              ? `
+            <div class="panel-card" style="margin-top: 1.5rem; border-left: 5px solid var(--accent); background: var(--surface-2, rgba(255,255,255,0.03)); padding: 1.25rem 1.5rem;">
+              <div style="font-weight: 700; color: var(--accent); font-size: 1.15rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <span>📖 Căn cứ pháp lý &amp; Giải thích đáp án:</span>
+              </div>
+              <div style="font-size: 1.1rem; line-height: 1.6; color: var(--text);">
+                ${escapeHtml(q.explanation)}
+              </div>
+            </div>
+          `
+              : ""
+          }
+
+          <div class="panel-card" style="margin-top: 1.5rem;">
+            <h2 class="panel-title" style="font-size: 1.25rem; font-weight: 700;">Kết quả trả lời của các đội (Câu #${q.number}):</h2>
             <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem;">
               ${teamResultsList
                 .map(
                   (item) => `
-                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.65rem 0.9rem; border-radius: var(--radius-sm); border: 1px solid var(--border); background-color: var(--surface);">
-                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border); background-color: var(--surface);">
+                  <div style="display: flex; align-items: center; gap: 0.65rem;">
                     ${renderAvatarHtml(item.team, "team-avatar-sm")}
-                    <span style="font-weight: 600; font-size: 0.95rem;">${escapeHtml(item.team.name)}</span>
+                    <span style="font-weight: 600; font-size: 1.05rem;">${escapeHtml(item.team.name)}</span>
                   </div>
-                  <div style="display: flex; align-items: center; gap: 0.6rem; font-family: var(--font-mono);">
-                    <span style="font-weight: 800; font-size: 1.1rem; color: ${item.isCorrect ? "#2E7D4F" : "#C94A38"};">
+                  <div style="display: flex; align-items: center; gap: 1rem; font-family: var(--font-mono);">
+                    <span style="font-weight: 800; font-size: 1.25rem; color: ${item.isCorrect ? "#2E7D4F" : "#C94A38"};">
                       ${item.choice}
                     </span>
-                    <span style="font-size: 0.82rem; color: var(--text-muted); min-width: 56px; text-align: right;">${item.answered ? `${item.timeSec}s` : "—"}</span>
-                    <span style="font-weight: 800; color: var(--accent); min-width: 45px; text-align: right;">+${item.points}đ</span>
+                    <span style="font-size: 0.95rem; font-weight: 600; color: ${item.isCorrect ? "#2E7D4F" : (item.answered ? "#C94A38" : "var(--text-muted)")}; min-width: 70px; text-align: center;">
+                      ${item.isCorrect ? "✓ Đúng" : (item.answered ? "✗ Sai" : "Chưa trả lời")}
+                    </span>
+                    <span style="font-size: 0.92rem; color: var(--text-muted); min-width: 65px; text-align: right;">${item.answered ? `${item.timeSec}s` : "—"}</span>
+                    <span style="font-weight: 800; font-size: 1.05rem; color: var(--accent); min-width: 50px; text-align: right;">+${item.points}đ</span>
                   </div>
                 </div>
               `
@@ -517,6 +537,7 @@
                 ← Bộ đề
               </button>
               <span class="meta-pill accent">Bộ #${escapeHtml(selectedSet)} • Câu ${currentQuestionIdx + 1}/${totalQuestions}</span>
+              ${q.category ? `<span class="meta-pill" style="background: var(--surface-2, rgba(255,255,255,0.05)); border: 1px solid var(--border); font-size: 0.85rem; font-weight: 700;">Chuyên đề: ${escapeHtml(q.category)}</span>` : ""}
               <div class="r2-live-counter">
                 <span>⚡</span>
                 <span id="r2-answered-counter">${answeredCount}/${participatingTeams.length} đội đã trả lời</span>

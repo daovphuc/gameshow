@@ -351,12 +351,13 @@
       const result = r2.results?.[selectedTeamId];
       const correctLetter = isRevealed && q.correct ? String(q.correct).toUpperCase() : "";
 
-      const options = [
+      const allOptions = [
         { letter: "A", text: q.option_a, cls: "choice-a" },
         { letter: "B", text: q.option_b, cls: "choice-b" },
         { letter: "C", text: q.option_c, cls: "choice-c" },
         { letter: "D", text: q.option_d, cls: "choice-d" }
       ];
+      const options = allOptions.filter((opt) => opt.text !== undefined && opt.text !== null && String(opt.text).trim() !== "");
 
       const choicesHtml = options
         .map((opt) => {
@@ -422,8 +423,17 @@
           <div id="team-answer-status" style="text-align: center; min-height: 44px; margin-bottom: 1rem;">
             ${
               isRevealed && result
-                ? `<div style="display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.75rem 1.5rem; border-radius: 100px; font-weight: 800; font-size: 1.15rem; background-color: ${result.isCorrect ? "rgba(46, 125, 79, 0.15)" : "rgba(201, 74, 56, 0.15)"}; color: ${result.isCorrect ? "#2E7D4F" : "#C94A38"};">
-                    <span>${result.isCorrect ? `✓ Chính xác! (+${result.points} điểm)` : `✕ Rất tiếc! Đáp án đúng là ${correctLetter}`}</span>
+                ? `<div style="display: inline-flex; flex-direction: column; align-items: center; gap: 0.6rem; max-width: 600px; width: 100%;">
+                    <div style="display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.75rem 1.5rem; border-radius: 100px; font-weight: 800; font-size: 1.15rem; background-color: ${result.isCorrect ? "rgba(46, 125, 79, 0.15)" : "rgba(201, 74, 56, 0.15)"}; color: ${result.isCorrect ? "#2E7D4F" : "#C94A38"};">
+                      <span>${result.isCorrect ? `✓ Chính xác! (+${result.points} điểm)` : `✕ Rất tiếc! Đáp án đúng là ${correctLetter}`}</span>
+                    </div>
+                    ${
+                      q.explanation
+                        ? `<div style="margin-top: 0.5rem; padding: 0.75rem 1rem; border-radius: var(--radius-md); background: var(--surface-alt, rgba(0,0,0,0.04)); border-left: 4px solid var(--accent); font-size: 0.92rem; line-height: 1.45; text-align: left; color: var(--text);">
+                            <strong>📖 Giải thích:</strong> ${escapeHtml(q.explanation)}
+                          </div>`
+                        : ""
+                    }
                   </div>`
                 : hasAnswered
                   ? `<div style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.25rem; border-radius: 100px; background-color: rgba(46, 125, 79, 0.12); color: #2E7D4F; font-weight: 700;">
@@ -431,7 +441,7 @@
                     </div>`
                   : isLocked
                     ? `<div style="color: var(--text-muted); font-weight: 700; font-size: 1.05rem;">Đã hết giờ làm bài</div>`
-                    : `<div style="color: var(--text-muted); font-weight: 600; font-size: 1.05rem;">Chạm vào 1 trong 4 đáp án bên dưới để trả lời:</div>`
+                    : `<div style="color: var(--text-muted); font-weight: 600; font-size: 1.05rem;">Chạm vào phương án bên dưới để trả lời:</div>`
             }
           </div>
 

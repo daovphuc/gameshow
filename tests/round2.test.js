@@ -225,6 +225,22 @@ test("Round-2 ranking: tie on points broken by shorter total correct time, then 
 
   assert.equal(ranked[3].id, "doi-A");
   assert.equal(ranked[3].rank, 4);
+
+  // Điều 21.2.b: Tie on points broken by fastestCount first, then totalCorrectTimeMs
+  const tiedTeams = [
+    { id: "doi-X", name: "Đội X" },
+    { id: "doi-Y", name: "Đội Y" }
+  ];
+  const statsWithFastest = {
+    // Both 10 points; doi-X has 2 fastest questions, doi-Y has 1, even if doi-Y had lower total time
+    "doi-X": { points: 10, correctCount: 5, fastestCount: 2, totalCorrectTimeMs: 40000 },
+    "doi-Y": { points: 10, correctCount: 5, fastestCount: 1, totalCorrectTimeMs: 30000 }
+  };
+  const rankedTied = computeRound2Ranking(tiedTeams, statsWithFastest);
+  assert.equal(rankedTied[0].id, "doi-X");
+  assert.equal(rankedTied[0].rank, 1);
+  assert.equal(rankedTied[1].id, "doi-Y");
+  assert.equal(rankedTied[1].rank, 2);
 });
 
 test("Round-2 sheet normalisation: options, correct A-D (case-insensitive), invalid rows skipped, grouping by set, default time", () => {

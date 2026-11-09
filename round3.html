@@ -216,6 +216,7 @@
       container.innerHTML = `
         <div class="section-header">
           <div>
+            ${quizData.config?.show_subtitle ? `<div class="stage-cluster-subtitle" style="font-size: 1rem; color: var(--accent); font-weight: 700; margin-bottom: 0.35rem;">${escapeHtml(quizData.config.show_subtitle)}</div>` : ""}
             <h1 class="section-title">${escapeHtml(quizData.config.round3_name)}</h1>
             <p class="section-subtitle">
               Chọn đội đang trả lời từ danh sách thứ tự thi đấu, sau đó bấm mở ô câu hỏi tình huống trên bảng.

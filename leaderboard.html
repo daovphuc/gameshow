@@ -16,6 +16,7 @@
     <main class="stage-main">
       <div class="section-header">
         <div>
+          <div id="leaderboard-subtitle" class="stage-cluster-subtitle" style="font-size: 1rem; color: var(--accent); font-weight: 700; margin-bottom: 0.35rem; display: none;"></div>
           <h1 class="section-title">Bảng Xếp Hạng Đội Thi</h1>
           <p class="section-subtitle">
             Top 5 đội dẫn đầu vinh danh trên bục cúp chiến thắng; điểm số tự động cập nhật trực tiếp theo thời gian thực.
@@ -262,6 +263,12 @@
         gameState = { ...gameState, ...remoteLive };
         renderBoard();
       });
+
+      const subEl = document.getElementById("leaderboard-subtitle");
+      if (subEl && quizData?.config?.show_subtitle) {
+        subEl.textContent = quizData.config.show_subtitle;
+        subEl.style.display = "block";
+      }
 
       wireStageLayout({
         activePage: "leaderboard",

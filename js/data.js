@@ -5,6 +5,7 @@ import { parseCsv } from "./csv.js";
 import { normaliseRound2 } from "./round2.js";
 import { normaliseJudges } from "./judges.js";
 import { normaliseAccounts, resolveAccounts } from "./auth.js";
+import { normaliseClusters } from "./clusters.js";
 
 function toRows(input) {
   if (typeof input === "string") {
@@ -314,7 +315,8 @@ export function normaliseAllData({
   round3Csv = [],
   judgesCsv = [],
   accountsCsv = [],
-  configCsv = []
+  configCsv = [],
+  clustersCsv = []
 } = {}) {
   const config = normaliseConfig(configCsv);
   const teams = normaliseTeams(teamsCsv);
@@ -323,6 +325,7 @@ export function normaliseAllData({
   const round3Questions = normaliseRound3(round3Csv, config);
   const judges = normaliseJudges(judgesCsv);
   const accounts = resolveAccounts(toRows(accountsCsv), { judges, teams });
+  const clusters = normaliseClusters(clustersCsv);
 
   return {
     config,
@@ -332,6 +335,7 @@ export function normaliseAllData({
     round3Questions,
     judges,
     accounts,
+    clusters,
     scores: {}
   };
 }

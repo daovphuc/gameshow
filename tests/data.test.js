@@ -147,7 +147,7 @@ test("normaliseRound3 parses numbers, applies defaults, resolves image_url, has 
   assert.equal(tiles[0].number, 1);
   assert.equal("answer" in tiles[0], false);
   assert.equal(tiles[0].time_seconds, 25);
-  assert.equal(tiles[0].points, 20);
+  assert.equal(tiles[0].points, 30);
   assert.equal(tiles[0].image_url, "");
 
   assert.equal(tiles[1].number, 2);
@@ -157,7 +157,7 @@ test("normaliseRound3 parses numbers, applies defaults, resolves image_url, has 
   assert.equal(tiles[1].image_url, "images/cau-2.jpg");
 });
 
-test("sample CSV files in data/sample parse and normalise cleanly with 35 teams, 3 judges, 2 round-2 sets of 10 questions, 70 team-owned round-1 packages, and 15 round-3 questions", () => {
+test("sample CSV files in data/sample parse and normalise cleanly with 35 teams, 3 judges, 3 round-2 sets of 10 questions, 70 team-owned round-1 packages, and 15 round-3 questions", () => {
   const sampleDir = path.resolve("data/sample");
   const teamsCsv = fs.readFileSync(path.join(sampleDir, "teams.csv"), "utf8");
   const round1Csv = fs.readFileSync(path.join(sampleDir, "round1.csv"), "utf8");
@@ -178,7 +178,7 @@ test("sample CSV files in data/sample parse and normalise cleanly with 35 teams,
     assert.equal("answer" in pkg, false);
     assert.equal("answer" in pkg.questions[0], false);
   }
-  assert.equal(data.round2Questions.length, 20);
+  assert.equal(data.round2Questions.length, 30);
   assert.equal(data.round3Questions.length, 15);
   for (const tile of data.round3Questions) {
     assert.equal("answer" in tile, false);

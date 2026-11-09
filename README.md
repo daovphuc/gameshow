@@ -149,11 +149,18 @@ Hệ thống tích hợp sẵn trình soạn thảo nội dung trực quan cho M
 
 Toàn bộ dữ liệu được lưu trữ tại nút `content/` trên Firebase Realtime Database (hoặc bộ nhớ nội bộ ở chế độ Local Mode) và tự động đồng bộ tức thì tới tất cả các màn hình:
 
-1. **Đội thi**: Thêm, sửa tên, xóa đội thi, chọn màu sắc đại diện và ảnh đại diện của đội (hỗ trợ gợi ý danh sách 35 đội thi có sẵn). Ảnh không tải lên database: chép file ảnh vào thư mục `images/` của dự án rồi commit, sau đó nhập tên file (ví dụ `doi01.png`) hoặc một link https vào ô ảnh; trang hiển thị ảnh xem trước. Ảnh câu hỏi các vòng dùng cùng cách này.
-2. **Thứ tự thi (Phân vòng & Xếp lượt)**: Cấu hình danh sách đội tham gia và số thứ tự thi riêng biệt cho từng Vòng 1, Vòng 2 và Vòng 3. Hỗ trợ chọn/bỏ chọn đội tham gia, đổi vị trí lên/xuống (Move Up/Down), và đặt lại thứ tự mặc định.
-3. **Vòng 1**: Chỉnh sửa các gói câu hỏi (tên gói, đội sở hữu, nội dung câu hỏi, thời gian và điểm số).
-4. **Vòng 2**: Chỉnh sửa ngân hàng câu hỏi trắc nghiệm chia theo từng bộ đề (nội dung câu hỏi, 4 phương án lựa chọn A/B/C/D, đáp án đúng, thời gian làm bài).
-5. **Vòng 3**: Quản lý danh sách các ô tình huống truyền thông (số thứ tự ô, nội dung tình huống, thời gian suy nghĩ và điểm số).
+1. **Đội thi**: Thêm, sửa tên, xóa đội thi, chọn màu sắc đại diện và ảnh đại diện của đội (hỗ trợ gợi ý danh sách 35 đội thi có sẵn theo đúng danh mục Công an các tỉnh, thành phố và các Trường CAND). Ảnh không tải lên database: chép file ảnh vào thư mục `images/` của dự án rồi commit, sau đó nhập tên file (ví dụ `doi01.png`) hoặc một link https vào ô ảnh; trang hiển thị ảnh xem trước.
+2. **Thứ tự thi & Phân cụm thi đấu (Clusters)**:
+   - Cấu hình danh sách đội tham gia và số thứ tự thi riêng biệt cho toàn bộ hội thi (`contest`) và từng vòng thi (`round1`, `round2`, `round3`).
+   - Tích hợp sẵn nút chọn cụm nhanh: **Cụm 1** (12 đội — Học viện CSND, Hà Nội), **Cụm 2** (12 đội — Công an tỉnh Quảng Ngãi), **Cụm 3** (11 đội — Công an tỉnh Tây Ninh), và **Chung kết** (Khánh Hòa) theo đúng Kế hoạch số 204/KH-BCA-C07.
+   - Khi chọn cụm, hệ thống tự động thiết lập danh sách thứ tự thi của tất cả các vòng và tự động đồng bộ dòng phụ đề hội thi (`show_subtitle`) hiển thị thời gian, địa điểm thi đấu lên đầu các màn hình máy chiếu (`host.html`, `round1.html`, `round2.html`, `round3.html`, `leaderboard.html`, `scores.html`). Dữ liệu cấu hình cụm được lưu tại `data/sample/clusters.csv`.
+3. **Vòng 1 (Tuyên truyền)**: Chỉnh sửa các gói câu hỏi (tên gói, đội sở hữu, nội dung câu hỏi, thời gian 15 phút và thang điểm tối đa 50đ gồm 45đ nội dung + 5đ hình thức).
+4. **Vòng 2 (Trắc nghiệm)**:
+   - Chỉnh sửa ngân hàng câu hỏi trắc nghiệm chia theo từng bộ đề, bao gồm bộ **"Chạy thử"** (10 câu: 4 Kiểm tra, 3 Tuyên truyền, 2 Xử phạt, 1 Điều tra) và các bộ đề chính thức.
+   - Hỗ trợ câu hỏi 4 phương án (A, B, C, D) hoặc câu hỏi 2 phương án (A, B - dạng Đúng/Sai hoặc Có/Không), tự động ẩn các nút lựa chọn C, D trên màn hình iPad của đội thi.
+   - Quản lý trường **Lĩnh vực (`category`)** (Kiểm tra, Tuyên truyền, Xử phạt, Điều tra) với bộ lọc chuyên biệt, và **Căn cứ pháp lý / Giải thích (`explanation`)**.
+   - Bảo mật thông tin: iPad đội thi (`team.html`) không bao giờ nhận được đáp án đúng hoặc nội dung giải thích trước khi câu hỏi được công bố (reveal). Khi MC mở đáp án, máy chiếu sân khấu hiển thị đáp án đúng, trích dẫn pháp lý chi tiết và bảng thống kê kết quả, thời gian phản hồi của từng đội thi.
+5. **Vòng 3 (Xử lý tình huống)**: Quản lý danh sách các ô tình huống truyền thông (số thứ tự ô, nội dung tình huống, thời gian suy nghĩ 2 phút + trả lời 5 phút và điểm số tối đa 30đ gồm 25đ nội dung + 5đ hình thức).
 6. **Ban Giám khảo**: Thêm, sửa họ tên và mã định danh của các thành viên Ban Giám khảo.
 7. **Tài khoản**: Quản lý phân quyền tài khoản (vai trò, đối tượng liên kết, tên hiển thị) và tạo tài khoản Firebase Authentication trực tiếp trong ứng dụng. Hỗ trợ tạo từng tài khoản hoặc tạo hàng loạt từ file CSV. Ở chế độ Local Mode, hỗ trợ thêm/sửa/tạo tài khoản thử nghiệm trực tiếp.
 8. **Cài đặt chung**: Điều chỉnh tên hội thi, tiêu đề phụ, thời gian đếm ngược, điểm trắc nghiệm mỗi câu đúng Vòng 2 và thang điểm từng vòng thi.
@@ -199,21 +206,25 @@ Dẫn chương trình (`host`) có toàn quyền quản lý tài khoản tại t
 
 ## 5. Quy Tắc Chấm Điểm & Xếp Hạng (Điều 21 & Điều 22)
 
-Hệ thống tự động thực hiện đầy đủ các quy định theo Thể lệ hội thi:
+Hệ thống tự động thực hiện đầy đủ các quy định theo Thể lệ hội thi (xem bảng đối chiếu chi tiết toàn bộ 27 điều khoản tại [`docs/doi-chieu-dieu-le.md`](./docs/doi-chieu-dieu-le.md)):
 
-1. **Vòng 1 & Vòng 3 (Điểm Giám Khảo & Điểm Trừ - Điều 19 & 21)**:
+1. **Vòng 1 & Vòng 3 (Điểm Giám Khảo & Điểm Phạt - Điều 19, 20 & 21)**:
    - Điểm của đội là trung bình cộng điểm chấm của các Giám khảo (Nội dung + Hình thức) trừ đi Điểm phạt do vi phạm quy chế hoặc quá thời gian quy định.
+   - Thang điểm: Vòng 1 tối đa 50 điểm (45 điểm nội dung + 5 điểm hình thức), thời gian 15 phút. Vòng 3 tối đa 30 điểm (25 điểm nội dung + 5 điểm hình thức), thời gian suy nghĩ 2 phút + trả lời 5 phút.
+   - Trừ điểm thời gian (Điều 19): Quá từ 01s đến 30s trừ 0.5 điểm; quá từ 31s đến 60s trừ 1.0 điểm; quá trên 60s trừ 2.0 điểm (được hỗ trợ tính và nhập tại trang `scores.html`).
+   - Xử lý vi phạm (Điều 20): Trừ 2.0 điểm nếu dùng tài liệu không được phép; hủy kết quả phần thi (0 điểm) nếu có hành vi gian lận.
    - Các giám khảo chưa bấm gửi điểm sẽ tự động bị loại khỏi mẫu số tính trung bình.
    - Khi có các đội bằng điểm nhau ở Vòng 1 hoặc Vòng 3: Đội có điểm trung bình phần **Nội dung** cao hơn sẽ được xếp trên.
 
-2. **Vòng 2 (Trắc nghiệm tương tác - Điều 15)**:
+2. **Vòng 2 (Trắc nghiệm tương tác - Điều 15 & Điều 21.2.b)**:
    - Mỗi câu trả lời đúng trong thời gian quy định (mặc định 30 giây) nhận điểm cố định (mặc định 2 điểm/câu, cấu hình qua `round2_points_per_correct`).
    - Trả lời sai, quá thời gian quy định hoặc không trả lời nhận 0 điểm.
    - Tổng điểm Vòng 2 là tổng điểm của các câu trả lời đúng (tối đa 20 điểm với bộ đề 10 câu).
-   - **Thống kê & Xếp hạng Vòng 2**: Bảng thống kê xếp hạng Vòng 2 được sắp xếp theo các tiêu chí ưu tiên:
-     1. Điểm số Vòng 2 cao hơn (nhiều điểm hơn xếp trên).
-     2. Tổng thời gian trả lời của các câu trả lời đúng ngắn hơn (trả lời đúng nhanh hơn xếp trên).
-     3. Thứ tự đội thi / bốc thăm ban đầu.
+   - **Thống kê & Xếp hạng Vòng 2 (Điều 21.2.b)**: Bảng thống kê xếp hạng Vòng 2 được sắp xếp theo các tiêu chí ưu tiên:
+     1. Điểm số Vòng 2 cao hơn (nhiều câu đúng hơn xếp trên).
+     2. Số lần đưa ra câu trả lời đúng nhanh nhất nhiều hơn (`fastestCount` cao hơn xếp trên).
+     3. Tổng thời gian trả lời của các câu trả lời đúng ngắn hơn (trả lời đúng nhanh hơn xếp trên).
+     4. Thứ tự đội thi / bốc thăm ban đầu.
    - Bảng thống kê hiển thị sau khi MC công bố đáp án và có thể mở lại bất cứ lúc nào qua nút "📊 Thống kê Vòng 2" trên màn hình `round2.html`, đồng thời xuất hiện trên trang "Điểm số" (`scores.html`) và trong file báo cáo CSV xuất ra.
 
 3. **Bảng tổng sắp toàn đoàn (Điều 22)**:

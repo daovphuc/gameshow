@@ -10,3 +10,5 @@ import "./judges.test.js";
 import "./report.test.js";
 import "./content.test.js";
 import "./scores-filter.test.js";
+import "./clusters.test.js";
+import "./pages.test.js";
