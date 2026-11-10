@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   calculateRound2QuestionScore,
   calculateRound2Score,
@@ -436,6 +437,43 @@ test("Live-state reducer/commands (pure): show question → answers accepted →
   assert.equal(state.status, "idle");
   assert.equal(state.currentQuestionIndex, 1);
   assert.equal(state.history.length, 1);
+});
+
+test("Host publishes reveal details only until the next question", () => {
+  const page = readFileSync(new URL("../round2.html", import.meta.url), "utf8");
+  function publishedUpdate(handler, context) {
+    const body = page.split(`async function ${handler}()`)[1].split('await update("live/round2", ')[1];
+    const end = body.search(/\n\s*\}\);/);
+    const expression = `${body.slice(0, end)}\n}`;
+    return Function(...Object.keys(context), `return (${expression});`)(...Object.values(context));
+  }
+
+  const question = { question: "Q", option_a: "A", option_b: "B", correct: "B", explanation: "Because", time_seconds: 30 };
+  let state = startRound2Question(createInitialRound2LiveState(), question, 1000);
+  const context = { liveR2: state, currentQuestionIdx: 0, questionKey: "q1", tabletQuestion: state.activeQuestion };
+  state.questionsMeta = { q1: {} };
+  const open = publishedUpdate("handleStartQuestion", context);
+  assert.equal(open.correct, null);
+  assert.equal(open.explanation, null);
+  assert.equal("correct" in open.activeQuestion, false);
+  assert.equal("explanation" in open.activeQuestion, false);
+
+  state = revealRound2Question(lockRound2Question(state), question);
+  const revealed = publishedUpdate("handleRevealQuestion", { liveR2: state });
+  assert.equal(revealed.correct, "B");
+  assert.equal(revealed.explanation, "Because");
+  const next = publishedUpdate("handleNextQuestion", { currentQuestionIdx: 1 });
+  assert.equal(next.correct, null);
+  assert.equal(next.explanation, null);
+  assert.equal(next.activeQuestion, null);
+  const nextState = nextRound2Question(state);
+  assert.equal("correct" in nextState, false);
+  assert.equal("explanation" in nextState, false);
+  const reopened = startRound2Question(state, question, 2000);
+  assert.equal("correct" in reopened, false);
+  assert.equal("explanation" in reopened, false);
+  state = revealRound2Question(reopened, { ...question, explanation: undefined });
+  assert.equal(publishedUpdate("handleRevealQuestion", { liveR2: state }).explanation, null);
 });
 
 test("Reveal derives response time from server answeredAt when tablets store only answeredAt", () => {

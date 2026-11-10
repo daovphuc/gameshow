@@ -284,8 +284,9 @@ export function createInitialRound2LiveState() {
  */
 export function startRound2Question(state, fullQuestion, serverTime = Date.now()) {
   const durationSec = Number(fullQuestion.time_seconds) || 30;
+  const { correct: _omittedCorrect, explanation: _omittedExplanation, ...restState } = state || {};
   return {
-    ...state,
+    ...restState,
     status: "open",
     activeQuestion: filterQuestionForTablet(fullQuestion),
     shownAt: serverTime,
@@ -354,15 +355,19 @@ export function revealRound2Question(
 ) {
   const durationSec = Number(fullQuestion.time_seconds) || 30;
   const correctLetter = String(fullQuestion.correct || "").trim().toUpperCase();
+  const rawExplanation =
+    fullQuestion.explanation !== undefined && fullQuestion.explanation !== null
+      ? String(fullQuestion.explanation).trim()
+      : "";
   const results = {};
 
-  const answers = state.answers || {};
+  const answers = state?.answers || {};
   for (const [teamId, record] of Object.entries(answers)) {
     const isCorrect = record.answer === correctLetter;
     const points = calculateRound2QuestionScore({
       isCorrect,
       answeredAt: record.answeredAt,
-      shownAt: state.shownAt,
+      shownAt: state?.shownAt,
       durationSeconds: durationSec,
       pointsPerCorrect
     });
@@ -372,19 +377,33 @@ export function revealRound2Question(
       isCorrect,
       // Tablets store only the server-side answeredAt, so derive the time here.
       responseTimeMs:
-        Number.isFinite(record.answeredAt) && Number.isFinite(state.shownAt)
+        Number.isFinite(record.answeredAt) && Number.isFinite(state?.shownAt)
           ? Math.max(0, record.answeredAt - state.shownAt)
           : null,
       points
     };
   }
 
-  return {
+  const revealedState = {
     ...state,
     status: "revealed",
-    activeQuestion: { ...fullQuestion },
+    activeQuestion: {
+      ...fullQuestion,
+      correct: correctLetter
+    },
+    correct: correctLetter,
     results
   };
+
+  if (rawExplanation) {
+    revealedState.explanation = rawExplanation;
+    revealedState.activeQuestion.explanation = rawExplanation;
+  } else {
+    delete revealedState.explanation;
+    delete revealedState.activeQuestion.explanation;
+  }
+
+  return revealedState;
 }
 
 /**
@@ -392,23 +411,25 @@ export function revealRound2Question(
  */
 export function nextRound2Question(state) {
   const entry = {
-    question: state.activeQuestion,
-    shownAt: state.shownAt,
-    deadline: state.deadline,
-    answers: state.answers,
-    results: state.results
+    question: state?.activeQuestion,
+    shownAt: state?.shownAt,
+    deadline: state?.deadline,
+    answers: state?.answers,
+    results: state?.results
   };
 
+  const { correct: _omittedCorrect, explanation: _omittedExplanation, ...restState } = state || {};
+
   return {
-    ...state,
+    ...restState,
     status: "idle",
-    currentQuestionIndex: (state.currentQuestionIndex || 0) + 1,
+    currentQuestionIndex: (state?.currentQuestionIndex || 0) + 1,
     activeQuestion: null,
     shownAt: null,
     deadline: null,
     answers: {},
     results: null,
-    history: [...(state.history || []), entry]
+    history: [...(state?.history || []), entry]
   };
 }
 
