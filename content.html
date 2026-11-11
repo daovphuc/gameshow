@@ -220,7 +220,9 @@
               style="min-width: 240px;"
             />
           </div>
-          <div style="display: flex; gap: 0.5rem;">
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" id="btn-download-r2-sample" class="btn btn-sm">📥 Tải mẫu CSV</button>
+            <button type="button" id="btn-import-r2-csv" class="btn btn-sm">📁 Nhập câu hỏi từ CSV</button>
             <button type="button" id="btn-add-r2-set" class="btn btn-sm">+ Thêm bộ đề mới</button>
             <button type="button" id="btn-add-round2" class="btn btn-primary btn-sm">+ Thêm câu hỏi</button>
           </div>
@@ -357,6 +359,39 @@
     </div>
   </div>
 
+  <!-- Modal: Import Round 2 Questions from CSV -->
+  <div id="modal-import-round2-csv" class="login-modal" role="dialog" aria-modal="true" style="display: none;">
+    <div class="login-modal-card" style="max-width: 760px; max-height: 90vh; overflow-y: auto;">
+      <button type="button" id="btn-close-modal-r2-csv" class="login-modal-close" aria-label="Đóng">✕</button>
+      <div class="login-modal-header">
+        <div class="login-modal-icon">📋</div>
+        <h2 class="login-modal-title">Nhập Câu Hỏi Vòng 2 từ CSV</h2>
+      </div>
+      <div>
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin: 0 0 1rem;">
+          Dán nội dung CSV hoặc chọn tệp CSV có các cột: <code>set,number,question,option_a,option_b,option_c,option_d,correct,time_seconds,image_url,category,explanation</code> (giống tệp <code>data/sample/round2.csv</code>).
+        </p>
+        <div style="margin-bottom: 1rem;">
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <label class="btn btn-sm" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;">
+              📂 Chọn tệp CSV...
+              <input type="file" id="file-r2-csv" accept=".csv,text/csv" style="display: none;" />
+            </label>
+            <button type="button" id="btn-download-r2-sample-modal" class="btn btn-sm">📥 Tải mẫu CSV</button>
+          </div>
+          <textarea id="r2-csv-text" class="editor-textarea" rows="8" placeholder="set,number,question,option_a,option_b,option_c,option_d,correct,time_seconds,image_url,category,explanation&#10;1,1,&quot;Câu hỏi mẫu?&quot;,&quot;Phương án A&quot;,&quot;Phương án B&quot;,&quot;Phương án C&quot;,&quot;Phương án D&quot;,A,30,,Kiểm tra,&quot;Căn cứ...&quot;"></textarea>
+        </div>
+        <div id="r2-csv-error" class="login-error" role="alert" aria-live="polite"></div>
+        <div id="r2-csv-preview" style="margin-top: 1rem; display: none;"></div>
+        <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.25rem;">
+          <button type="button" id="btn-cancel-r2-csv" class="btn">Đóng</button>
+          <button type="button" id="btn-preview-r2-csv" class="btn">🔍 Kiểm tra dữ liệu</button>
+          <button type="button" id="btn-confirm-r2-csv" class="btn btn-primary" style="display: none;">✅ Xác nhận thay thế câu hỏi</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <datalist id="preset-team-names"></datalist>
   <datalist id="r2-category-list">
     <option value="Kiểm tra"></option>
@@ -391,6 +426,7 @@
     import { resolveImageUrl } from "./js/data.js";
     import { set, get, listen, isFirebaseBackend, createUserWithSecondaryApp, resetLiveState } from "./js/backend.js";
     import { buildReportCsv } from "./js/report.js";
+    import { validateRound2Csv, ROUND2_CSV_SAMPLE } from "./js/round2.js";
 
     // Populate preset team names datalist
     const datalistEl = document.getElementById("preset-team-names");
@@ -1577,6 +1613,107 @@
       if (modal) modal.style.display = "none";
     }
 
+    let pendingRound2Import = null;
+
+    function downloadRound2Sample() {
+      const blob = new Blob([ROUND2_CSV_SAMPLE], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "mau_cau_hoi_vong_2.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function openImportRound2Modal() {
+      const modal = document.getElementById("modal-import-round2-csv");
+      const errEl = document.getElementById("r2-csv-error");
+      const prevEl = document.getElementById("r2-csv-preview");
+      const confirmBtn = document.getElementById("btn-confirm-r2-csv");
+      if (!modal) return;
+      if (errEl) errEl.innerHTML = "";
+      if (prevEl) {
+        prevEl.style.display = "none";
+        prevEl.innerHTML = "";
+      }
+      if (confirmBtn) confirmBtn.style.display = "none";
+      pendingRound2Import = null;
+      modal.style.display = "flex";
+      document.getElementById("r2-csv-text")?.focus();
+    }
+
+    function closeImportRound2Modal() {
+      const modal = document.getElementById("modal-import-round2-csv");
+      if (modal) modal.style.display = "none";
+      pendingRound2Import = null;
+    }
+
+    function handleRound2CsvValidation() {
+      const text = document.getElementById("r2-csv-text")?.value || "";
+      const errEl = document.getElementById("r2-csv-error");
+      const prevEl = document.getElementById("r2-csv-preview");
+      const confirmBtn = document.getElementById("btn-confirm-r2-csv");
+
+      if (!text.trim()) {
+        if (errEl) errEl.textContent = "Vui lòng nhập hoặc dán nội dung CSV.";
+        if (prevEl) prevEl.style.display = "none";
+        if (confirmBtn) confirmBtn.style.display = "none";
+        pendingRound2Import = null;
+        return;
+      }
+
+      const res = validateRound2Csv(text, content.config);
+      if (!res.ok) {
+        if (errEl) {
+          errEl.innerHTML = `<strong>Có ${res.errors.length} lỗi trong dữ liệu CSV:</strong><ul style="margin: 0.5rem 0 0; padding-left: 1.25rem;">${res.errors.map((e) => `<li>${escapeHtml(e)}</li>`).join("")}</ul>`;
+        }
+        if (prevEl) prevEl.style.display = "none";
+        if (confirmBtn) confirmBtn.style.display = "none";
+        pendingRound2Import = null;
+        return;
+      }
+
+      if (errEl) errEl.innerHTML = "";
+      pendingRound2Import = res.questions;
+
+      if (prevEl) {
+        const { totalSets, totalQuestions, sets } = res.preview;
+        let setBreakdownHtml = "";
+        for (const [setName, info] of Object.entries(sets)) {
+          const catBadges = Object.entries(info.categories)
+            .map(([cat, count]) => `<span class="badge" style="font-size: 0.8rem; background: var(--surface); border: 1px solid var(--border);">${escapeHtml(cat)}: <strong>${count}</strong></span>`)
+            .join(" ");
+          setBreakdownHtml += `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.6rem; background: var(--surface-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 0.4rem;">
+              <div><strong>Bộ đề #${escapeHtml(setName)}:</strong> ${info.count} câu</div>
+              <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">${catBadges}</div>
+            </div>
+          `;
+        }
+
+        prevEl.innerHTML = `
+          <div style="padding: 1rem; border: 1px solid var(--accent); border-radius: var(--radius-md); background: var(--surface);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <h4 style="margin: 0; color: var(--accent);">📊 Xem trước dữ liệu: ${totalSets} bộ đề, tổng cộng ${totalQuestions} câu</h4>
+            </div>
+            <div style="max-height: 220px; overflow-y: auto; margin-bottom: 0.75rem;">
+              ${setBreakdownHtml}
+            </div>
+            <p style="margin: 0; font-size: 0.85rem; color: var(--warning, #eab308); font-weight: 600;">
+              ⚠️ Lưu ý: Khi xác nhận, toàn bộ câu hỏi Vòng 2 hiện tại trong trình chỉnh sửa (${content.round2?.length || 0} câu) sẽ được thay thế bằng danh sách mới (${totalQuestions} câu).
+            </p>
+          </div>
+        `;
+        prevEl.style.display = "block";
+      }
+
+      if (confirmBtn) {
+        confirmBtn.style.display = "inline-flex";
+      }
+    }
+
     function renderAccounts() {
       const root = document.getElementById("accounts-panel-root");
       if (!root) return;
@@ -2415,6 +2552,40 @@
         markUnsaved();
         renderRound2();
         updateBadgeCounts();
+      });
+
+      // Round 2 CSV Import & Sample Download
+      document.getElementById("btn-download-r2-sample")?.addEventListener("click", downloadRound2Sample);
+      document.getElementById("btn-download-r2-sample-modal")?.addEventListener("click", downloadRound2Sample);
+      document.getElementById("btn-import-r2-csv")?.addEventListener("click", openImportRound2Modal);
+      document.getElementById("btn-close-modal-r2-csv")?.addEventListener("click", closeImportRound2Modal);
+      document.getElementById("btn-cancel-r2-csv")?.addEventListener("click", closeImportRound2Modal);
+      document.getElementById("btn-preview-r2-csv")?.addEventListener("click", handleRound2CsvValidation);
+
+      document.getElementById("file-r2-csv")?.addEventListener("change", async (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          try {
+            const text = await file.text();
+            const textarea = document.getElementById("r2-csv-text");
+            if (textarea) {
+              textarea.value = text;
+              handleRound2CsvValidation();
+            }
+          } catch (err) {
+            showToast(`Lỗi đọc file: ${err.message}`);
+          }
+        }
+      });
+
+      document.getElementById("btn-confirm-r2-csv")?.addEventListener("click", () => {
+        if (!pendingRound2Import || pendingRound2Import.length === 0) return;
+        content.round2 = pendingRound2Import;
+        markUnsaved();
+        renderRound2();
+        updateBadgeCounts();
+        closeImportRound2Modal();
+        showToast(`Đã thay thế thành công ${content.round2.length} câu hỏi Vòng 2! Nhớ bấm "Lưu thay đổi".`);
       });
 
       // Button: Add Round 3 Tile
