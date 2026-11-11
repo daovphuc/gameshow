@@ -5,7 +5,7 @@
 import { CONTENT_TABS, SHEET_TABS } from "./config.js";
 import { getActiveSession, saveActiveSession, clearActiveSession, validateSession, isRoleAllowedForPortal } from "./auth.js";
 import { normaliseAllData, resolveImageUrl } from "./data.js";
-import { contentToQuizData, isContentEmpty, getContestTeams } from "./content.js";
+import { contentToQuizData, isContentEmpty, getContestTeams, ALLOWED_TEAM_CONTENT_KEYS, assembleTeamContent } from "./content.js";
 import { createInitialState, syncStateWithTeams, exportState, importState, computeTeamScores } from "./state.js";
 import { getTeamInitials, computeLeaderboard, diffLeaderboard, shortenTeamName } from "./leaderboard.js";
 import { LIGHT_THEME, mergeTheme, themeToCssVars } from "./theme.js";
@@ -265,6 +265,56 @@ export async function fetchSampleQuizData(forceRefresh = false) {
   return normaliseAllData(fetched);
 }
 
+// True once a whole-`content` read was denied (team accounts): read and listen per allowed child.
+let contentRestricted = false;
+
+/**
+ * Reads `content`; when the rules deny the whole node (team role), reads only
+ * the children a team may see and assembles them.
+ * @returns {Promise<object|null>}
+ */
+export async function readContent() {
+  try {
+    const whole = await get("content");
+    contentRestricted = false;
+    return whole;
+  } catch {
+    // Denied for this role (or offline): fall back to the allowed children.
+  }
+  contentRestricted = true;
+  const parts = {};
+  await Promise.all(
+    ALLOWED_TEAM_CONTENT_KEYS.map(async (key) => {
+      try {
+        parts[key] = await get(`content/${key}`);
+      } catch {
+        parts[key] = null;
+      }
+    })
+  );
+  const assembled = assembleTeamContent(parts);
+  return Object.keys(assembled).length ? assembled : null;
+}
+
+/**
+ * Subscribes to content changes using the same paths `readContent` could read.
+ * @param {(content: object|null) => void} callback
+ * @returns {() => void}
+ */
+export function listenContent(callback) {
+  if (!contentRestricted) return listen("content", callback);
+  const latest = {};
+  const seen = new Set();
+  const unsubs = ALLOWED_TEAM_CONTENT_KEYS.map((key) =>
+    listen(`content/${key}`, (value) => {
+      latest[key] = value;
+      seen.add(key);
+      if (seen.size === ALLOWED_TEAM_CONTENT_KEYS.length) callback(assembleTeamContent(latest));
+    })
+  );
+  return () => unsubs.forEach((u) => u());
+}
+
 /**
  * Fetches contest data from live backend content node or falls back to sample CSVs.
  * @param {{forceRefresh?: boolean, portal?: string}} options
@@ -272,12 +322,7 @@ export async function fetchSampleQuizData(forceRefresh = false) {
 export async function fetchQuizData({ forceRefresh = false, portal = "host" } = {}) {
   await initBackend({ portal });
 
-  let remoteContent = null;
-  try {
-    remoteContent = await get("content");
-  } catch {
-    // Ignore database read error
-  }
+  const remoteContent = await readContent();
 
   let data;
   let isSample = false;
@@ -639,7 +684,7 @@ export function wireStageLayout({
       contentReloadHandler = onReload;
       if (!contentListenerStarted) {
         contentListenerStarted = true;
-        listen("content", async (newContent) => {
+        listenContent(async (newContent) => {
           const serialized = JSON.stringify(newContent ?? null);
           if (lastContentJson === null) {
             // First callback carries the content this page was just rendered from.

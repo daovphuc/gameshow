@@ -69,3 +69,49 @@ test("only host and head judge may write overtime penalties", () => {
   assert.ok(rule.includes("'host'") && rule.includes("'head_judge'"));
   assert.ok(!rule.includes("'judge'") && !rule.includes("'team'"));
 });
+
+test("content root read excludes team and grants read only on allowed children", () => {
+  const parsed = JSON.parse(fs.readFileSync(path.resolve("firebase/database.rules.json"), "utf8"));
+  const contentRule = parsed.rules?.content?.[".read"];
+  assert.ok(typeof contentRule === "string" && contentRule.length > 0, "content/.read must exist");
+  assert.ok(contentRule.includes("'host'"), "content/.read must allow host");
+  assert.ok(contentRule.includes("'head_judge'"), "content/.read must allow head_judge");
+  assert.ok(contentRule.includes("'judge'"), "content/.read must allow judge");
+  assert.ok(!contentRule.includes("'team'"), "content/.read must exclude team");
+
+  const allowedChildren = ["teams", "config", "clusters", "round_order", "judges"];
+  for (const child of allowedChildren) {
+    const childRead = parsed.rules?.content?.[child]?.[".read"];
+    assert.ok(typeof childRead === "string", `content/${child}/.read must exist`);
+    assert.ok(childRead.includes("'team'"), `content/${child}/.read must grant read to team`);
+  }
+
+  const forbiddenChildren = ["round1", "round2", "round3"];
+  for (const child of forbiddenChildren) {
+    const childNode = parsed.rules?.content?.[child];
+    const childRead = childNode?.[".read"];
+    assert.ok(
+      !childRead || !childRead.includes("'team'"),
+      `content/${child}/.read must not grant read to team`
+    );
+  }
+});
+
+test("answers root read excludes team and allows matching team ref_id per question", () => {
+  const parsed = JSON.parse(fs.readFileSync(path.resolve("firebase/database.rules.json"), "utf8"));
+  const answersRule = parsed.rules?.answers?.[".read"];
+  assert.ok(typeof answersRule === "string" && answersRule.length > 0, "answers/.read must exist");
+  assert.ok(answersRule.includes("'host'"), "answers/.read must allow host");
+  assert.ok(answersRule.includes("'head_judge'"), "answers/.read must allow head_judge");
+  assert.ok(answersRule.includes("'judge'"), "answers/.read must allow judge");
+  assert.ok(!answersRule.includes("'team'"), "answers/.read must exclude team");
+
+  const teamReadRule = parsed.rules?.answers?.["$questionKey"]?.["$teamId"]?.[".read"];
+  assert.ok(
+    typeof teamReadRule === "string" && teamReadRule.length > 0,
+    "answers/$questionKey/$teamId/.read must exist"
+  );
+  assert.ok(teamReadRule.includes("'team'"), "must check role === 'team'");
+  assert.ok(teamReadRule.includes("ref_id"), "must check ref_id");
+  assert.ok(teamReadRule.includes("$teamId"), "must match $teamId");
+});

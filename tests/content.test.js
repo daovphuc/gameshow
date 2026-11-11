@@ -16,7 +16,11 @@ import {
   getRoundTeams,
   isTeamInRound,
   getContestTeams,
-  isTeamInContest
+  isTeamInContest,
+  getContentPathsForRole,
+  ALLOWED_TEAM_CONTENT_PATHS,
+  ALLOWED_TEAM_CONTENT_KEYS,
+  assembleTeamContent
 } from "../js/content.js";
 
 const sampleDir = path.resolve("data/sample");
@@ -474,4 +478,44 @@ test("validation rejects unknown team IDs and duplicates in round_order.contest 
     resDup.errors.some((e) => e.includes("trùng lặp") && e.includes("doi-01") && e.includes("Đội tham gia hội thi")),
     `Expected error for duplicate team in contest list, got: ${JSON.stringify(resDup.errors)}`
   );
+});
+
+test("getContentPathsForRole returns allowed children for team and full content for host/judge/head_judge", () => {
+  const teamPaths = getContentPathsForRole("team");
+  assert.deepEqual(teamPaths, [
+    "content/teams",
+    "content/config",
+    "content/clusters",
+    "content/round_order",
+    "content/judges"
+  ]);
+  assert.ok(!teamPaths.includes("content/round1"));
+  assert.ok(!teamPaths.includes("content/round2"));
+  assert.ok(!teamPaths.includes("content/round3"));
+  assert.ok(!teamPaths.includes("content"));
+
+  assert.deepEqual(getContentPathsForRole("host"), ["content"]);
+  assert.deepEqual(getContentPathsForRole("judge"), ["content"]);
+  assert.deepEqual(getContentPathsForRole("head_judge"), ["content"]);
+  assert.deepEqual(getContentPathsForRole(null), ["content"]);
+  assert.deepEqual(getContentPathsForRole(undefined), ["content"]);
+});
+
+
+test("assembleTeamContent keeps only allowed children and drops question banks", () => {
+  const assembled = assembleTeamContent({
+    teams: [{ id: "doi-01", name: "A" }],
+    config: { show_title: "X" },
+    clusters: null,
+    round_order: undefined,
+    judges: [{ id: "gk-01" }],
+    round2: [{ question: "Q", correct: "B" }],
+    round1: [{ question: "T" }],
+    round3: [{ question: "S" }]
+  });
+  assert.deepEqual(Object.keys(assembled).sort(), ["config", "judges", "teams"]);
+  assert.equal(assembled.round2, undefined);
+  assert.equal(assembled.round1, undefined);
+  assert.equal(assembled.round3, undefined);
+  assert.deepEqual(assembleTeamContent(), {});
 });

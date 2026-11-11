@@ -52,7 +52,9 @@ export function isContentEmpty(content) {
   const hasRound2 = Array.isArray(content.round2) && content.round2.length > 0;
   const hasRound3 = Array.isArray(content.round3) && content.round3.length > 0;
   const hasJudges = Array.isArray(content.judges) && content.judges.length > 0;
-  return !hasTeams && !hasRound1 && !hasRound2 && !hasRound3 && !hasJudges;
+  const hasConfig = content.config && typeof content.config === "object" && Object.keys(content.config).length > 0;
+  const hasClusters = Array.isArray(content.clusters) && content.clusters.length > 0;
+  return !hasTeams && !hasRound1 && !hasRound2 && !hasRound3 && !hasJudges && !hasConfig && !hasClusters;
 }
 
 /**
@@ -633,3 +635,39 @@ export function importContentFromJson(jsonString) {
     content: parsed
   };
 }
+
+export const ALLOWED_TEAM_CONTENT_KEYS = ["teams", "config", "clusters", "round_order", "judges"];
+export const ALLOWED_TEAM_CONTENT_PATHS = ALLOWED_TEAM_CONTENT_KEYS.map((k) => `content/${k}`);
+
+/**
+ * Decides which content paths a role loads from the database.
+ * Team role loads only allowed children (never round1/round2/round3 question banks).
+ * Host, judge, and head_judge load the entire content node.
+ *
+ * @param {string} role
+ * @returns {Array<string>}
+ */
+export function getContentPathsForRole(role) {
+  const cleanRole = String(role || "").trim().toLowerCase();
+  if (cleanRole === "team") {
+    return [...ALLOWED_TEAM_CONTENT_PATHS];
+  }
+  return ["content"];
+}
+
+/**
+ * Builds a content object from separately read children (a team cannot read
+ * `content` as a whole). Missing or null children are left out.
+ *
+ * @param {Record<string, any>} parts  key -> value read from `content/<key>`
+ * @returns {Record<string, any>}
+ */
+export function assembleTeamContent(parts = {}) {
+  const out = {};
+  for (const key of ALLOWED_TEAM_CONTENT_KEYS) {
+    const value = parts?.[key];
+    if (value !== undefined && value !== null) out[key] = value;
+  }
+  return out;
+}
+

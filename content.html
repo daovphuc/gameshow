@@ -345,7 +345,7 @@
             📂 Chọn tệp CSV...
             <input type="file" id="file-bulk-csv" accept=".csv,text/csv" style="display: none;" />
           </label>
-          <textarea id="bulk-csv-text" class="editor-textarea" rows="6" placeholder="username,password,role,ref_id,display_name&#10;gk1,122345678910,judge,gk-01,Ban Giám khảo 1&#10;doi01,122345678910,team,doi-01,Công an TP. Hà Nội"></textarea>
+          <textarea id="bulk-csv-text" class="editor-textarea" rows="6" placeholder="username,password,role,ref_id,display_name&#10;gktong,&lt;mật khẩu&gt;,head_judge,,Giám khảo tổng&#10;hn,&lt;mật khẩu&gt;,team,doi-01,Công an TP. Hà Nội"></textarea>
         </div>
         <div id="bulk-acc-error" class="login-error" role="alert" aria-live="polite"></div>
         <div id="bulk-acc-results" style="margin-top: 1rem; display: none;"></div>
@@ -1831,7 +1831,7 @@
 
                     <div class="editor-field">
                       <label class="editor-label">Mật khẩu</label>
-                      <input type="text" class="editor-input" data-acc-field="password" data-index="${idx}" value="${escapeHtml(acc.password || '')}" placeholder="vd: 122345678910" required />
+                      <input type="text" class="editor-input" data-acc-field="password" data-index="${idx}" value="${escapeHtml(acc.password || '')}" placeholder="ít nhất 6 ký tự" required />
                     </div>
 
                     <div class="editor-field">
@@ -1890,7 +1890,7 @@
         document.getElementById("btn-add-account")?.addEventListener("click", () => {
           content.accounts.push({
             username: `user${content.accounts.length + 1}`,
-            password: "122345678910",
+            password: "",
             role: "team",
             ref_id: content.teams[0]?.id || "",
             display_name: ""
@@ -2448,7 +2448,7 @@
       document.getElementById("btn-add-account")?.addEventListener("click", () => {
         content.accounts.push({
           username: `user${content.accounts.length + 1}`,
-          password: "122345678910",
+          password: "",
           role: "team",
           ref_id: content.teams[0]?.id || "",
           display_name: ""
