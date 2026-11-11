@@ -485,8 +485,11 @@
       });
 
       document.getElementById("btn-random-set")?.addEventListener("click", () => {
-        if (availableSets.length > 0) {
-          const rand = availableSets[Math.floor(Math.random() * availableSets.length)];
+        // Never draw the rehearsal set ("Chạy thử") at random; it can still be picked by hand.
+        const drawable = availableSets.filter((s) => !/^ch[aạ]y\s*th[uử]$/i.test(String(s).trim()));
+        const pool = drawable.length > 0 ? drawable : availableSets;
+        if (pool.length > 0) {
+          const rand = pool[Math.floor(Math.random() * pool.length)];
           selectedSet = rand;
           showToast(`Đã chọn ngẫu nhiên Bộ đề #${rand}`);
           renderStage();

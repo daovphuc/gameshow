@@ -275,6 +275,172 @@ export function normaliseRound2(input = [], config = DEFAULT_CONFIG) {
   return results;
 }
 
+export const ROUND2_CSV_HEADER = "set,number,question,option_a,option_b,option_c,option_d,correct,time_seconds,image_url,category,explanation";
+
+export const ROUND2_CSV_SAMPLE = `\ufeff${ROUND2_CSV_HEADER}
+1,1,"Số điện thoại gọi cứu hỏa khẩn cấp tại Việt Nam là gì?",113,114,115,116,B,30,,Tuyên truyền,"Căn cứ Luật PCCC"`;
+
+/**
+ * Parses and validates Round 2 questions from CSV string or parsed row objects.
+ * Reports errors per row (with 1-based row number) for missing questions, missing
+ * options, missing correct answer, or correct answer pointing to an empty option.
+ *
+ * @param {string|Array<any>} input CSV text or rows
+ * @param {Record<string, any>} [config]
+ * @returns {{
+ *   ok: boolean,
+ *   questions: Array<any>,
+ *   errors: Array<string>,
+ *   results: Array<{ row: number, ok: boolean, errors: Array<string> }>,
+ *   preview: {
+ *     totalSets: number,
+ *     totalQuestions: number,
+ *     sets: Record<string, { count: number, categories: Record<string, number> }>,
+ *     setCounts: Record<string, number>,
+ *     categoryCounts: Record<string, number>
+ *   }
+ * }}
+ */
+export function validateRound2Csv(input, config = DEFAULT_CONFIG) {
+  const rows = toRows(input);
+  const defaultTime = parsePositiveNumber(
+    config?.round2_time_seconds,
+    DEFAULT_CONFIG.round2_time_seconds || 30
+  );
+
+  const errors = [];
+  const results = [];
+  const questions = [];
+
+  if (rows.length === 0) {
+    errors.push("Dữ liệu CSV trống hoặc không có dòng câu hỏi nào.");
+    return {
+      ok: false,
+      questions: [],
+      errors,
+      results: [],
+      preview: { totalSets: 0, totalQuestions: 0, sets: {}, setCounts: {}, categoryCounts: {} }
+    };
+  }
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 1;
+    const rowErrors = [];
+
+    if (!row || typeof row !== "object") {
+      rowErrors.push(`Dòng ${rowNum}: Dữ liệu dòng không hợp lệ.`);
+      errors.push(...rowErrors);
+      results.push({ row: rowNum, ok: false, errors: rowErrors });
+      continue;
+    }
+
+    const question = row?.question !== undefined && row?.question !== null ? String(row.question).trim() : "";
+    const option_a = row?.option_a !== undefined && row?.option_a !== null ? String(row.option_a).trim() : "";
+    const option_b = row?.option_b !== undefined && row?.option_b !== null ? String(row.option_b).trim() : "";
+    const option_c = row?.option_c !== undefined && row?.option_c !== null ? String(row.option_c).trim() : "";
+    const option_d = row?.option_d !== undefined && row?.option_d !== null ? String(row.option_d).trim() : "";
+    const rawCorrect = row?.correct !== undefined && row?.correct !== null ? String(row.correct).trim().toUpperCase() : "";
+
+    if (!question) {
+      rowErrors.push(`Dòng ${rowNum}: Thiếu nội dung câu hỏi.`);
+    }
+
+    if (!option_a) {
+      rowErrors.push(`Dòng ${rowNum}: Thiếu phương án A.`);
+    }
+
+    if (!option_b) {
+      rowErrors.push(`Dòng ${rowNum}: Thiếu phương án B.`);
+    }
+
+    if ((option_c && !option_d) || (!option_c && option_d)) {
+      rowErrors.push(`Dòng ${rowNum}: Phải có đủ 4 phương án (A, B, C, D) hoặc chỉ có 2 phương án (A, B).`);
+    }
+
+    if (!rawCorrect) {
+      rowErrors.push(`Dòng ${rowNum}: Thiếu đáp án đúng.`);
+    } else {
+      const validLetters = new Set(["A", "B"]);
+      if (option_c) validLetters.add("C");
+      if (option_d) validLetters.add("D");
+
+      if (!["A", "B", "C", "D"].includes(rawCorrect)) {
+        rowErrors.push(`Dòng ${rowNum}: Đáp án đúng "${rawCorrect}" không hợp lệ (phải là A, B, C hoặc D).`);
+      } else if (!validLetters.has(rawCorrect)) {
+        rowErrors.push(`Dòng ${rowNum}: Đáp án đúng "${rawCorrect}" tương ứng với phương án bị trống.`);
+      }
+    }
+
+    if (rowErrors.length > 0) {
+      errors.push(...rowErrors);
+      results.push({ row: rowNum, ok: false, errors: rowErrors });
+    } else {
+      const set = row?.set !== undefined && row?.set !== null && String(row.set).trim() !== ""
+        ? String(row.set).trim()
+        : "1";
+      const number = parsePositiveNumber(row?.number, questions.length + 1);
+      const time_seconds = parsePositiveNumber(row?.time_seconds, defaultTime);
+      const image_url = resolveImageUrl(row?.image_url);
+      const category = row?.category !== undefined && row?.category !== null ? String(row.category).trim() : "";
+      const explanation = row?.explanation !== undefined && row?.explanation !== null ? String(row.explanation).trim() : "";
+
+      const q = {
+        id: `r2_${set}_${number}`,
+        set,
+        number,
+        question,
+        option_a,
+        option_b,
+        option_c,
+        option_d,
+        correct: rawCorrect,
+        time_seconds,
+        image_url,
+        category,
+        explanation
+      };
+      questions.push(q);
+      results.push({ row: rowNum, ok: true, errors: [] });
+    }
+  }
+
+  const previewSets = {};
+  const setCounts = {};
+  const categoryCounts = {};
+
+  for (const q of questions) {
+    const s = q.set || "1";
+    if (!previewSets[s]) {
+      previewSets[s] = { count: 0, categories: {} };
+    }
+    previewSets[s].count++;
+    setCounts[s] = (setCounts[s] || 0) + 1;
+
+    const cat = q.category || "Chưa phân loại";
+    previewSets[s].categories[cat] = (previewSets[s].categories[cat] || 0) + 1;
+    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+  }
+
+  const preview = {
+    totalSets: Object.keys(previewSets).length,
+    totalQuestions: questions.length,
+    sets: previewSets,
+    setCounts,
+    categoryCounts
+  };
+
+  return {
+    ok: errors.length === 0,
+    questions,
+    errors,
+    results,
+    preview
+  };
+}
+
+export const parseRound2Csv = validateRound2Csv;
+
 /**
  * Groups normalised Round 2 questions by set.
  * @param {Array<any>} questions

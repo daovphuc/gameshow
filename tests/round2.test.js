@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { parseCsv } from "../js/csv.js";
 import {
   calculateRound2QuestionScore,
   calculateRound2Score,
@@ -10,6 +11,10 @@ import {
   filterQuestionForTablet,
   normaliseRound2,
   groupRound2BySet,
+  validateRound2Csv,
+  parseRound2Csv,
+  ROUND2_CSV_HEADER,
+  ROUND2_CSV_SAMPLE,
   createInitialRound2LiveState,
   startRound2Question,
   submitRound2Answer,
@@ -520,5 +525,70 @@ test("formatRound2AnswerTime formats milliseconds into Vietnamese comma-separate
   assert.equal(formatRound2AnswerTime(15040), "15,04 s");
   assert.equal(formatRound2AnswerTime(null), "0,00 s");
   assert.equal(formatRound2AnswerTime(undefined), "0,00 s");
+});
+
+test("validateRound2Csv: parses valid CSV, computes preview per-set counts and categories", () => {
+  const csv = `set,number,question,option_a,option_b,option_c,option_d,correct,time_seconds,image_url,category,explanation
+1,1,"Câu hỏi 1 bộ 1?",A1,B1,C1,D1,A,30,,Kiểm tra,"Giải thích 1"
+1,2,"Câu hỏi 2 bộ 1?",A2,B2,,,B,30,,Tuyên truyền,
+2,1,"Câu hỏi 1 bộ 2?",A3,B3,C3,D3,C,30,,Xử phạt,
+2,2,"Câu hỏi 2 bộ 2?",A4,B4,C4,D4,D,30,,Điều tra,
+2,3,"Câu hỏi 3 bộ 2?",A5,B5,,,A,30,,Kiểm tra,`;
+
+  const res = validateRound2Csv(csv);
+  assert.equal(res.ok, true);
+  assert.equal(res.errors.length, 0);
+  assert.equal(res.questions.length, 5);
+  assert.equal(res.preview.totalSets, 2);
+  assert.equal(res.preview.totalQuestions, 5);
+  assert.equal(res.preview.setCounts["1"], 2);
+  assert.equal(res.preview.setCounts["2"], 3);
+  assert.equal(res.preview.sets["1"].count, 2);
+  assert.equal(res.preview.sets["1"].categories["Kiểm tra"], 1);
+  assert.equal(res.preview.sets["1"].categories["Tuyên truyền"], 1);
+  assert.equal(res.preview.sets["2"].count, 3);
+  assert.equal(res.preview.sets["2"].categories["Xử phạt"], 1);
+  assert.equal(res.preview.sets["2"].categories["Điều tra"], 1);
+  assert.equal(res.preview.sets["2"].categories["Kiểm tra"], 1);
+});
+
+test("validateRound2Csv: reports row-level errors for missing correct, empty correct option, and malformed rows", () => {
+  // Row 1: missing correct
+  // Row 2: correct option letter is C, but options are only A and B
+  // Row 3: missing option B
+  // Row 4: missing question
+  const invalidCsv = `set,number,question,option_a,option_b,option_c,option_d,correct,time_seconds,image_url,category,explanation
+1,1,"Câu hỏi không có đáp án?",A,B,C,D,,30,,Kiểm tra,
+1,2,"Câu hỏi đáp án C nhưng chỉ có 2 phương án?",A,B,,,C,30,,Kiểm tra,
+1,3,"Câu hỏi thiếu phương án B?",A,,,,A,30,,Kiểm tra,
+1,4,,A,B,C,D,A,30,,Kiểm tra,`;
+
+  const res = validateRound2Csv(invalidCsv);
+  assert.equal(res.ok, false);
+  assert.equal(res.questions.length, 0);
+
+  // Missing correct on row 1
+  assert.ok(
+    res.errors.some((e) => e.includes("Dòng 1") && e.includes("Thiếu đáp án đúng")),
+    `Expected Dòng 1 missing correct error, got: ${JSON.stringify(res.errors)}`
+  );
+
+  // Correct points to empty option on row 2
+  assert.ok(
+    res.errors.some((e) => e.includes("Dòng 2") && (e.includes("trống") || e.includes("không hợp lệ"))),
+    `Expected Dòng 2 empty option for correct error, got: ${JSON.stringify(res.errors)}`
+  );
+
+  // Missing option B on row 3
+  assert.ok(
+    res.errors.some((e) => e.includes("Dòng 3") && e.includes("phương án B")),
+    `Expected Dòng 3 missing option B error, got: ${JSON.stringify(res.errors)}`
+  );
+
+  // Missing question on row 4
+  assert.ok(
+    res.errors.some((e) => e.includes("Dòng 4") && e.includes("câu hỏi")),
+    `Expected Dòng 4 missing question error, got: ${JSON.stringify(res.errors)}`
+  );
 });
 
