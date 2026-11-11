@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import {
   calculateRound2QuestionScore,
   calculateRound2Score,
+  calculateRound2AnswerTime,
+  formatRound2AnswerTime,
   computeRound2Ranking,
   filterQuestionForTablet,
   normaliseRound2,
@@ -490,3 +492,33 @@ test("Reveal derives response time from server answeredAt when tablets store onl
   assert.equal(revealed.results.t2.responseTimeMs, 2000);
   assert.equal(revealed.results.t2.points, 0);
 });
+
+test("calculateRound2AnswerTime computes server-time delta accurately and resists clock skew/invalid inputs", () => {
+  // Normal delta
+  assert.equal(calculateRound2AnswerTime(10000, 13200), 3200);
+  assert.equal(calculateRound2AnswerTime(1000000, 1000540), 540);
+
+  // Negative delta (clock anomaly or answeredAt < shownAt) clamps to 0
+  assert.equal(calculateRound2AnswerTime(10000, 9000), 0);
+  assert.equal(calculateRound2AnswerTime(10000, 10000), 0);
+
+  // Missing or non-finite inputs return 0
+  assert.equal(calculateRound2AnswerTime(null, 12000), 0);
+  assert.equal(calculateRound2AnswerTime(10000, null), 0);
+  assert.equal(calculateRound2AnswerTime(undefined, undefined), 0);
+  assert.equal(calculateRound2AnswerTime("abc", 12000), 0);
+  assert.equal(calculateRound2AnswerTime(10000, "xyz"), 0);
+
+  // Fractional milliseconds get rounded cleanly
+  assert.equal(calculateRound2AnswerTime(1000.4, 4200.8), 3200);
+});
+
+test("formatRound2AnswerTime formats milliseconds into Vietnamese comma-separated seconds string", () => {
+  assert.equal(formatRound2AnswerTime(3200), "3,20 s");
+  assert.equal(formatRound2AnswerTime(0), "0,00 s");
+  assert.equal(formatRound2AnswerTime(540), "0,54 s");
+  assert.equal(formatRound2AnswerTime(15040), "15,04 s");
+  assert.equal(formatRound2AnswerTime(null), "0,00 s");
+  assert.equal(formatRound2AnswerTime(undefined), "0,00 s");
+});
+

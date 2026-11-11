@@ -197,12 +197,92 @@
       `;
     }
 
-    let hasPlayedFireworks = false;
+    let fireworksRunning = false;
+    let fireworksRafId = null;
+    let lastBurstTime = 0;
+    let lastFrameTime = 0;
 
-    function launchPodiumFireworks() {
-      if (hasPlayedFireworks) return;
-      hasPlayedFireworks = true;
+    const MAX_PARTICLES = 180;
+    const particlePool = Array.from({ length: MAX_PARTICLES }, () => ({
+      active: false,
+      x: 0,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      color: "#F59E0B",
+      alpha: 0,
+      decay: 0.015,
+      radius: 2
+    }));
 
+    const FIREWORK_COLORS = [
+      "#F59E0B", "#EF4444", "#10B981", "#3B82F6",
+      "#8B5CF6", "#EC4899", "#FBBF24", "#FFFFFF"
+    ];
+
+    function getPodiumOrigins(width, height) {
+      const podiumCols = document.querySelectorAll(".podium-column");
+      const origins = [];
+      podiumCols.forEach((col) => {
+        const rect = col.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          origins.push({
+            x: rect.left + rect.width / 2,
+            y: Math.max(80, rect.top - 20)
+          });
+        }
+      });
+      if (origins.length === 0) {
+        origins.push(
+          { x: width * 0.3, y: height * 0.3 },
+          { x: width * 0.5, y: height * 0.22 },
+          { x: width * 0.7, y: height * 0.3 }
+        );
+      }
+      return origins;
+    }
+
+    function spawnBurst(originX, originY, count = 22) {
+      const baseColor = FIREWORK_COLORS[Math.floor(Math.random() * FIREWORK_COLORS.length)];
+      let spawned = 0;
+
+      for (let i = 0; i < MAX_PARTICLES && spawned < count; i++) {
+        const p = particlePool[i];
+        if (!p.active) {
+          p.active = true;
+          p.x = originX + (Math.random() - 0.5) * 24;
+          p.y = originY + (Math.random() - 0.5) * 16;
+          const angle = (Math.PI * 2 * spawned) / count + (Math.random() - 0.5) * 0.35;
+          const speed = 2.0 + Math.random() * 4.2;
+          p.vx = Math.cos(angle) * speed;
+          p.vy = Math.sin(angle) * speed - 0.5;
+          p.color = Math.random() > 0.25 ? baseColor : FIREWORK_COLORS[Math.floor(Math.random() * FIREWORK_COLORS.length)];
+          p.alpha = 1;
+          p.decay = 0.011 + Math.random() * 0.012;
+          p.radius = 2 + Math.random() * 2;
+          spawned++;
+        }
+      }
+    }
+
+    function stopPodiumFireworks() {
+      fireworksRunning = false;
+      if (fireworksRafId) {
+        cancelAnimationFrame(fireworksRafId);
+        fireworksRafId = null;
+      }
+      for (const p of particlePool) {
+        p.active = false;
+      }
+      const canvas = document.getElementById("fireworks-canvas");
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    function startPodiumFireworks() {
+      if (fireworksRunning) return;
       if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         return;
       }
@@ -212,85 +292,71 @@
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      const dpr = window.devicePixelRatio || 1;
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-      ctx.scale(dpr, dpr);
+      fireworksRunning = true;
+      lastBurstTime = 0;
+      lastFrameTime = performance.now();
 
-      const podiumCols = document.querySelectorAll(".podium-column");
-      const origins = [];
-      podiumCols.forEach((col) => {
-        const rect = col.getBoundingClientRect();
-        origins.push({
-          x: rect.left + rect.width / 2,
-          y: Math.max(90, rect.top - 30)
-        });
-      });
-
-      if (origins.length === 0) {
-        origins.push(
-          { x: width * 0.3, y: height * 0.3 },
-          { x: width * 0.5, y: height * 0.22 },
-          { x: width * 0.7, y: height * 0.3 }
-        );
-      }
-
-      const colors = ["#F59E0B", "#EF4444", "#10B981", "#3B82F6", "#8B5CF6", "#EC4899", "#FBBF24", "#FFFFFF"];
-      const particles = [];
-
-      function createBurst(originX, originY) {
-        const count = 35 + Math.floor(Math.random() * 20);
-        const baseColor = colors[Math.floor(Math.random() * colors.length)];
-        for (let i = 0; i < count; i++) {
-          const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
-          const speed = 2.5 + Math.random() * 5;
-          particles.push({
-            x: originX,
-            y: originY,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            color: Math.random() > 0.3 ? baseColor : colors[Math.floor(Math.random() * colors.length)],
-            alpha: 1,
-            decay: 0.012 + Math.random() * 0.012,
-            radius: 2 + Math.random() * 2
-          });
+      function resizeCanvas() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
+          canvas.width = width * dpr;
+          canvas.height = height * dpr;
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.scale(dpr, dpr);
         }
       }
 
-      origins.forEach((orig, idx) => {
-        setTimeout(() => {
-          createBurst(orig.x + (Math.random() - 0.5) * 30, orig.y + (Math.random() - 0.5) * 20);
-        }, idx * 220);
-      });
-
-      setTimeout(() => {
-        origins.forEach((orig) => {
-          if (Math.random() > 0.3) {
-            createBurst(orig.x + (Math.random() - 0.5) * 50, orig.y - 15);
-          }
-        });
-      }, 900);
-
-      const startTime = performance.now();
-      const maxDuration = 3500;
+      resizeCanvas();
 
       function loop(now) {
-        const elapsed = now - startTime;
+        if (!fireworksRunning) return;
+
+        if (document.hidden) {
+          fireworksRafId = requestAnimationFrame(loop);
+          return;
+        }
+
+        const elapsed = now - lastFrameTime;
+        if (elapsed < 24) {
+          fireworksRafId = requestAnimationFrame(loop);
+          return;
+        }
+        lastFrameTime = now;
+
+        resizeCanvas();
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        if (now - lastBurstTime > 750) {
+          lastBurstTime = now;
+          const origins = getPodiumOrigins(width, height);
+          if (origins.length > 0) {
+            const origin = origins[Math.floor(Math.random() * origins.length)];
+            spawnBurst(origin.x, origin.y, 22);
+            if (origins.length > 2 && Math.random() > 0.5) {
+              const second = origins[Math.floor(Math.random() * origins.length)];
+              if (second !== origin) spawnBurst(second.x, second.y, 18);
+            }
+          }
+        }
+
         ctx.clearRect(0, 0, width, height);
 
-        for (let i = particles.length - 1; i >= 0; i--) {
-          const p = particles[i];
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+          const p = particlePool[i];
+          if (!p.active) continue;
+
           p.x += p.vx;
           p.y += p.vy;
-          p.vy += 0.055;
+          p.vy += 0.045;
           p.vx *= 0.985;
           p.vy *= 0.985;
           p.alpha -= p.decay;
 
-          if (p.alpha <= 0) {
-            particles.splice(i, 1);
+          if (p.alpha <= 0 || p.y > height + 20) {
+            p.active = false;
             continue;
           }
 
@@ -303,14 +369,39 @@
           ctx.restore();
         }
 
-        if (elapsed < maxDuration || particles.length > 0) {
-          requestAnimationFrame(loop);
-        } else {
-          ctx.clearRect(0, 0, width, height);
-        }
+        fireworksRafId = requestAnimationFrame(loop);
       }
 
-      requestAnimationFrame(loop);
+      const origins = getPodiumOrigins(window.innerWidth, window.innerHeight);
+      origins.forEach((orig, idx) => {
+        setTimeout(() => {
+          if (fireworksRunning) spawnBurst(orig.x, orig.y, 24);
+        }, idx * 180);
+      });
+
+      fireworksRafId = requestAnimationFrame(loop);
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        const canvas = document.getElementById("fireworks-canvas");
+        if (canvas) {
+          const ctx = canvas.getContext("2d");
+          if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      } else if (fireworksRunning) {
+        lastFrameTime = performance.now();
+        lastBurstTime = performance.now();
+      }
+    });
+
+    if (window.matchMedia) {
+      const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
+      mql.addEventListener?.("change", (e) => {
+        if (e.matches) {
+          stopPodiumFireworks();
+        }
+      });
     }
 
     function renderBoard() {
@@ -347,6 +438,7 @@
         podiumEl.classList.add("animate-rise");
 
         if (podiumSlots.length === 0) {
+          stopPodiumFireworks();
           podiumEl.innerHTML = `
             <div class="podium-waiting-card" style="text-align: center; padding: 3.5rem 1.5rem; color: var(--text-muted); font-size: 1.25rem; font-weight: 700;">
               Chưa có điểm
@@ -359,7 +451,7 @@
             </div>
             <div class="podium-striped-base" aria-hidden="true"></div>
           `;
-          launchPodiumFireworks();
+          startPodiumFireworks();
         }
       }
 

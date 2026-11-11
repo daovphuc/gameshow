@@ -3,7 +3,7 @@
 
 Website tĩnh tổ chức thi đấu chuyên nghiệp dành cho hội thi PCCC và CNCH qua 3 vòng thi, vận hành trực tiếp trên máy chiếu sân khấu và các thiết bị máy tính bảng (iPad) của Ban Giám khảo và các Đội thi, lưu trữ miễn phí trên **GitHub Pages**.
 
-Toàn bộ danh sách đội thi, gói câu hỏi, ban giám khảo, tài khoản và cấu hình được quản lý trực tiếp ngay trong ứng dụng qua trang **"Cấu hình nội dung" (`content.html`)**. Trạng thái thi đấu trực tiếp (câu hỏi hiện tại, đồng hồ đếm ngược, đáp án đội thi, điểm số ban giám khảo, bảng tổng sắp) được đồng bộ hóa tức thì (real-time) giữa tất cả các thiết bị qua **Firebase Realtime Database** (gói miễn phí Spark) hoặc tự động chạy **Chế độ thử trên 1 máy (Local Mode)** khi chưa cấu hình Firebase.
+Toàn bộ danh sách đội thi, câu hỏi và chủ đề thi, ban giám khảo, tài khoản và cấu hình được quản lý trực tiếp ngay trong ứng dụng qua trang **"Cấu hình nội dung" (`content.html`)**. Trạng thái thi đấu trực tiếp (câu hỏi hiện tại, đồng hồ đếm ngược, đáp án đội thi, điểm số ban giám khảo, bảng tổng sắp) được đồng bộ hóa tức thì (real-time) giữa tất cả các thiết bị qua **Firebase Realtime Database** (gói miễn phí Spark) hoặc tự động chạy **Chế độ thử trên 1 máy (Local Mode)** khi chưa cấu hình Firebase.
 
 ---
 
@@ -15,7 +15,7 @@ Hệ thống được thiết kế tối ưu cho 3 vai trò sử dụng tại h�
    - Vận hành trên máy tính của người dẫn chương trình kết nối máy chiếu hoặc màn hình LED lớn.
    - Bao gồm các màn hình chuyên biệt:
      - `host.html`: Tổng quan 3 vòng thi và thông tin hội thi.
-     - `round1.html`: Vòng 1 — Tuyên truyền PCCC (chọn đội theo số thứ tự thi, mỗi đội chọn 1 gói câu hỏi riêng).
+     - `round1.html`: Vòng 1 — Tuyên truyền PCCC (chọn đội theo số thứ tự thi, mỗi đội chọn 1 chủ đề riêng).
      - `round2.html`: Vòng 2 — Trắc nghiệm kiến thức (chọn bộ đề, mở câu hỏi, đếm ngược đồng bộ tới tất cả iPad, tự động khóa khi hết giờ, công bố đáp án và thống kê bảng xếp hạng Vòng 2).
      - `round3.html`: Vòng 3 — Xử lý tình huống truyền thông (bảng ô số tương tác).
      - `leaderboard.html`: Bảng xếp hạng vinh danh Top 5 trên bục cúp chiến thắng với hoạt họa ánh kim và pháo hoa chúc mừng; hỗ trợ xuất báo cáo kết quả cuộc thi (CSV).
@@ -33,7 +33,7 @@ Hệ thống được thiết kế tối ưu cho 3 vai trò sử dụng tại h�
 3. **Cổng Đội thi (`team.html`)**:
    - Vận hành trên iPad đặt tại bàn của từng đội thi.
    - Đăng nhập bằng tài khoản đội (vd: `doi01`..`doi35`) sẽ vào thẳng danh tính đội của mình, không cần chọn thủ công.
-   - Ở Vòng 1 & Vòng 3: Màn hình chờ thông minh hiển thị rõ tên vòng thi, báo hiệu khi đến lượt đội mình bước lên sân khấu và hiển thị nội dung gói câu hỏi / tình huống bốc thăm. Nếu đội không tham gia vòng thi (do cấu hình thứ tự thi), màn hình thông báo rõ đội không tham gia.
+   - Ở Vòng 1 & Vòng 3: Màn hình chờ thông minh hiển thị rõ tên vòng thi, báo hiệu khi đến lượt đội mình bước lên sân khấu và hiển thị nội dung chủ đề / tình huống bốc thăm. Nếu đội không tham gia vòng thi (do cấu hình thứ tự thi), màn hình thông báo rõ đội không tham gia.
    - Ở Vòng 2: Khi MC phát lệnh tính giờ trên sân khấu, iPad của đội lập tức hiển thị nội dung câu hỏi và 4 nút chọn đáp án **A, B, C, D** cỡ lớn.
    - Tự động ghi nhận thời gian trả lời theo mili-giây chuẩn từ máy chủ và khóa nút sau khi chạm để đảm bảo mỗi đội chỉ được gửi một đáp án duy nhất. Đội không tham gia vòng 2 sẽ không thể gửi đáp án.
 
@@ -160,7 +160,7 @@ Toàn bộ dữ liệu được lưu trữ tại nút `content/` trên Firebase 
    - Cấu hình danh sách đội tham gia và số thứ tự thi riêng biệt cho toàn bộ hội thi (`contest`) và từng vòng thi (`round1`, `round2`, `round3`).
    - Tích hợp sẵn nút chọn cụm nhanh: **Cụm 1** (12 đội — Học viện CSND, Hà Nội), **Cụm 2** (12 đội — Công an tỉnh Quảng Ngãi), **Cụm 3** (11 đội — Công an tỉnh Tây Ninh), và **Chung kết** (Khánh Hòa) theo đúng Kế hoạch số 204/KH-BCA-C07.
    - Khi chọn cụm, hệ thống tự động thiết lập danh sách thứ tự thi của tất cả các vòng và tự động đồng bộ dòng phụ đề hội thi (`show_subtitle`) hiển thị thời gian, địa điểm thi đấu lên đầu các màn hình máy chiếu (`host.html`, `round1.html`, `round2.html`, `round3.html`, `leaderboard.html`). Dữ liệu cấu hình cụm được lưu tại `data/sample/clusters.csv`.
-3. **Vòng 1 (Tuyên truyền)**: Chỉnh sửa các gói câu hỏi (tên gói, đội sở hữu, nội dung câu hỏi, thời gian 15 phút và thang điểm tối đa 50đ gồm 45đ nội dung + 5đ hình thức).
+3. **Vòng 1 (Tuyên truyền)**: Chỉnh sửa các chủ đề (tên chủ đề, đội sở hữu, nội dung câu hỏi, thời gian 15 phút và thang điểm tối đa 50đ gồm 45đ nội dung + 5đ hình thức).
 4. **Vòng 2 (Trắc nghiệm)**:
    - Chỉnh sửa ngân hàng câu hỏi trắc nghiệm chia theo từng bộ đề, bao gồm bộ **"Chạy thử"** (10 câu: 4 Kiểm tra, 3 Tuyên truyền, 2 Xử phạt, 1 Điều tra) và các bộ đề chính thức.
    - Hỗ trợ câu hỏi 4 phương án (A, B, C, D) hoặc câu hỏi 2 phương án (A, B - dạng Đúng/Sai hoặc Có/Không), tự động ẩn các nút lựa chọn C, D trên màn hình iPad của đội thi.
