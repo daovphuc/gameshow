@@ -85,7 +85,7 @@
   </div>
 
   <script type="module">
-    import { fetchQuizData, escapeHtml, logoutUser } from "./js/app.js";
+    import { fetchQuizData, escapeHtml, logoutUser, listenContent } from "./js/app.js";
     import { contentToQuizData } from "./js/content.js";
     import { listen, isFirebaseBackend, signInAndResolveRole } from "./js/backend.js";
     import {
@@ -232,7 +232,7 @@
         // Fallback to static text
       }
 
-      listen("content", (newContent) => {
+      listenContent((newContent) => {
         if (newContent) {
           quizData = contentToQuizData(newContent);
           if (quizData?.config?.show_title) {
