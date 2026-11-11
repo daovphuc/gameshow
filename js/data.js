@@ -1,6 +1,7 @@
 // Data normalisation, image path resolution, and package selection logic (DOM-free).
 
 import { DEFAULT_CONFIG, TEAM_PALETTE } from "./config.js";
+export { DEFAULT_CONFIG, TEAM_PALETTE } from "./config.js";
 import { parseCsv } from "./csv.js";
 import { normaliseRound2 } from "./round2.js";
 import { normaliseJudges } from "./judges.js";
@@ -132,6 +133,43 @@ export function normaliseTeams(input = []) {
 }
 
 /**
+ * Derives a human-friendly "Chủ đề 1", "Chủ đề 2", ... label for a Round 1 package.
+ * Works for both new naming ("Chủ đề 1") and legacy naming ("Gói A", "Gói B"),
+ * honoring package order for each team.
+ *
+ * @param {any} pkg
+ * @param {number|null} [index]
+ * @returns {string}
+ */
+export function getRound1TopicLabel(pkg, index = null) {
+  if (typeof index === "number" && index >= 0) {
+    return `Chủ đề ${index + 1}`;
+  }
+  if (pkg && typeof pkg === "object") {
+    if (pkg.label) return pkg.label;
+    if (typeof pkg.topicIndex === "number" && pkg.topicIndex >= 0) {
+      return `Chủ đề ${pkg.topicIndex + 1}`;
+    }
+  }
+  const name = typeof pkg === "object" && pkg !== null
+    ? (pkg.package || pkg.name || "")
+    : String(pkg || "");
+  const trimmed = name.trim();
+  const mNum = trimmed.match(/(?:chủ\s*đề|gói)\s*(\d+)/i);
+  if (mNum) {
+    return `Chủ đề ${mNum[1]}`;
+  }
+  const mLetter = trimmed.match(/(?:chủ\s*đề|gói)?\s*([a-zA-Z])$/i);
+  if (mLetter) {
+    const code = mLetter[1].toUpperCase().charCodeAt(0) - 64;
+    if (code >= 1 && code <= 26) {
+      return `Chủ đề ${code}`;
+    }
+  }
+  return trimmed ? `Chủ đề ${trimmed}` : "Chủ đề 1";
+}
+
+/**
  * Normalises rows from the `round1` tab into single-question team packages.
  * - Required fields per row: `package`, `team_id`, `question`.
  * - Optional fields: `image_url`, `time_seconds`, `points`.
@@ -142,6 +180,8 @@ export function normaliseTeams(input = []) {
  * @returns {Array<{
  *   id: string,
  *   package: string,
+ *   label: string,
+ *   topicIndex: number,
  *   team_id: string,
  *   question: string,
  *   image_url: string,
@@ -162,6 +202,7 @@ export function normaliseRound1(input = [], config = DEFAULT_CONFIG) {
   );
 
   const packageMap = new Map();
+  const teamPackageCounts = new Map();
 
   for (const row of rows) {
     const pkgName = row?.package !== undefined && row?.package !== null ? String(row.package).trim() : "";
@@ -183,9 +224,15 @@ export function normaliseRound1(input = [], config = DEFAULT_CONFIG) {
       continue;
     }
 
+    const topicIndex = teamPackageCounts.get(team_id) || 0;
+    teamPackageCounts.set(team_id, topicIndex + 1);
+    const label = getRound1TopicLabel(pkgName, topicIndex);
+
     const singleQuestion = {
       id: `${pkgKey}__1`,
       package: pkgName,
+      label,
+      topicIndex,
       team_id,
       order: 1,
       question,
@@ -197,6 +244,8 @@ export function normaliseRound1(input = [], config = DEFAULT_CONFIG) {
     packageMap.set(pkgKey, {
       id: pkgKey,
       package: pkgName,
+      label,
+      topicIndex,
       team_id,
       question,
       image_url,

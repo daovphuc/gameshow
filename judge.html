@@ -26,6 +26,7 @@
     import { clampScore, buildPerJudgeScoreWrites, calculateTeamRoundScore, calculateOvertimePenalty } from "./js/judges.js";
     import { getRoundTeams } from "./js/content.js";
     import { shortenTeamName } from "./js/leaderboard.js";
+    import { getRound1TopicLabel } from "./js/data.js";
     import { set, listen, onStatusChange } from "./js/backend.js";
     import { getActiveSession } from "./js/auth.js";
 
@@ -36,6 +37,9 @@
 
     // Track active team selected for scoring (either from host or tapped by judge)
     let manuallySelectedTeamId = null;
+
+    // Track manually chosen round (null = follow host's live currentRound)
+    let manuallySelectedRound = null;
 
     // Track saved timestamps: teamId -> timestamp string
     const lastSavedTimestamps = {};
@@ -84,6 +88,82 @@
       `;
     }
 
+    function renderRoundPickerHtml(activeRound) {
+      const hostRound = liveState.currentRound || "round1";
+      const isOverridden = manuallySelectedRound !== null && manuallySelectedRound !== hostRound;
+      const hostRoundLabel = hostRound === "round1" ? "Phần 1" : hostRound === "round2" ? "Phần 2" : "Phần 3";
+
+      return `
+        <div class="judge-round-bar">
+          <div class="judge-round-picker" role="tablist" aria-label="Chọn phần thi để chấm điểm">
+            <button
+              type="button"
+              class="judge-round-btn ${activeRound === 'round1' ? 'active' : ''}"
+              data-round-target="round1"
+            >
+              <span class="round-badge">1</span>
+              <span>Phần thi 1: Tuyên truyền</span>
+            </button>
+
+            ${hostRound === 'round2' ? `
+            <button
+              type="button"
+              class="judge-round-btn ${activeRound === 'round2' ? 'active' : ''}"
+              data-round-target="round2"
+            >
+              <span class="round-badge">2</span>
+              <span>Phần thi 2: Trắc nghiệm</span>
+            </button>
+            ` : ''}
+
+            <button
+              type="button"
+              class="judge-round-btn ${activeRound === 'round3' ? 'active' : ''}"
+              data-round-target="round3"
+            >
+              <span class="round-badge">3</span>
+              <span>Phần thi 3: Tình huống</span>
+            </button>
+          </div>
+
+          <div class="judge-round-sync-note">
+            ${
+              isOverridden
+                ? `<button type="button" id="btn-sync-with-mc" class="btn btn-sm btn-outline" style="color: var(--accent); font-weight: 700;">
+                    ↩ Quay lại theo MC (${hostRoundLabel})
+                   </button>`
+                : `<span style="font-weight: 600; color: var(--success); display: inline-flex; align-items: center; gap: 0.35rem;">
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--success);"></span>
+                    Đang theo MC (${hostRoundLabel})
+                   </span>`
+            }
+          </div>
+        </div>
+      `;
+    }
+
+    function wireRoundPickerControls(root) {
+      root.querySelectorAll("[data-round-target]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const target = btn.dataset.roundTarget;
+          const hostRound = liveState.currentRound || "round1";
+          if (target === hostRound) {
+            manuallySelectedRound = null;
+          } else {
+            manuallySelectedRound = target;
+          }
+          manuallySelectedTeamId = null;
+          renderJudgePortal();
+        });
+      });
+
+      root.querySelector("#btn-sync-with-mc")?.addEventListener("click", () => {
+        manuallySelectedRound = null;
+        manuallySelectedTeamId = null;
+        renderJudgePortal();
+      });
+    }
+
     function renderRound1Or3Scoring(root, roundKey) {
       const isR1 = roundKey === "round1";
       const roundName = isR1 ? quizData.config.round1_name : quizData.config.round3_name;
@@ -94,13 +174,16 @@
         ? Number(quizData.config.round1_max_manner) || 5
         : Number(quizData.config.round3_max_manner) || 5;
 
+      // Teams list ordered by round order
+      const roundTeams = getRoundTeams(quizData.teams, quizData.round_order, roundKey);
+
       // Stage team from host
       const stageTeamId = isR1
-        ? (liveState.round1?.activeSession?.teamId || liveState.stageTeamId)
-        : (liveState.round3?.activeTile?.selectedTeamId || (liveState.round3?.activeTile ? liveState.stageTeamId : null));
+        ? (liveState.round1?.activeSession?.teamId || (liveState.currentRound === "round1" ? liveState.stageTeamId : null))
+        : (liveState.round3?.activeTile?.selectedTeamId || (liveState.currentRound === "round3" && liveState.round3?.activeTile ? liveState.stageTeamId : null));
 
       // Effective team being scored
-      const activeTeamId = manuallySelectedTeamId || stageTeamId;
+      const activeTeamId = manuallySelectedTeamId || stageTeamId || (manuallySelectedRound !== null && roundTeams.length > 0 ? roundTeams[0].id : null);
       const activeTeam = quizData.teams.find((t) => t.id === activeTeamId);
 
       // Lock status for the active team
@@ -111,9 +194,17 @@
       // Topic / Question text
       let topicText = "";
       if (isR1) {
-        topicText = liveState.round1?.activeSession?.packageQuestion || "";
+        const pickedPkgId = liveState.round1?.teamPackages?.[activeTeamId] || (activeTeamId === liveState.round1?.activeSession?.teamId ? liveState.round1?.activeSession?.packageId : null);
+        const pickedPkg = quizData.round1Packages.find((p) => p.id === pickedPkgId);
+        if (pickedPkg) {
+          topicText = getRound1TopicLabel(pickedPkg);
+        } else {
+          topicText = liveState.round1?.activeSession?.packageQuestion || "";
+        }
       } else {
-        topicText = liveState.round3?.activeTile?.question || "";
+        topicText = (activeTeamId === liveState.round3?.activeTile?.selectedTeamId || !manuallySelectedTeamId)
+          ? (liveState.round3?.activeTile?.question || "")
+          : "";
       }
 
       // Existing scores for active team
@@ -127,7 +218,6 @@
       const lastSavedTime = lastSavedTimestamps[activeTeamId] || (hasSavedScore ? "trước đó" : "");
 
       // Teams list ordered by round order
-      const roundTeams = getRoundTeams(quizData.teams, quizData.round_order, roundKey);
       const totalTeams = roundTeams.length;
       let scoredCount = 0;
 
@@ -167,6 +257,7 @@
 
       root.innerHTML = `
         ${renderJudgeHeader()}
+        ${renderRoundPickerHtml(roundKey)}
 
         <div class="judge-layout">
         <!-- Main Scoring Card (right column) -->
@@ -222,7 +313,7 @@
                       <strong>${isR1 ? "Nội dung tuyên truyền:" : "Tình huống:"}</strong> ${escapeHtml(topicText)}
                     </div>`
                   : `<div class="judge-topic-callout" style="border-left-color: var(--border); color: var(--text-muted);">
-                      <em>${isR1 ? "Đang chờ MC chọn gói chủ đề..." : "Đang chờ MC mở nội dung ô..."}</em>
+                      <em>${isR1 ? "Đang chờ MC chọn chủ đề..." : "Đang chờ MC mở nội dung ô..."}</em>
                     </div>`
               }
 
@@ -497,6 +588,7 @@
       `;
 
       wireHeaderControls();
+      wireRoundPickerControls(root);
 
       // Back to stage button
       document.getElementById("btn-back-to-stage")?.addEventListener("click", () => {
@@ -723,6 +815,7 @@
 
       root.innerHTML = `
         ${renderJudgeHeader()}
+        ${renderRoundPickerHtml("round2")}
 
         <main class="judge-stage-card">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
@@ -751,6 +844,7 @@
       `;
 
       wireHeaderControls();
+      wireRoundPickerControls(root);
     }
 
     function wireHeaderControls() {
@@ -766,7 +860,7 @@
       const root = document.getElementById("judge-app-root");
       if (!root || !quizData) return;
 
-      const currentRound = liveState.currentRound || "round1";
+      const currentRound = manuallySelectedRound || liveState.currentRound || "round1";
       if (currentRound === "round2") {
         renderRound2View(root);
       } else {
@@ -808,7 +902,15 @@
       listen("live", (data) => {
         if (!data) return;
         const prevRound2 = liveState.round2 || {};
+        const oldHostRound = liveState.currentRound;
         liveState = { ...initialLiveState(), ...data };
+        const newHostRound = liveState.currentRound;
+
+        if (oldHostRound && newHostRound !== oldHostRound) {
+          if (manuallySelectedRound === null) {
+            manuallySelectedTeamId = null;
+          }
+        }
         if (prevRound2.answers && liveState.round2 && liveState.round2.questionKey === prevRound2.questionKey && !liveState.round2.answers) {
           liveState.round2 = { ...liveState.round2, answers: prevRound2.answers };
         }

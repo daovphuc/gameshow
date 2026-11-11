@@ -51,7 +51,8 @@
       computeRound2Ranking,
       filterQuestionForTablet,
       buildQuestionKey,
-      recomputeRound2FromAnswers
+      recomputeRound2FromAnswers,
+      calculateRound2AnswerTime
     } from "./js/round2.js";
     import { formatTimer } from "./js/timer.js";
     import { formatSeconds } from "./js/leaderboard.js";
@@ -62,6 +63,7 @@
     let availableSets = [];
     let selectedSet = "1";
     let currentQuestionIdx = 0; // 0 to 9
+    let showingRules = true;
 
     // Local live state mirror
     let liveR2 = {
@@ -93,6 +95,82 @@
           const count = participatingTeams.filter((t) => liveR2.answers && liveR2.answers[t.id]).length;
           counterEl.textContent = `${count}/${participatingTeams.length} đội đã trả lời`;
         }
+        updateLiveAnswersDisplay();
+      });
+    }
+
+    function renderLiveTeamsAnswersHtml() {
+      if (!quizData) return "";
+      const participatingTeams = getRoundTeams(quizData.teams, quizData.round_order, "round2");
+      return participatingTeams
+        .map((t) => {
+          const ansRecord = liveR2.answers && liveR2.answers[t.id];
+          const hasAnswered = Boolean(ansRecord);
+          const timeMs = hasAnswered && Number.isFinite(ansRecord.answeredAt) && Number.isFinite(liveR2.shownAt)
+            ? calculateRound2AnswerTime(liveR2.shownAt, ansRecord.answeredAt)
+            : (hasAnswered && Number.isFinite(ansRecord.responseTimeMs) ? ansRecord.responseTimeMs : null);
+          const timeStr = timeMs !== null ? formatSeconds(timeMs / 1000) : "";
+          return `
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.85rem; border-radius: var(--radius-sm); border: 1px solid ${hasAnswered ? "rgba(46, 125, 79, 0.45)" : "var(--border)"}; background-color: ${hasAnswered ? "rgba(46, 125, 79, 0.08)" : "var(--surface)"};">
+              <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden;">
+                ${renderAvatarHtml(t, "team-avatar-sm")}
+                <span style="font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(t.name)}</span>
+              </div>
+              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.9rem;">
+                ${
+                  hasAnswered
+                    ? `<span style="color: #2E7D4F;">✓ ${timeStr}</span>`
+                    : `<span style="color: var(--text-muted); font-size: 0.82rem;">Chưa gửi</span>`
+                }
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+    }
+
+    function updateLiveAnswersDisplay() {
+      const grid = document.getElementById("r2-live-teams-grid");
+      if (grid) {
+        grid.innerHTML = renderLiveTeamsAnswersHtml();
+      }
+    }
+
+    function renderRulesStage(container) {
+      stopTimerTick();
+
+      const rulesText = quizData.config?.round2_rules || "";
+      const roundTitle = quizData.config?.round2_name || "Phần thi thứ hai: Trả lời câu hỏi trắc nghiệm";
+
+      container.innerHTML = `
+        <div class="rules-stage" style="max-width: 960px; margin: 0 auto; padding: 1.5rem;">
+          <div class="section-header" style="text-align: center; margin-bottom: 2rem;">
+            <div style="font-size: 1rem; color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">
+              Quy định & Thể lệ
+            </div>
+            <h1 class="section-title" style="font-size: clamp(1.8rem, 3.5vw, 2.5rem); margin-bottom: 0.5rem;">
+              ${escapeHtml(roundTitle)}
+            </h1>
+            <p class="section-subtitle" style="font-size: 1.1rem; color: var(--text-muted); margin: 0 auto;">
+              MC đọc phổ biến thể lệ thi đấu trước khi bắt đầu phần thi
+            </p>
+          </div>
+
+          <div class="rules-card" style="background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius-lg, 16px); padding: clamp(1.5rem, 3vw, 2.5rem); box-shadow: var(--shadow-md, 0 4px 20px rgba(0,0,0,0.06)); margin-bottom: 2rem;">
+            <div style="white-space: pre-wrap; font-family: var(--font-sans, system-ui); font-size: clamp(1.05rem, 1.8vw, 1.25rem); line-height: 1.8; color: var(--text);">${escapeHtml(rulesText)}</div>
+          </div>
+
+          <div style="display: flex; justify-content: center; gap: 1rem;">
+            <button type="button" id="btn-dismiss-rules" class="btn btn-primary btn-lg" style="font-size: 1.25rem; padding: 0.85rem 2.5rem; font-weight: 700; border-radius: var(--radius-full, 9999px);">
+              ${liveR2.setStarted ? "Quay lại phần thi →" : "Vào phần thi →"}
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.getElementById("btn-dismiss-rules")?.addEventListener("click", () => {
+        showingRules = false;
+        renderStage();
       });
     }
 
@@ -363,21 +441,26 @@
 
       container.innerHTML = `
         <div class="section-header">
-          <div>
-            ${quizData.config?.show_subtitle ? `<div class="stage-cluster-subtitle" style="font-size: 1rem; color: var(--accent); font-weight: 700; margin-bottom: 0.35rem;">${escapeHtml(quizData.config.show_subtitle)}</div>` : ""}
-            <h1 class="section-title">${escapeHtml(quizData.config.round2_name)}</h1>
-            <p class="section-subtitle">
-              Chọn bộ đề 10 câu hỏi trắc nghiệm hoặc bấm "Chọn ngẫu nhiên".
-            </p>
-          </div>
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; width: 100%;">
+            <div>
+              ${quizData.config?.show_subtitle ? `<div class="stage-cluster-subtitle" style="font-size: 1rem; color: var(--accent); font-weight: 700; margin-bottom: 0.35rem;">${escapeHtml(quizData.config.show_subtitle)}</div>` : ""}
+              <h1 class="section-title">${escapeHtml(quizData.config.round2_name)}</h1>
+              <p class="section-subtitle">
+                Chọn bộ đề 10 câu hỏi trắc nghiệm hoặc bấm "Chọn ngẫu nhiên".
+              </p>
+            </div>
 
-          <div style="display: flex; gap: 0.75rem;">
-            <button type="button" id="btn-random-set" class="btn btn-secondary">
-              🎲 Chọn ngẫu nhiên bộ đề
-            </button>
-            <button type="button" id="btn-start-set" class="btn btn-primary">
-              Bắt đầu với Bộ đề #${escapeHtml(selectedSet)} →
-            </button>
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+              <button type="button" id="btn-open-rules" class="btn btn-outline" style="font-weight: 600; font-size: 0.95rem;">
+                📜 Thể lệ phần thi
+              </button>
+              <button type="button" id="btn-random-set" class="btn btn-secondary">
+                🎲 Chọn ngẫu nhiên bộ đề
+              </button>
+              <button type="button" id="btn-start-set" class="btn btn-primary">
+                Bắt đầu với Bộ đề #${escapeHtml(selectedSet)} →
+              </button>
+            </div>
           </div>
         </div>
 
@@ -388,6 +471,11 @@
           </div>
         </div>
       `;
+
+      document.getElementById("btn-open-rules")?.addEventListener("click", () => {
+        showingRules = true;
+        renderStage();
+      });
 
       container.querySelectorAll("[data-pick-set]").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -421,15 +509,20 @@
 
       container.innerHTML = `
         <div class="section-header">
-          <div>
-            <h1 class="section-title">Thống Kê Vòng 2 — Bộ Đề #${escapeHtml(selectedSet)}</h1>
-            <p class="section-subtitle">
-              Hoàn thành các câu hỏi trắc nghiệm Vòng 2. Xếp hạng theo Điểm số giảm dần, ưu tiên tổng thời gian câu đúng ngắn hơn.
-            </p>
-          </div>
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; width: 100%;">
+            <div>
+              <h1 class="section-title">Thống Kê Vòng 2 — Bộ Đề #${escapeHtml(selectedSet)}</h1>
+              <p class="section-subtitle">
+                Hoàn thành các câu hỏi trắc nghiệm Vòng 2. Xếp hạng theo Điểm số giảm dần, ưu tiên tổng thời gian câu đúng ngắn hơn.
+              </p>
+            </div>
 
-          <div style="display: flex; gap: 0.75rem;">
-            <a href="./round3.html" class="btn btn-primary btn-lg">Sang Vòng 3 →</a>
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+              <button type="button" id="btn-open-rules" class="btn btn-outline" style="font-weight: 600;">
+                📜 Thể lệ
+              </button>
+              <a href="./round3.html" class="btn btn-primary btn-lg">Sang Vòng 3 →</a>
+            </div>
           </div>
         </div>
 
@@ -437,6 +530,11 @@
           ${renderRound2StatsTableHtml()}
         </section>
       `;
+
+      document.getElementById("btn-open-rules")?.addEventListener("click", () => {
+        showingRules = true;
+        renderStage();
+      });
     }
 
     function renderQuestionPresenter(container) {
@@ -480,12 +578,18 @@
       if (isRevealed && liveR2.results) {
         const teamResultsList = participatingTeams.map((t) => {
           const res = liveR2.results[t.id];
+          const ansRecord = liveR2.answers?.[t.id];
+          const timeMs = res && Number.isFinite(res.responseTimeMs)
+            ? res.responseTimeMs
+            : (ansRecord && Number.isFinite(ansRecord.answeredAt) && Number.isFinite(liveR2.shownAt)
+              ? calculateRound2AnswerTime(liveR2.shownAt, ansRecord.answeredAt)
+              : null);
           return {
             team: t,
-            answered: Boolean(res),
-            choice: res?.answer || "—",
+            answered: Boolean(res || ansRecord),
+            choice: res?.answer || ansRecord?.answer || "—",
             isCorrect: res?.isCorrect || false,
-            timeSec: res ? (res.responseTimeMs / 1000).toFixed(2) : "—",
+            timeSec: timeMs !== null ? formatSeconds(timeMs / 1000) : "—",
             points: res?.points || 0
           };
         });
@@ -524,7 +628,7 @@
                     <span style="font-size: 0.95rem; font-weight: 600; color: ${item.isCorrect ? "#2E7D4F" : (item.answered ? "#C94A38" : "var(--text-muted)")}; min-width: 70px; text-align: center;">
                       ${item.isCorrect ? "✓ Đúng" : (item.answered ? "✗ Sai" : "Chưa trả lời")}
                     </span>
-                    <span style="font-size: 0.92rem; color: var(--text-muted); min-width: 65px; text-align: right;">${item.answered ? `${item.timeSec}s` : "—"}</span>
+                    <span style="font-size: 0.92rem; color: var(--text-muted); min-width: 65px; text-align: right;">${item.answered ? item.timeSec : "—"}</span>
                     <span style="font-weight: 800; font-size: 1.05rem; color: var(--accent); min-width: 50px; text-align: right;">+${item.points}đ</span>
                   </div>
                 </div>
@@ -543,6 +647,19 @@
           </div>
         `;
       }
+
+      const liveTeamsListHtml = !isRevealed && liveR2.status !== "idle"
+        ? `
+          <div class="panel-card" style="margin-top: 1.5rem;">
+            <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0 0 0.85rem;">
+              ⚡ Tiến độ trả lời của các đội (${answeredCount}/${participatingTeams.length}):
+            </h3>
+            <div id="r2-live-teams-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.65rem;">
+              ${renderLiveTeamsAnswersHtml()}
+            </div>
+          </div>
+        `
+        : "";
 
       container.innerHTML = `
         <div class="question-stage">
@@ -564,6 +681,10 @@
             </div>
 
             <div class="screen-right-group">
+              <button type="button" id="btn-open-rules" class="btn btn-outline btn-sm">
+                📜 Thể lệ
+              </button>
+
               <div id="r2-timer-box" class="top-timer-box ${(liveR2.status === "locked" || liveR2.status === "revealed") ? "finished" : ""}">
                 <span id="r2-timer-digits" class="top-timer-digits">${
                   formatTimer(
@@ -629,6 +750,7 @@
                 </article>`
           }
 
+          ${liveTeamsListHtml}
           ${resultsHtml}
         </div>
       `;
@@ -640,6 +762,10 @@
         renderStage();
       });
 
+      document.getElementById("btn-open-rules")?.addEventListener("click", () => {
+        showingRules = true;
+        renderStage();
+      });
       document.getElementById("btn-toggle-r2-stats")?.addEventListener("click", openStatsModal);
       document.getElementById("btn-open-question")?.addEventListener("click", handleStartQuestion);
       document.getElementById("btn-lock-question")?.addEventListener("click", handleLockQuestion);
@@ -651,7 +777,9 @@
       const container = document.getElementById("round2-stage");
       const questions = getQuestionsInActiveSet();
 
-      if (currentQuestionIdx >= questions.length && questions.length > 0) {
+      if (showingRules) {
+        renderRulesStage(container);
+      } else if (currentQuestionIdx >= questions.length && questions.length > 0) {
         renderSummaryStage(container);
       } else if (!liveR2.setStarted && liveR2.status === "idle" && currentQuestionIdx === 0 && !liveR2.activeQuestion) {
         renderSetChooser(container);

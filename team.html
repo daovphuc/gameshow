@@ -25,6 +25,7 @@
     } from "./js/app.js";
     import { resolveImageUrl } from "./js/data.js";
     import { isTeamInRound, isTeamInContest } from "./js/content.js";
+    import { calculateRound2AnswerTime, formatSeconds } from "./js/round2.js";
     import { formatTimer } from "./js/timer.js";
     import { set, listen, getServerTime, serverTimestamp, onStatusChange } from "./js/backend.js";
     import { getActiveSession } from "./js/auth.js";
@@ -155,16 +156,23 @@
         choiceBtn.classList.add("selected");
       }
 
+      const responseTimeMs = calculateRound2AnswerTime(r2.shownAt, now);
+      const timeStr = formatSeconds(responseTimeMs / 1000);
+
       const statusNote = document.getElementById("team-answer-status");
       if (statusNote) {
         statusNote.innerHTML = `
           <div style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.25rem; border-radius: 100px; background-color: rgba(46, 125, 79, 0.12); color: var(--success); font-weight: 700;">
-            <span>✓ Đã ghi nhận đáp án: <strong>${letter}</strong></span>
+            <span>✓ Đã ghi nhận đáp án: <strong>${letter}</strong> — Đã trả lời sau ${timeStr}</span>
           </div>
         `;
       }
 
-      myAnswers[r2.questionKey] = letter;
+      myAnswers[r2.questionKey] = {
+        answer: letter,
+        answeredAt: now,
+        responseTimeMs
+      };
 
       // Write answer directly to database path: answers/<questionKey>/<selectedTeamId>
       const path = `answers/${r2.questionKey}/${selectedTeamId}`;
@@ -276,7 +284,7 @@
                   topicText
                     ? `<div style="text-align: left; max-width: 600px; margin: 1.5rem auto 0; padding: 1.2rem; border-radius: var(--radius-md); background-color: var(--surface-elevated); border: 1px solid var(--border);">
                         <strong style="display: block; font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.4rem;">
-                          ${isR1 ? "Gói câu hỏi bốc thăm:" : "Tình huống truyền thông:"}
+                          ${isR1 ? "Chủ đề bốc thăm:" : "Tình huống truyền thông:"}
                         </strong>
                         <div style="font-size: 1.15rem; font-weight: 600; line-height: 1.4;">
                           ${escapeHtml(topicText)}
@@ -341,9 +349,14 @@
         return;
       }
 
-      const mySavedAnswer = (r2.questionKey && myAnswers[r2.questionKey]) || r2.results?.[selectedTeamId]?.answer;
+      const mySavedAnswer = (r2.questionKey && myAnswers[r2.questionKey]) || r2.results?.[selectedTeamId];
       const hasAnswered = Boolean(mySavedAnswer);
-      const chosenLetter = mySavedAnswer;
+      const chosenLetter = typeof mySavedAnswer === "object" ? mySavedAnswer?.answer : mySavedAnswer;
+      const ansTime = typeof mySavedAnswer === "object" ? mySavedAnswer?.answeredAt : null;
+      const responseTimeMs = ansTime && Number.isFinite(ansTime) && Number.isFinite(r2.shownAt)
+        ? calculateRound2AnswerTime(r2.shownAt, ansTime)
+        : (typeof mySavedAnswer === "object" && Number.isFinite(mySavedAnswer?.responseTimeMs) ? mySavedAnswer.responseTimeMs : null);
+      const timeStr = responseTimeMs !== null ? ` — Đã trả lời sau ${formatSeconds(responseTimeMs / 1000)}` : "";
 
       const isRevealed = r2.status === "revealed";
       const isLocked = r2.status === "locked" || isRevealed;
@@ -425,7 +438,7 @@
               isRevealed
                 ? `<div style="display: inline-flex; flex-direction: column; align-items: center; gap: 0.6rem; max-width: 600px; width: 100%;">
                     <div style="display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.75rem 1.5rem; border-radius: 100px; font-weight: 800; font-size: 1.15rem; background-color: ${result?.isCorrect ? "rgba(46, 125, 79, 0.15)" : "rgba(201, 74, 56, 0.15)"}; color: ${result?.isCorrect ? "#2E7D4F" : "#C94A38"};">
-                      <span>${result?.isCorrect ? `✓ Chính xác! (+${result.points} điểm)` : result ? `✕ Rất tiếc! Đáp án đúng là ${escapeHtml(correctLetter)}` : `Đáp án đúng là ${escapeHtml(correctLetter)}`}</span>
+                      <span>${result?.isCorrect ? `✓ Chính xác! (+${result.points} điểm)` : result ? `✕ Rất tiếc! Đáp án đúng là ${escapeHtml(correctLetter)}` : `Đáp án đúng là ${escapeHtml(correctLetter)}`}${timeStr}</span>
                     </div>
                     ${
                       r2.explanation
@@ -437,7 +450,7 @@
                   </div>`
                 : hasAnswered
                   ? `<div style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.25rem; border-radius: 100px; background-color: rgba(46, 125, 79, 0.12); color: #2E7D4F; font-weight: 700;">
-                      <span>✓ Đã ghi nhận đáp án: <strong>${chosenLetter}</strong></span>
+                      <span>✓ Đã ghi nhận đáp án: <strong>${chosenLetter}</strong>${timeStr}</span>
                     </div>`
                   : isLocked
                     ? `<div style="color: var(--text-muted); font-weight: 700; font-size: 1.05rem;">Đã hết giờ làm bài</div>`
@@ -541,7 +554,12 @@
           if (currentTeamAnswerUnsub) currentTeamAnswerUnsub();
           currentTeamAnswerUnsub = listen(`answers/${qKey}/${selectedTeamId}`, (ans) => {
             if (ans?.answer) {
-              myAnswers[qKey] = ans.answer;
+              const prev = myAnswers[qKey];
+              const ansAt = ans.answeredAt || (typeof prev === "object" ? prev?.answeredAt : null);
+              myAnswers[qKey] = {
+                answer: ans.answer,
+                answeredAt: ansAt
+              };
               renderTeamPortal();
             }
           });

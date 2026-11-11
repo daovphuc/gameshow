@@ -378,10 +378,10 @@ export function validateContent(content = {}) {
     const teamId = pkg?.team_id !== undefined && pkg?.team_id !== null ? String(pkg.team_id).trim() : "";
     const question = pkg?.question !== undefined && pkg?.question !== null ? String(pkg.question).trim() : "";
 
-    const label = pkgName ? `Gói "${pkgName}"` : `Gói câu hỏi thứ ${index + 1}`;
+    const label = pkgName ? `Chủ đề "${pkgName}"` : `Chủ đề thứ ${index + 1}`;
 
     if (!pkgName) {
-      errors.push(`${label} của Vòng 1 thiếu tên gói.`);
+      errors.push(`${label} của Vòng 1 thiếu tên chủ đề.`);
     }
     if (!teamId) {
       errors.push(`${label} của Vòng 1 thiếu mã đội thi sở hữu.`);

@@ -172,7 +172,7 @@
       <!-- Panel: Round 1 -->
       <section id="panel-round1" class="editor-panel">
         <div class="tab-explanation">
-          <strong>① Vòng 1:</strong> Gói câu hỏi tuyên truyền theo từng đội; MC chọn gói khi đội lên sân khấu và đáp án/chủ đề hiển thị trên màn hình chính.
+          <strong>① Vòng 1:</strong> Chủ đề tuyên truyền theo từng đội; MC chọn chủ đề khi đội lên sân khấu và nội dung hiển thị trên màn hình chính.
         </div>
 
         <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;">
@@ -184,11 +184,11 @@
               type="text"
               id="r1-filter-search"
               class="scores-search-input"
-              placeholder="🔍 Tìm gói câu hỏi, nội dung..."
+              placeholder="🔍 Tìm chủ đề, nội dung..."
               style="min-width: 240px;"
             />
           </div>
-          <button type="button" id="btn-add-round1" class="btn btn-primary btn-sm">+ Thêm gói câu hỏi mới</button>
+          <button type="button" id="btn-add-round1" class="btn btn-primary btn-sm">+ Thêm chủ đề mới</button>
         </div>
 
         <div id="round1-list"></div>
@@ -901,7 +901,7 @@
       }
 
       if (!content.round1 || content.round1.length === 0) {
-        container.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Chưa có gói câu hỏi nào. Bấm "+ Thêm gói câu hỏi mới" để tạo mới.</div>`;
+        container.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Chưa có chủ đề nào. Bấm "+ Thêm chủ đề mới" để tạo mới.</div>`;
         return;
       }
 
@@ -933,16 +933,16 @@
           groupsHtml += `
             <div class="group-header-card">
               <h3 class="group-header-title">
-                ${escapeHtml(team.name)} — <span style="color: var(--accent);">${teamPkgsWithIndex.length} gói</span>
+                ${escapeHtml(team.name)} — <span style="color: var(--accent);">${teamPkgsWithIndex.length} chủ đề</span>
               </h3>
               <button type="button" class="btn btn-sm btn-primary" data-add-r1-for-team="${escapeHtml(team.id)}">
-                + Thêm gói cho đội này
+                + Thêm chủ đề cho đội này
               </button>
             </div>
           `;
 
           if (teamPkgsWithIndex.length === 0) {
-            groupsHtml += `<div style="padding: 1rem; color: var(--text-muted); font-size: 0.9rem;">Chưa có gói câu hỏi nào cho đội này. Bấm "+ Thêm gói cho đội này" ở trên.</div>`;
+            groupsHtml += `<div style="padding: 1rem; color: var(--text-muted); font-size: 0.9rem;">Chưa có chủ đề nào cho đội này. Bấm "+ Thêm chủ đề cho đội này" ở trên.</div>`;
           } else {
             groupsHtml += teamPkgsWithIndex
               .map(({ pkg, idx }) => {
@@ -957,10 +957,10 @@
                   <div class="editor-card" data-r1-index="${idx}">
                     <div class="editor-card-header">
                       <div style="display: flex; align-items: center; gap: 0.75rem;">
-                        <span class="meta-pill accent">Gói #${idx + 1}</span>
-                        <h3 class="editor-card-title">${escapeHtml(pkg.package || 'Gói câu hỏi')}</h3>
+                        <span class="meta-pill accent">Chủ đề #${idx + 1}</span>
+                        <h3 class="editor-card-title">${escapeHtml(pkg.package || 'Chủ đề')}</h3>
                       </div>
-                      <button type="button" class="btn btn-sm btn-danger" data-remove-r1="${idx}">Xóa gói</button>
+                      <button type="button" class="btn btn-sm btn-danger" data-remove-r1="${idx}">Xóa chủ đề</button>
                     </div>
 
                     <div class="editor-grid-3">
@@ -973,8 +973,8 @@
                       </div>
 
                       <div class="editor-field">
-                        <label class="editor-label">Tên gói câu hỏi</label>
-                        <input type="text" class="editor-input" data-r1-field="package" data-index="${idx}" value="${escapeHtml(pkg.package || '')}" placeholder="vd: Gói A hoặc Gói B" />
+                        <label class="editor-label">Tên chủ đề</label>
+                        <input type="text" class="editor-input" data-r1-field="package" data-index="${idx}" value="${escapeHtml(pkg.package || '')}" placeholder="vd: Chủ đề 1 hoặc Chủ đề 2" />
                       </div>
 
                       <div class="editor-grid-2">
@@ -995,10 +995,10 @@
                     </div>
 
                     <div class="editor-field" style="margin-top: 0.5rem;">
-                      <label class="editor-label">Ảnh đính kèm gói câu hỏi (tùy chọn)</label>
+                      <label class="editor-label">Ảnh đính kèm chủ đề (tùy chọn)</label>
                       <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
                         <div style="flex: 1; min-width: 260px;">
-                          <input type="text" class="editor-input" data-r1-field="image_url" data-index="${idx}" value="${escapeHtml(pkg.image_url || '')}" placeholder="vd: v1-goi-a.jpg hoặc https://..." />
+                          <input type="text" class="editor-input" data-r1-field="image_url" data-index="${idx}" value="${escapeHtml(pkg.image_url || '')}" placeholder="vd: v1-chude-1.jpg hoặc https://..." />
                           <span style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">Chép ảnh vào thư mục images/ của dự án rồi nhập tên file</span>
                         </div>
                         <div id="r1-preview-box-${idx}">
@@ -1027,15 +1027,15 @@
       if (unassigned.length > 0 && !r1FilterTeamId) {
         groupsHtml += `
           <div class="group-header-card" style="border-color: var(--danger);">
-            <h3 class="group-header-title" style="color: var(--danger);">Gói chưa gán đội hợp lệ — ${unassigned.length} gói</h3>
+            <h3 class="group-header-title" style="color: var(--danger);">Chủ đề chưa gán đội hợp lệ — ${unassigned.length} chủ đề</h3>
           </div>
         `;
         groupsHtml += unassigned
           .map(({ pkg, idx }) => `
             <div class="editor-card" data-r1-index="${idx}">
               <div class="editor-card-header">
-                <span class="meta-pill">Gói #${idx + 1}</span>
-                <button type="button" class="btn btn-sm btn-danger" data-remove-r1="${idx}">Xóa gói</button>
+                <span class="meta-pill">Chủ đề #${idx + 1}</span>
+                <button type="button" class="btn btn-sm btn-danger" data-remove-r1="${idx}">Xóa chủ đề</button>
               </div>
               <div class="editor-field">
                 <label class="editor-label">Chọn lại đội thi sở hữu</label>
@@ -1050,7 +1050,7 @@
       }
 
       if (!groupsHtml) {
-        container.innerHTML = `<div style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Không tìm thấy gói câu hỏi nào phù hợp với bộ lọc.</div>`;
+        container.innerHTML = `<div style="padding: 2.5rem; text-align: center; color: var(--text-muted); background: var(--surface); border-radius: var(--radius-md);">Không tìm thấy chủ đề nào phù hợp với bộ lọc.</div>`;
         return;
       }
 
@@ -1065,7 +1065,7 @@
           content.round1[idx][field] = e.target.value;
           if (field === "package") {
             const cardTitle = container.querySelector(`[data-r1-index="${idx}"] .editor-card-title`);
-            if (cardTitle) cardTitle.textContent = e.target.value || 'Gói câu hỏi';
+            if (cardTitle) cardTitle.textContent = e.target.value || 'Chủ đề';
           } else if (field === "image_url") {
             const box = document.getElementById(`r1-preview-box-${idx}`);
             if (box) box.innerHTML = renderImagePreviewHtml(e.target.value);
@@ -1089,9 +1089,8 @@
         btn.addEventListener("click", () => {
           const teamId = btn.dataset.addR1ForTeam;
           const currentCount = content.round1.filter((p) => p.team_id === teamId).length;
-          const letter = String.fromCharCode(65 + currentCount); // A, B, C...
           content.round1.push({
-            package: `Gói ${letter}`,
+            package: `Chủ đề ${currentCount + 1}`,
             team_id: teamId,
             question: "",
             time_seconds: Number(content.config?.round1_time_seconds) || 900,
@@ -1976,6 +1975,10 @@
               <input type="number" class="editor-input" data-cfg-field="round1_max_manner" value="${cfg.round1_max_manner || 5}" />
             </div>
           </div>
+          <div class="editor-field" style="margin-top: 0.75rem;">
+            <label class="editor-label">Thể lệ Vòng 1 (kịch bản MC đọc trước phần thi, giữ nguyên xuống dòng)</label>
+            <textarea class="editor-textarea" data-cfg-field="round1_rules" rows="6" placeholder="Nhập thể lệ Vòng 1...">${escapeHtml(cfg.round1_rules || '')}</textarea>
+          </div>
         </div>
 
         <div class="editor-card">
@@ -2001,6 +2004,10 @@
               <label class="editor-label">Điểm mỗi câu đúng</label>
               <input type="number" class="editor-input" data-cfg-field="round2_points_per_correct" value="${cfg.round2_points_per_correct !== undefined ? cfg.round2_points_per_correct : 2}" min="0" step="0.5" />
             </div>
+          </div>
+          <div class="editor-field" style="margin-top: 0.75rem;">
+            <label class="editor-label">Thể lệ Vòng 2 (kịch bản MC đọc trước phần thi, giữ nguyên xuống dòng)</label>
+            <textarea class="editor-textarea" data-cfg-field="round2_rules" rows="6" placeholder="Nhập thể lệ Vòng 2...">${escapeHtml(cfg.round2_rules || '')}</textarea>
           </div>
         </div>
 
@@ -2035,6 +2042,10 @@
               <label class="editor-label">Thời gian cảnh báo (giây)</label>
               <input type="number" class="editor-input" data-cfg-field="warning_seconds" value="${cfg.warning_seconds || 5}" />
             </div>
+          </div>
+          <div class="editor-field" style="margin-top: 0.75rem;">
+            <label class="editor-label">Thể lệ Vòng 3 (kịch bản MC đọc trước phần thi, giữ nguyên xuống dòng)</label>
+            <textarea class="editor-textarea" data-cfg-field="round3_rules" rows="6" placeholder="Nhập thể lệ Vòng 3...">${escapeHtml(cfg.round3_rules || '')}</textarea>
           </div>
         </div>
 
@@ -2112,7 +2123,7 @@
 
       document.getElementById("btn-reset-match-live")?.addEventListener("click", async () => {
         const confirmed = window.confirm(
-          "CẢNH BÁO: BẠN CÓ CHẮC CHẮN MUỐN ĐẶT LẠI TRẬN ĐẤU?\n\nToàn bộ dữ liệu sau sẽ bị XÓA VĨNH VIỄN trên tất cả thiết bị:\n- Điểm số của giám khảo cho các đội (Vòng 1 & Vòng 3)\n- Điểm trừ quá giờ và vi phạm\n- Tất cả câu trả lời và bảng xếp hạng Vòng 2 (answers/)\n- Trạng thái các câu hỏi và gói thi đang mở\n\nCấu hình nội dung, danh sách đội thi và câu hỏi KHÔNG bị xóa.\n\nNhấn OK để xác nhận xóa và đặt lại trận đấu."
+          "CẢNH BÁO: BẠN CÓ CHẮC CHẮN MUỐN ĐẶT LẠI TRẬN ĐẤU?\n\nToàn bộ dữ liệu sau sẽ bị XÓA VĨNH VIỄN trên tất cả thiết bị:\n- Điểm số của giám khảo cho các đội (Vòng 1 & Vòng 3)\n- Điểm trừ quá giờ và vi phạm\n- Tất cả câu trả lời và bảng xếp hạng Vòng 2 (answers/)\n- Trạng thái các câu hỏi và chủ đề đang mở\n\nCấu hình nội dung, danh sách đội thi và câu hỏi KHÔNG bị xóa.\n\nNhấn OK để xác nhận xóa và đặt lại trận đấu."
         );
         if (!confirmed) return;
         try {
@@ -2345,7 +2356,7 @@
       document.getElementById("btn-add-round1")?.addEventListener("click", () => {
         const firstTeam = r1FilterTeamId || content.teams[0]?.id || "";
         content.round1.push({
-          package: "Gói mới",
+          package: "Chủ đề mới",
           team_id: firstTeam,
           question: "",
           time_seconds: Number(content.config?.round1_time_seconds) || 900,

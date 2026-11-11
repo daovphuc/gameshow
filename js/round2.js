@@ -4,6 +4,40 @@
 import { parseCsv } from "./csv.js";
 import { resolveImageUrl } from "./data.js";
 import { DEFAULT_CONFIG } from "./config.js";
+import { formatSeconds } from "./leaderboard.js";
+
+export { formatSeconds };
+
+/**
+ * Calculates response time in milliseconds from question shownAt to answer answeredAt.
+ * Uses authoritative server timestamps to eliminate client clock skew.
+ *
+ * @param {number|null} shownAt - Server timestamp when question started
+ * @param {number|null} answeredAt - Server timestamp when answer was submitted
+ * @returns {number} Response time in milliseconds (>= 0)
+ */
+export function calculateRound2AnswerTime(shownAt, answeredAt) {
+  if (
+    shownAt === undefined ||
+    shownAt === null ||
+    answeredAt === undefined ||
+    answeredAt === null ||
+    !Number.isFinite(Number(shownAt)) ||
+    !Number.isFinite(Number(answeredAt))
+  ) {
+    return 0;
+  }
+  return Math.max(0, Math.round(Number(answeredAt) - Number(shownAt)));
+}
+
+/**
+ * Formats a response time duration in milliseconds with Vietnamese comma and 's' suffix.
+ * @param {number} responseTimeMs
+ * @returns {string}
+ */
+export function formatRound2AnswerTime(responseTimeMs) {
+  return formatSeconds((Number(responseTimeMs) || 0) / 1000);
+}
 
 function toRows(input) {
   if (typeof input === "string") {
@@ -58,7 +92,7 @@ export function calculateRound2QuestionScore({
   }
 
   const durationSec = Number(durationSeconds) || 30;
-  const elapsedMs = Math.max(0, answeredAt - shownAt);
+  const elapsedMs = calculateRound2AnswerTime(shownAt, answeredAt);
   const elapsedSec = elapsedMs / 1000;
 
   // Answers strictly after the deadline are late and receive 0
@@ -317,7 +351,7 @@ export function submitRound2Answer(state, { teamId, answer, serverTime = Date.no
   }
 
   const cleanAns = String(answer).trim().toUpperCase();
-  const responseTimeMs = state.shownAt ? Math.max(0, serverTime - state.shownAt) : 0;
+  const responseTimeMs = calculateRound2AnswerTime(state?.shownAt, serverTime);
 
   return {
     ...state,
@@ -376,10 +410,7 @@ export function revealRound2Question(
       answer: record.answer,
       isCorrect,
       // Tablets store only the server-side answeredAt, so derive the time here.
-      responseTimeMs:
-        Number.isFinite(record.answeredAt) && Number.isFinite(state?.shownAt)
-          ? Math.max(0, record.answeredAt - state.shownAt)
-          : null,
+      responseTimeMs: calculateRound2AnswerTime(state?.shownAt, record.answeredAt),
       points
     };
   }
@@ -517,7 +548,7 @@ export function recomputeRound2FromAnswers({
         pointsPerCorrect: ptsPerCorrect
       });
 
-      const responseTimeMs = Math.max(0, answeredAt - shownAt);
+      const responseTimeMs = calculateRound2AnswerTime(shownAt, answeredAt);
 
       results[teamId] = {
         answer: rawAns,
@@ -533,6 +564,7 @@ export function recomputeRound2FromAnswers({
         teamStats[teamId].points += points;
         teamStats[teamId].softwarePoints += points;
         teamStats[teamId].totalCorrectTimeMs += responseTimeMs;
+        teamStats[teamId].totalCorrectTimeSeconds = Math.round((teamStats[teamId].totalCorrectTimeMs / 1000) * 100) / 100;
       }
     }
 

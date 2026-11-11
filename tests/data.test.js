@@ -9,7 +9,9 @@ import {
   normaliseRound1,
   normaliseRound3,
   getOfferedPackages,
-  normaliseAllData
+  getRound1TopicLabel,
+  normaliseAllData,
+  DEFAULT_CONFIG
 } from "../js/data.js";
 
 test("resolveImageUrl maps bare file names to images/, keeps https:// and paths with /, and returns empty for blank", () => {
@@ -187,4 +189,47 @@ test("sample CSV files in data/sample parse and normalise cleanly with 35 teams,
   assert.equal(data.config.round2_time_seconds, 30);
   assert.equal(data.config.round3_time_seconds, 420);
   assert.equal(data.config.warning_seconds, 5);
+  assert.ok(data.config.round1_rules.includes("Điều 15"));
+  assert.ok(data.config.round2_rules.includes("Điều 17"));
+  assert.ok(data.config.round3_rules.includes("Điều 18"));
 });
+
+test("getRound1TopicLabel derives human-friendly labels for legacy and new packages while honoring order", () => {
+  // Explicit index overrides
+  assert.equal(getRound1TopicLabel("Gói A", 0), "Chủ đề 1");
+  assert.equal(getRound1TopicLabel("Gói B", 1), "Chủ đề 2");
+
+  // Package object with label or topicIndex
+  assert.equal(getRound1TopicLabel({ label: "Chủ đề 1" }), "Chủ đề 1");
+  assert.equal(getRound1TopicLabel({ package: "Gói A", topicIndex: 0 }), "Chủ đề 1");
+  assert.equal(getRound1TopicLabel({ package: "Gói B", topicIndex: 1 }), "Chủ đề 2");
+
+  // Legacy string format
+  assert.equal(getRound1TopicLabel("Gói A"), "Chủ đề 1");
+  assert.equal(getRound1TopicLabel("Gói B"), "Chủ đề 2");
+  assert.equal(getRound1TopicLabel("Chủ đề 1"), "Chủ đề 1");
+  assert.equal(getRound1TopicLabel("Chủ đề 2"), "Chủ đề 2");
+  assert.equal(getRound1TopicLabel("1"), "Chủ đề 1");
+  assert.equal(getRound1TopicLabel(""), "Chủ đề 1");
+});
+
+test("DEFAULT_CONFIG and normaliseConfig include and preserve rules for all 3 rounds", () => {
+  assert.ok(DEFAULT_CONFIG.round1_rules);
+  assert.ok(DEFAULT_CONFIG.round2_rules);
+  assert.ok(DEFAULT_CONFIG.round3_rules);
+
+  const custom = normaliseConfig([
+    { key: "round1_rules", value: "Quy định riêng vòng 1" },
+    { key: "round2_rules", value: "Quy định riêng vòng 2" },
+    { key: "round3_rules", value: "Quy định riêng vòng 3" }
+  ]);
+  assert.equal(custom.round1_rules, "Quy định riêng vòng 1");
+  assert.equal(custom.round2_rules, "Quy định riêng vòng 2");
+  assert.equal(custom.round3_rules, "Quy định riêng vòng 3");
+
+  const empty = normaliseConfig([]);
+  assert.equal(empty.round1_rules, DEFAULT_CONFIG.round1_rules);
+  assert.equal(empty.round2_rules, DEFAULT_CONFIG.round2_rules);
+  assert.equal(empty.round3_rules, DEFAULT_CONFIG.round3_rules);
+});
+
