@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Núi Bà Đen - Tây Ninh -->
+  <!-- Mountain base & plains -->
+  <path d="M4 56h56" stroke="#15803D" stroke-width="3" stroke-linecap="round"/>
+  <!-- Iconic solitary mountain cone -->
+  <path d="M6 56l26-38 26 38H6z" fill="#047857"/>
+  <path d="M32 18l26 38H32V18z" fill="#065F46"/>
+  <!-- White cloud wreath around peak -->
+  <path d="M16 36c6-4 12-4 16 0 6-4 12-4 16 0" stroke="#F1F5F9" stroke-width="3" stroke-linecap="round"/>
+  <!-- Ba Den Pagoda pagoda roof on slope -->
+  <path d="M22 42l6-4 6 4H22z" fill="#DC2626"/>
+  <!-- Golden sun -->
+  <circle cx="48" cy="16" r="6" fill="#F59E0B"/>
+</svg>

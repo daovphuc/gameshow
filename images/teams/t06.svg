@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Học viện PCCC và CNCH (T06) - Khiên & Ngọn lửa PCCC -->
+  <!-- Outer golden shield -->
+  <path d="M32 6l20 6v18c0 14-10 24-20 28C22 54 12 44 12 30V12l20-6z" fill="#1E3A8A" stroke="#F59E0B" stroke-width="3"/>
+  <!-- Inner red shield area -->
+  <path d="M32 10l16 5v15c0 11-8 19-16 22-8-3-16-11-16-22V15l16-5z" fill="#B91C1C"/>
+  <!-- Laurel / golden star at top -->
+  <polygon points="32,13 33.5,17 38,17 34.5,19.5 35.8,24 32,21.5 28.2,24 29.5,19.5 26,17 30.5,17" fill="#FDE047"/>
+  <!-- Fire fighter flame (3 licking tongues of fire: red/orange/yellow) -->
+  <path d="M32 24c4 4 8 10 6 16-2 6-8 8-12 4-2-4 0-8 2-10 0 6 6 8 8 2 2-6-4-10-4-12z" fill="#EA580C"/>
+  <path d="M32 26c6 4 6 12 2 16-4 4-10 2-8-4 1 2 4 4 6 2 3-3 1-8 0-14z" fill="#F97316"/>
+  <path d="M32 30c3 3 4 8 1 11-3 3-7 1-5-3 1 1 3 2 4 1 2-2 1-6 0-9z" fill="#FDE047"/>
+  <!-- Two crossed silver axes / water nozzle accent -->
+  <path d="M22 46l20-16M42 46L22 30" stroke="#E2E8F0" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+</svg>

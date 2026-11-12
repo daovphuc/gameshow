@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Thủy điện Sơn La -->
+  <!-- Mountain sides -->
+  <path d="M4 16l14 36H4V16zM60 16L46 52h14V16z" fill="#047857"/>
+  <!-- Concrete Dam wall -->
+  <path d="M14 28h36l-4 24H18l-4-24z" fill="#94A3B8"/>
+  <path d="M14 28h36v6H14z" fill="#64748B"/>
+  <!-- Spillway floodgates -->
+  <rect x="22" y="34" width="4" height="12" fill="#334155"/>
+  <rect x="30" y="34" width="4" height="12" fill="#334155"/>
+  <rect x="38" y="34" width="4" height="12" fill="#334155"/>
+  <!-- Flowing water -->
+  <path d="M22 46c-2 6 0 10 0 10M30 46c0 6 2 10 2 10M38 46c2 6 0 10 0 10" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Electric energy lightning -->
+  <path d="M34 6l-6 10h6l-4 8 10-12h-6l4-6z" fill="#F59E0B"/>
+</svg>

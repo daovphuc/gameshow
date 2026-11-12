@@ -4,6 +4,8 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   resolveImageUrl,
+  resolveTeamIcon,
+  TEAM_ICONS,
   normaliseConfig,
   normaliseTeams,
   normaliseRound1,
@@ -232,4 +234,84 @@ test("DEFAULT_CONFIG and normaliseConfig include and preserve rules for all 3 ro
   assert.equal(empty.round2_rules, DEFAULT_CONFIG.round2_rules);
   assert.equal(empty.round3_rules, DEFAULT_CONFIG.round3_rules);
 });
+
+test("every file referenced by TEAM_ICONS exists under images/teams/", () => {
+  const slugs = Object.keys(TEAM_ICONS);
+  assert.equal(slugs.length, 35);
+  for (const [slug, iconPath] of Object.entries(TEAM_ICONS)) {
+    assert.ok(iconPath.startsWith("images/teams/"));
+    assert.ok(fs.existsSync(path.resolve(iconPath)), `Icon file missing for ${slug}: ${iconPath}`);
+  }
+});
+
+test("resolveTeamIcon resolves each of the 35 sample teams to an existing icon file", () => {
+  const sampleCsv = fs.readFileSync(path.resolve("data/sample/teams.csv"), "utf8");
+  const lines = sampleCsv.trim().split("\n").slice(1);
+  assert.equal(lines.length, 35);
+
+  for (const line of lines) {
+    const [id, name] = line.split(",");
+    const resolved = resolveTeamIcon({ id, name });
+    assert.ok(resolved, `Failed to resolve icon for ${name} (${id})`);
+    assert.ok(fs.existsSync(path.resolve(resolved)), `File does not exist: ${resolved}`);
+
+    // Also resolves directly from name string
+    const resolvedByName = resolveTeamIcon(name);
+    assert.equal(resolvedByName, resolved);
+  }
+});
+
+test("resolveTeamIcon: explicit image wins over province name match", () => {
+  // Explicit filename
+  assert.equal(
+    resolveTeamIcon({ name: "Công an TP. Hà Nội", image_url: "custom-avatar.png" }),
+    "images/custom-avatar.png"
+  );
+  // Explicit full URL
+  assert.equal(
+    resolveTeamIcon({ name: "Công an tỉnh Lào Cai", image_url: "https://example.com/laocai.jpg" }),
+    "https://example.com/laocai.jpg"
+  );
+  // Explicit image field
+  assert.equal(
+    resolveTeamIcon({ name: "Công an TP. Đà Nẵng", image: "danang.svg" }),
+    "images/danang.svg"
+  );
+  // Blank explicit image falls back to province icon
+  assert.equal(
+    resolveTeamIcon({ name: "Công an TP. Hà Nội", image_url: "   " }),
+    "images/teams/ha-noi.svg"
+  );
+});
+
+test("resolveTeamIcon: accent, case, and 'TP.' / 'tỉnh' / short name variants still match", () => {
+  // Accents stripped & case variants
+  assert.equal(resolveTeamIcon("cong an tp ha noi"), "images/teams/ha-noi.svg");
+  assert.equal(resolveTeamIcon("CONG AN TINH LAO CAI"), "images/teams/lao-cai.svg");
+  assert.equal(resolveTeamIcon("lao cai"), "images/teams/lao-cai.svg");
+  assert.equal(resolveTeamIcon("tinh Lao Cai"), "images/teams/lao-cai.svg");
+  assert.equal(resolveTeamIcon("TP. Ho Chi Minh"), "images/teams/ho-chi-minh.svg");
+  assert.equal(resolveTeamIcon("tp ho chi minh"), "images/teams/ho-chi-minh.svg");
+  assert.equal(resolveTeamIcon("hcm"), "images/teams/ho-chi-minh.svg");
+  assert.equal(resolveTeamIcon("Sai Gon"), "images/teams/ho-chi-minh.svg");
+  assert.equal(resolveTeamIcon("TP. Hue"), "images/teams/hue.svg");
+  assert.equal(resolveTeamIcon("Thua Thien Hue"), "images/teams/hue.svg");
+  assert.equal(resolveTeamIcon("Hoc vien T06"), "images/teams/t06.svg");
+  assert.equal(resolveTeamIcon("T06"), "images/teams/t06.svg");
+  assert.equal(resolveTeamIcon("Học viện Phòng cháy chữa cháy"), "images/teams/t06.svg");
+  assert.equal(resolveTeamIcon("Dak Lak"), "images/teams/dak-lak.svg");
+  assert.equal(resolveTeamIcon("Dac Lac"), "images/teams/dak-lak.svg");
+});
+
+test("resolveTeamIcon: unknown name or empty input returns null fallback", () => {
+  assert.equal(resolveTeamIcon("Đội thi đấu không xác định"), null);
+  assert.equal(resolveTeamIcon("Unknown Team"), null);
+  assert.equal(resolveTeamIcon(""), null);
+  assert.equal(resolveTeamIcon("   "), null);
+  assert.equal(resolveTeamIcon(null), null);
+  assert.equal(resolveTeamIcon(undefined), null);
+  assert.equal(resolveTeamIcon({ name: "Unknown" }), null);
+  assert.equal(resolveTeamIcon({}), null);
+});
+
 

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Thác Bản Giốc - Cao Bằng -->
+  <!-- Rocky tiers -->
+  <path d="M4 24h24v12h14v12H4V24z" fill="#475569"/>
+  <path d="M36 16h24v16H46v16H60V16z" fill="#334155"/>
+  <!-- Tiered cascading waterfalls -->
+  <path d="M12 24v28M18 24v28M24 24v28M42 16v36M48 16v36M54 16v36" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Foam/spray at basin -->
+  <path d="M4 54c8-3 16 0 28-2s18 1 28-1" stroke="#E0F2FE" stroke-width="4" stroke-linecap="round"/>
+  <!-- Lush greenery on crest -->
+  <circle cx="28" cy="18" r="5" fill="#15803D"/>
+  <circle cx="36" cy="12" r="5" fill="#16A34A"/>
+</svg>

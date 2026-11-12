@@ -4,7 +4,7 @@
 
 import { CONTENT_TABS, SHEET_TABS } from "./config.js";
 import { getActiveSession, saveActiveSession, clearActiveSession, validateSession, isRoleAllowedForPortal } from "./auth.js";
-import { normaliseAllData, resolveImageUrl } from "./data.js";
+import { normaliseAllData, resolveImageUrl, resolveTeamIcon } from "./data.js";
 import { contentToQuizData, isContentEmpty, getContestTeams, ALLOWED_TEAM_CONTENT_KEYS, assembleTeamContent } from "./content.js";
 import { createInitialState, syncStateWithTeams, exportState, importState, computeTeamScores } from "./state.js";
 import { getTeamInitials, computeLeaderboard, diffLeaderboard, shortenTeamName } from "./leaderboard.js";
@@ -373,16 +373,17 @@ export function saveAppState(state) {
 export function renderAvatarHtml(team, sizeClass = "") {
   const initials = escapeHtml(getTeamInitials(team?.name || "?"));
   const color = escapeHtml(team?.color || "#D97757");
-  const cls = ["team-avatar", sizeClass].filter(Boolean).join(" ");
-  const resolvedUrl = resolveImageUrl(team?.image_url);
+  const resolvedUrl = resolveTeamIcon(team);
+  const isSvg = Boolean(resolvedUrl && /\.svg(?:$|[?#])/i.test(resolvedUrl));
+  const cls = ["team-avatar", sizeClass, isSvg ? "has-svg" : ""].filter(Boolean).join(" ");
   if (resolvedUrl) {
     const imgUrl = escapeHtml(resolvedUrl);
-    return `<div class="${cls}" style="background-color: ${color}">
+    return `<div class="${cls}" style="--team-color: ${color}; border-color: ${color}; background-color: ${color}">
       <span class="team-avatar-initials">${initials}</span>
-      <img src="${imgUrl}" alt="" onload="if(this.previousElementSibling)this.previousElementSibling.style.display='none'" onerror="this.remove()" />
+      <img class="${isSvg ? "team-avatar-svg" : ""}" src="${imgUrl}" alt="" onload="this.parentElement.classList.add('has-image');if(this.previousElementSibling)this.previousElementSibling.style.display='none'" onerror="this.remove()" />
     </div>`;
   }
-  return `<div class="${cls}" style="background-color: ${color}">${initials}</div>`;
+  return `<div class="${cls}" style="--team-color: ${color}; border-color: ${color}; background-color: ${color}">${initials}</div>`;
 }
 
 export function showToast(message, durationMs = 2800) {

@@ -614,30 +614,50 @@ body.sidebar-collapsed .sidebar-bottom .sidebar-link {
   width: 64px;
   height: 64px;
   border-radius: 50%;
+  border: 3px solid var(--team-color, var(--accent));
   font-weight: 800;
   font-size: 1.3rem;
   color: #FFFFFF;
   flex-shrink: 0;
   overflow: hidden;
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25);
+  box-shadow: var(--shadow-sm);
+}
+
+.team-avatar-xs {
+  width: 28px;
+  height: 28px;
+  border-width: 2px;
+  font-size: 0.72rem;
 }
 
 .team-avatar-sm {
   width: 40px;
   height: 40px;
+  border-width: 2.5px;
   font-size: 0.95rem;
 }
 
 .team-avatar-lg {
   width: 76px;
   height: 76px;
+  border-width: 3px;
   font-size: 1.55rem;
+}
+
+.team-avatar.has-image.has-svg {
+  background-color: #FAF9F5 !important;
 }
 
 .team-avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
+}
+
+.team-avatar img.team-avatar-svg {
+  object-fit: contain;
+  padding: 12%;
 }
 
 /* Round 1 Team Grid */
@@ -2219,7 +2239,8 @@ body.sidebar-collapsed .sidebar-bottom .sidebar-link {
 /* Round 2 Host Controls */
 .round2-options-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
   gap: 1rem;
   margin-top: 1.5rem;
 }
@@ -2235,6 +2256,8 @@ body.sidebar-collapsed .sidebar-bottom .sidebar-link {
   align-items: center;
   gap: 1rem;
   padding: 1.25rem 1.4rem;
+  min-height: 84px;
+  height: 100%;
   border-radius: var(--radius-md);
   border: 2px solid var(--border);
   background-color: var(--surface-elevated);
@@ -2249,10 +2272,19 @@ body.sidebar-collapsed .sidebar-bottom .sidebar-link {
   justify-content: center;
   width: 44px;
   height: 44px;
+  flex-shrink: 0;
   border-radius: 12px;
   font-weight: 900;
   font-size: 1.3rem;
   color: #FFFFFF;
+}
+
+.r2-option-card .opt-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .r2-option-card.opt-a .opt-letter { background-color: #E63A54; }
@@ -2278,11 +2310,65 @@ body.sidebar-collapsed .sidebar-bottom .sidebar-link {
   font-size: 1.1rem;
 }
 
+/* Round 2 Live Answer Progress Grid (35 teams at a glance on 1366x768 and 1920x1080) */
+.r2-live-teams-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 0.5rem;
+}
+
+.r2-live-team-cell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.45rem;
+  row-gap: 0.1rem;
+  height: 100%;
+  min-width: 0;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background-color: var(--surface);
+}
+
+.r2-live-team-cell.answered {
+  border-color: rgba(46, 125, 79, 0.45);
+  background-color: rgba(46, 125, 79, 0.08);
+}
+
+/* Avatar spans both rows; name on the first row, status under it. */
+.r2-live-team-info {
+  display: contents;
+}
+
+.r2-live-team-cell .team-avatar {
+  grid-row: 1 / span 2;
+  width: 34px;
+  height: 34px;
+}
+
+.r2-live-team-name {
+  font-weight: 700;
+  font-size: 0.86rem;
+  line-height: 1.2;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.r2-live-team-status {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
 /* Tablet Screens (Judge & Team) */
 .tablet-container {
-  max-width: 780px;
+  max-width: 980px;
   margin: 0 auto;
-  padding: 1.5rem 1.25rem 4rem;
+  padding: 1.15rem 1.25rem 2.5rem;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -2294,11 +2380,11 @@ body.sidebar-collapsed .sidebar-bottom .sidebar-link {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.75rem 1rem;
-  padding: 1rem 1.25rem;
+  padding: 0.8rem 1.15rem;
   background-color: var(--surface-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.1rem;
 }
 
 .tablet-identity-banner {
@@ -2340,21 +2426,27 @@ body.sidebar-collapsed .sidebar-bottom .sidebar-link {
   background-color: var(--surface-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 2rem 1.75rem;
+  padding: 1.5rem 1.65rem;
   box-shadow: var(--shadow-sm);
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 
 /* Team 4 Big A/B/C/D Buttons */
 .team-answers-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.2rem;
-  margin-top: 1.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.team-answers-grid.options-count-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 @media (max-width: 580px) {
-  .team-answers-grid {
+  .team-answers-grid,
+  .team-answers-grid.options-count-2 {
     grid-template-columns: 1fr;
   }
 }
@@ -2362,19 +2454,74 @@ body.sidebar-collapsed .sidebar-bottom .sidebar-link {
 .team-btn-choice {
   display: flex;
   align-items: center;
-  gap: 1.2rem;
-  padding: 1.4rem 1.5rem;
+  gap: 1rem;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 1.15rem 1.35rem;
   border-radius: var(--radius-md);
   border: 3px solid transparent;
   color: #FFFFFF;
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   font-weight: 800;
   cursor: pointer;
   box-shadow: var(--shadow-md);
-  min-height: 80px;
+  min-height: 92px;
   text-align: left;
   transition: transform 0.1s ease, filter 0.15s ease, opacity 0.2s ease;
   -webkit-tap-highlight-color: transparent;
+}
+
+.team-answers-grid.options-count-2 .team-btn-choice {
+  min-height: 120px;
+}
+
+.team-choice-letter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  font-size: 1.45rem;
+  font-weight: 900;
+}
+
+.team-choice-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 1.12rem;
+  line-height: 1.35;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* iPad landscape & compact-height viewports: keep timer, question, and all buttons visible without scrolling */
+@media (min-width: 760px) and (max-height: 860px) {
+  .tablet-container {
+    padding: 0.75rem 1.25rem 1rem;
+  }
+  .tablet-header {
+    padding: 0.6rem 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .tablet-stage-card {
+    padding: 1.15rem 1.4rem;
+    margin-bottom: 0.75rem;
+  }
+  .team-answers-grid {
+    gap: 0.85rem;
+    margin-top: 0.75rem;
+  }
+  .team-btn-choice {
+    min-height: 80px;
+    padding: 0.9rem 1.15rem;
+  }
+  .team-answers-grid.options-count-2 .team-btn-choice {
+    min-height: 104px;
+  }
 }
 
 .team-btn-choice:active:not(:disabled) {

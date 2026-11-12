@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Cầu Hàm Rồng - Thanh Hóa -->
+  <!-- Ma River -->
+  <path d="M4 56c12-3 24-2 56 0" stroke="#0284C7" stroke-width="3" stroke-linecap="round"/>
+  <!-- Ngoc mountain behind bridge -->
+  <path d="M4 46l12-18 10 10 16-20 18 28H4z" fill="#047857" opacity="0.6"/>
+  <!-- Steel truss bridge deck -->
+  <path d="M4 46h56" stroke="#475569" stroke-width="3.5"/>
+  <!-- Two steel arch spans -->
+  <path d="M6 46c4-16 18-16 24 0" stroke="#DC2626" stroke-width="3.5" fill="none"/>
+  <path d="M32 46c4-16 18-16 24 0" stroke="#DC2626" stroke-width="3.5" fill="none"/>
+  <!-- Truss diagonal braces -->
+  <path d="M12 46l6-10 6 10M38 46l6-10 6 10" stroke="#EF4444" stroke-width="1.5"/>
+  <!-- Pier support -->
+  <rect x="29" y="46" width="6" height="8" fill="#64748B"/>
+</svg>

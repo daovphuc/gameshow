@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Đỉnh Fansipan 3.143m - Lào Cai -->
+  <!-- Mountain peak -->
+  <path d="M6 56l26-36 26 36H6z" fill="#334155"/>
+  <path d="M32 20l26 36H32V20z" fill="#1E293B"/>
+  <!-- Metal pyramid summit marker -->
+  <polygon points="32,10 24,26 40,26" fill="#F59E0B" stroke="#D97706" stroke-width="1.5"/>
+  <!-- Vietnam flag on top -->
+  <rect x="32" y="4" width="10" height="7" fill="#DC2626"/>
+  <polygon points="37,6 37.5,7.5 39,7.5 37.8,8.5 38.2,10 37,9 35.8,10 36.2,8.5 35,7.5 36.5,7.5" fill="#FDE047"/>
+  <path d="M32 4v7" stroke="#D97706" stroke-width="1.5"/>
+  <!-- Clouds around summit -->
+  <path d="M10 44c4-3 10-3 14 0M40 44c4-3 10-3 14 0" stroke="#E2E8F0" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

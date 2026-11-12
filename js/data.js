@@ -55,6 +55,136 @@ export function resolveImageUrl(raw) {
   return `images/${trimmed}`;
 }
 
+export const TEAM_ICONS = {
+  "ha-noi": "images/teams/ha-noi.svg",
+  "hai-phong": "images/teams/hai-phong.svg",
+  "hue": "images/teams/hue.svg",
+  "da-nang": "images/teams/da-nang.svg",
+  "ho-chi-minh": "images/teams/ho-chi-minh.svg",
+  "can-tho": "images/teams/can-tho.svg",
+  "lai-chau": "images/teams/lai-chau.svg",
+  "dien-bien": "images/teams/dien-bien.svg",
+  "son-la": "images/teams/son-la.svg",
+  "lao-cai": "images/teams/lao-cai.svg",
+  "tuyen-quang": "images/teams/tuyen-quang.svg",
+  "cao-bang": "images/teams/cao-bang.svg",
+  "lang-son": "images/teams/lang-son.svg",
+  "thai-nguyen": "images/teams/thai-nguyen.svg",
+  "phu-tho": "images/teams/phu-tho.svg",
+  "bac-ninh": "images/teams/bac-ninh.svg",
+  "quang-ninh": "images/teams/quang-ninh.svg",
+  "hung-yen": "images/teams/hung-yen.svg",
+  "ninh-binh": "images/teams/ninh-binh.svg",
+  "thanh-hoa": "images/teams/thanh-hoa.svg",
+  "nghe-an": "images/teams/nghe-an.svg",
+  "ha-tinh": "images/teams/ha-tinh.svg",
+  "quang-tri": "images/teams/quang-tri.svg",
+  "quang-ngai": "images/teams/quang-ngai.svg",
+  "gia-lai": "images/teams/gia-lai.svg",
+  "dak-lak": "images/teams/dak-lak.svg",
+  "khanh-hoa": "images/teams/khanh-hoa.svg",
+  "lam-dong": "images/teams/lam-dong.svg",
+  "dong-nai": "images/teams/dong-nai.svg",
+  "tay-ninh": "images/teams/tay-ninh.svg",
+  "dong-thap": "images/teams/dong-thap.svg",
+  "vinh-long": "images/teams/vinh-long.svg",
+  "an-giang": "images/teams/an-giang.svg",
+  "ca-mau": "images/teams/ca-mau.svg",
+  "t06": "images/teams/t06.svg"
+};
+
+const TEAM_MATCH_RULES = [
+  { slug: "t06", patterns: [/\bt06\b/, /\bhoc vien\b/] },
+  { slug: "ho-chi-minh", patterns: [/\bho chi minh\b/, /\bhcm\b/, /\btphcm\b/, /\bsai gon\b/] },
+  { slug: "ha-noi", patterns: [/\bha noi\b/, /\bhanoi\b/] },
+  { slug: "hai-phong", patterns: [/\bhai phong\b/] },
+  { slug: "da-nang", patterns: [/\bda nang\b/] },
+  { slug: "can-tho", patterns: [/\bcan tho\b/] },
+  { slug: "lai-chau", patterns: [/\blai chau\b/] },
+  { slug: "dien-bien", patterns: [/\bdien bien\b/] },
+  { slug: "son-la", patterns: [/\bson la\b/] },
+  { slug: "lao-cai", patterns: [/\blao cai\b/] },
+  { slug: "tuyen-quang", patterns: [/\btuyen quang\b/] },
+  { slug: "cao-bang", patterns: [/\bcao bang\b/] },
+  { slug: "lang-son", patterns: [/\blang son\b/] },
+  { slug: "thai-nguyen", patterns: [/\bthai nguyen\b/] },
+  { slug: "phu-tho", patterns: [/\bphu tho\b/] },
+  { slug: "bac-ninh", patterns: [/\bbac ninh\b/] },
+  { slug: "quang-ninh", patterns: [/\bquang ninh\b/] },
+  { slug: "hung-yen", patterns: [/\bhung yen\b/] },
+  { slug: "ninh-binh", patterns: [/\bninh binh\b/] },
+  { slug: "thanh-hoa", patterns: [/\bthanh hoa\b/] },
+  { slug: "nghe-an", patterns: [/\bnghe an\b/] },
+  { slug: "ha-tinh", patterns: [/\bha tinh\b/] },
+  { slug: "quang-tri", patterns: [/\bquang tri\b/] },
+  { slug: "quang-ngai", patterns: [/\bquang ngai\b/] },
+  { slug: "gia-lai", patterns: [/\bgia lai\b/] },
+  { slug: "dak-lak", patterns: [/\bdak lak\b/, /\bdaklak\b/, /\bdac lac\b/, /\bdaclac\b/] },
+  { slug: "khanh-hoa", patterns: [/\bkhanh hoa\b/] },
+  { slug: "lam-dong", patterns: [/\blam dong\b/] },
+  { slug: "dong-nai", patterns: [/\bdong nai\b/] },
+  { slug: "tay-ninh", patterns: [/\btay ninh\b/] },
+  { slug: "dong-thap", patterns: [/\bdong thap\b/] },
+  { slug: "vinh-long", patterns: [/\bvinh long\b/] },
+  { slug: "an-giang", patterns: [/\ban giang\b/] },
+  { slug: "ca-mau", patterns: [/\bca mau\b/] },
+  { slug: "hue", patterns: [/\bhue\b/, /\bthua thien\b/] }
+];
+
+function normalizeMatchString(str) {
+  if (str === undefined || str === null) return "";
+  return String(str)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Resolves a team's icon file path:
+ * 1. An explicit image (image_url or image) set by the host wins.
+ * 2. Otherwise matches the province/unit name or code (accent- and case-insensitive).
+ * 3. Returns null if unknown (triggering initials fallback).
+ *
+ * @param {string|{name?: string, id?: string, image_url?: string, image?: string}} [teamOrName]
+ * @returns {string|null}
+ */
+export function resolveTeamIcon(teamOrName) {
+  if (teamOrName === undefined || teamOrName === null) {
+    return null;
+  }
+  if (typeof teamOrName === "object") {
+    const explicit = teamOrName.image_url ?? teamOrName.image ?? teamOrName.avatar;
+    if (explicit !== undefined && explicit !== null && String(explicit).trim() !== "") {
+      const resolved = resolveImageUrl(String(explicit).trim());
+      if (resolved) return resolved;
+    }
+  }
+
+  // Match by name only: team ids are host-defined and may be in any order.
+  const rawName = typeof teamOrName === "object"
+    ? (teamOrName.name || "")
+    : String(teamOrName || "");
+
+  const norm = normalizeMatchString(rawName);
+  if (!norm) return null;
+
+  for (const rule of TEAM_MATCH_RULES) {
+    for (const pat of rule.patterns) {
+      if (pat.test(norm)) {
+        return TEAM_ICONS[rule.slug] || null;
+      }
+    }
+  }
+
+  return null;
+}
+
+export const getTeamIcon = resolveTeamIcon;
+
 /**
  * Normalises key/value rows from the `config` tab into a config object.
  * @param {Array<Record<string, any>>|string} input

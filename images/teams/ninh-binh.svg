@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Tràng An & Cố đô Hoa Lư - Ninh Bình -->
+  <!-- Towering limestone karst peaks -->
+  <path d="M4 48l14-32 10 14 12-22 14 26 6 14H4z" fill="#065F46"/>
+  <path d="M18 48l10-18 10 10 8-14 8 22H18z" fill="#047857"/>
+  <!-- River water -->
+  <path d="M4 56c12-3 24-2 56 0" stroke="#0284C7" stroke-width="3" stroke-linecap="round"/>
+  <!-- Sampan boat on Trang An river -->
+  <path d="M22 52c6 4 16 4 22 0l2 2H20l2-2z" fill="#78350F"/>
+  <!-- Boatman with conical hat -->
+  <polygon points="32,42 35,47 29,47" fill="#FDE047"/>
+  <circle cx="32" cy="46" r="2" fill="#78350F"/>
+</svg>

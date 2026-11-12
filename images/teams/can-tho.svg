@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Cầu Cần Thơ & Sông Hậu -->
+  <path d="M4 56c12-3 24-2 56 0" stroke="#0284C7" stroke-width="3" stroke-linecap="round"/>
+  <!-- Road deck -->
+  <path d="M4 42h56" stroke="#94A3B8" stroke-width="3"/>
+  <!-- Tower pylon (inverted Y) -->
+  <path d="M32 10v16l-8 16h5l5-10 5 10h5l-8-16V10h-4z" fill="#DC2626"/>
+  <!-- Cable stays -->
+  <path d="M32 14L10 42M32 18L16 42M32 22L22 42M32 14L54 42M32 18L48 42M32 22L42 42" stroke="#FCD34D" stroke-width="1.2"/>
+  <!-- Sampan boat on water -->
+  <path d="M14 52c4 4 12 4 16 0l2 2H12l2-2z" fill="#B45309"/>
+</svg>

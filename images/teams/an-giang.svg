@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Miếu Bà Chúa Xứ Núi Sam - An Giang -->
+  <!-- Mountain base -->
+  <path d="M4 56l18-18 10 8 16-20 12 30H4z" fill="#047857" opacity="0.4"/>
+  <path d="M10 56h44" stroke="#475569" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Shrine base wall -->
+  <rect x="18" y="38" width="28" height="18" fill="#B91C1C"/>
+  <rect x="26" y="42" width="12" height="14" fill="#FEF3C7"/>
+  <path d="M28 56v-10a4 4 0 0 1 8 0v10h-8z" fill="#B45309"/>
+  <!-- Multi-tier curved blue-green roofs -->
+  <!-- Lower roof -->
+  <path d="M12 38c6-3 14-4 20-4s14 1 20 4l-3 3H15l-3-3z" fill="#0D9488" stroke="#115E59" stroke-width="1"/>
+  <!-- Middle pavilion -->
+  <rect x="22" y="26" width="20" height="8" fill="#B91C1C"/>
+  <!-- Middle roof -->
+  <path d="M16 26c5-3 11-4 16-4s11 1 16 4l-2 3H18l-2-3z" fill="#0D9488" stroke="#115E59" stroke-width="1"/>
+  <!-- Top tower spire -->
+  <rect x="26" y="16" width="12" height="6" fill="#F59E0B"/>
+  <path d="M22 16c3-3 7-4 10-4s7 1 10 4l-2 2H24l-2-2z" fill="#047857"/>
+  <!-- Top lotus finial -->
+  <circle cx="32" cy="8" r="2.5" fill="#FBBF24"/>
+</svg>

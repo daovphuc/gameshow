@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Hoa sen Làng Sen quê Bác - Nghệ An -->
+  <!-- Lotus leaf / water base -->
+  <path d="M10 54c12 4 32 4 44 0" stroke="#047857" stroke-width="3" stroke-linecap="round"/>
+  <!-- Central lotus bud/petal -->
+  <path d="M32 16c-6 10-6 24 0 32 6-8 6-22 0-32z" fill="#F43F5E"/>
+  <!-- Inner side petals -->
+  <path d="M32 24c-10 6-16 16-10 24 6-4 12-14 10-24z" fill="#FB7185"/>
+  <path d="M32 24c10 6 16 16 10 24-6-4-12-14-10-24z" fill="#FB7185"/>
+  <!-- Outer spreading petals -->
+  <path d="M26 34c-12 6-16 14-8 18 8-2 14-10 8-18z" fill="#FDA4AF"/>
+  <path d="M38 34c12 6 16 14 8 18-8-2-14-10-8-18z" fill="#FDA4AF"/>
+  <!-- Center yellow receptacle -->
+  <ellipse cx="32" cy="38" rx="4" ry="2" fill="#FBBF24"/>
+</svg>

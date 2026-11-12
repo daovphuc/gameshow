@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Hòn Trống Mái Vịnh Hạ Long - Quảng Ninh -->
+  <!-- Emerald sea water -->
+  <path d="M4 56c8-3 18 0 28-2s18-1 28 2" stroke="#0D9488" stroke-width="3" stroke-linecap="round"/>
+  <path d="M8 52c6-2 14 0 22-1s16-1 26 1" stroke="#2DD4BF" stroke-width="2" stroke-linecap="round"/>
+  <!-- Left islet (Trống) narrower at water, wider above -->
+  <path d="M16 52l4-22 8-12 2 16-6 18h-8z" fill="#047857"/>
+  <path d="M20 30l8-12 2 16-6 18H20l4-22z" fill="#065F46"/>
+  <!-- Right islet (Mái) facing left -->
+  <path d="M48 52l-4-20-8-10-1 14 5 16h8z" fill="#0D9488"/>
+  <path d="M44 32l-8-10-1 14 5 16h4l-4-20z" fill="#115E59"/>
+  <!-- Seagull in sky -->
+  <path d="M12 16c3-3 6 0 8 0s5-3 8 0" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round"/>
+</svg>
