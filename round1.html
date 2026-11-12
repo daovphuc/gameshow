@@ -35,9 +35,11 @@
       getAvailableRound1Packages,
       pickRound1Package,
       cancelRound1Session,
-      finishRound1Package
+      finishRound1Package,
+      startRound1Performance
     } from "./js/state.js";
     import { createTimer, startTimer, tickTimer, formatTimer } from "./js/timer.js";
+    import { showLotteryDrawModal } from "./js/draw-ui.js";
     import { set, update, listen, getServerTime } from "./js/backend.js";
 
     const PENDING_TEAM_KEY = "gameshow_r1_pending_team";
@@ -46,10 +48,13 @@
     let gameState = null;
     let pendingTeamId = sessionStorage.getItem(PENDING_TEAM_KEY) || null;
     let showingRules = true;
+    let showManualPackages = false;
 
     let currentTimer = null;
     let timerInterval = null;
     let activeTimerKey = null;
+    let drawRequestUnsub = null;
+    let lastHandledDrawRequest = 0;
 
     function stopTimerLoop() {
       if (timerInterval) {
@@ -77,12 +82,15 @@
       updateTimerDom();
       stopTimerLoop();
 
+      const phase = gameState.round1.activeSession?.phase || "prep";
       // Publish timer start to live state for judges & secondary screens
       update("live/round1", {
+        phase,
         timer: {
           startedAt: now,
-          durationSeconds: currentTimer.totalSeconds,
-          status: "running"
+          durationSeconds: currentTimer.durationSeconds,
+          status: "running",
+          phase
         }
       });
 
@@ -92,9 +100,32 @@
         if (currentTimer.finished) {
           stopTimerLoop();
           update("live/round1/timer", { status: "finished" });
+          if (gameState.round1.activeSession?.phase === "prep") {
+            handleFinishPrep();
+          }
         }
       }, 100);
       return true;
+    }
+
+    function handleFinishPrep() {
+      const session = gameState.round1.activeSession;
+      if (!session) return;
+      stopTimerLoop();
+
+      gameState = startRound1Performance(gameState, quizData.config);
+      saveAppState(gameState);
+      syncLiveState();
+
+      const perfSec = Number(quizData.config?.round1_time_seconds) || 900;
+      const warnSec = Number(quizData.config?.warning_seconds) || 5;
+      activeTimerKey = `r1__${session.packageId}__performance`;
+      currentTimer = createTimer(perfSec, warnSec);
+
+      // Start the 15-minute countdown
+      triggerStartTimer();
+      renderStage();
+      showToast("Đã hoàn thành chuẩn bị! Bắt đầu tính giờ thuyết trình (15 phút).");
     }
 
     function updateTimerDom() {
@@ -132,15 +163,23 @@
 
     function setPendingTeam(teamId) {
       pendingTeamId = teamId;
+      showManualPackages = false;
       if (teamId) {
         sessionStorage.setItem(PENDING_TEAM_KEY, teamId);
       } else {
         sessionStorage.removeItem(PENDING_TEAM_KEY);
       }
-      // Broadcast active team to judges
+      // Broadcast active team to judges and draw status
       update("live", {
         currentRound: "round1",
-        stageTeamId: teamId || null
+        stageTeamId: teamId || null,
+        draw: teamId
+          ? {
+              round: "round1",
+              status: "pending",
+              stageTeamId: teamId
+            }
+          : null
       });
     }
 
@@ -152,6 +191,7 @@
         syncLiveState();
         stopTimerLoop();
         activeTimerKey = null;
+        set("live/draw", null);
         renderStage();
         return;
       }
@@ -173,6 +213,7 @@
         syncLiveState();
         stopTimerLoop();
         activeTimerKey = null;
+        set("live/draw", null);
         showToast(`Đã hoàn thành phần thi của ${team ? team.name : session.teamId}!`);
         renderStage();
         return;
@@ -191,10 +232,11 @@
 
     function selectPackageForTeam(teamId, packageId) {
       try {
-        gameState = pickRound1Package(gameState, teamId, packageId);
+        gameState = pickRound1Package(gameState, teamId, packageId, quizData.config);
         saveAppState(gameState);
         syncLiveState();
         setPendingTeam(null);
+        set("live/draw", null);
         renderStage();
       } catch (err) {
         showToast(err.message || "Không thể chọn chủ đề này.");
@@ -202,14 +244,16 @@
     }
 
     function syncLiveState() {
+      const activeSession = gameState.round1.activeSession || null;
       set("live/round1", {
         lockedTeams: gameState.round1.lockedTeams || [],
         pickedPackages: gameState.round1.pickedPackages || [],
         teamPackages: gameState.round1.teamPackages || {},
-        activeSession: gameState.round1.activeSession || null
+        activeSession,
+        phase: activeSession?.phase || null
       });
       set("live/currentRound", "round1");
-      set("live/stageTeamId", gameState.round1.activeSession?.teamId || pendingTeamId || null);
+      set("live/stageTeamId", activeSession?.teamId || pendingTeamId || null);
     }
 
     function renderRulesStage(container) {
@@ -314,6 +358,45 @@
       });
     }
 
+    function runRound1Lottery(teamId) {
+      const offeredLimit = Number(quizData.config?.round1_packages_offered) || 3;
+      const offered = getAvailableRound1Packages(gameState, quizData.round1Packages, teamId, offeredLimit);
+      if (offered.length === 0) return;
+
+      const team = quizData.teams.find((t) => t.id === teamId) || { name: teamId };
+
+      set("live/draw", {
+        round: "round1",
+        status: "rolling",
+        stageTeamId: teamId
+      });
+
+      showLotteryDrawModal({
+        items: offered,
+        title: "BỐC THĂM CHỦ ĐỀ VÒNG 1",
+        subtitle: `Lượt thi của: ${team.name}`,
+        getLabel: (pkg) => getRound1TopicLabel(pkg),
+        onComplete: (drawnPkg) => {
+          set("live/draw", {
+            round: "round1",
+            status: "done",
+            stageTeamId: teamId,
+            result: drawnPkg.id
+          });
+          selectPackageForTeam(teamId, drawnPkg.id);
+        },
+        onManualOverride: () => {
+          showManualPackages = true;
+          set("live/draw", {
+            round: "round1",
+            status: "pending",
+            stageTeamId: teamId
+          });
+          renderStage();
+        }
+      });
+    }
+
     function renderPackagePickStage(container, teamId) {
       stopTimerLoop();
       activeTimerKey = null;
@@ -325,7 +408,7 @@
         return;
       }
 
-      const offeredLimit = Number(quizData.config.round1_packages_offered) || 2;
+      const offeredLimit = Number(quizData.config.round1_packages_offered) || 3;
       const offered = getAvailableRound1Packages(gameState, quizData.round1Packages, teamId, offeredLimit);
 
       const renderPkgCard = (pkg, idx) => {
@@ -364,10 +447,11 @@
           </div>
         </div>
 
-        <div class="section-header">
-          <div>
-            <h1 class="section-title">Chọn 1 trong ${offered.length} chủ đề</h1>
-          </div>
+        <div class="section-header" style="text-align: center; margin-bottom: 2rem;">
+          <h1 class="section-title">Bốc thăm chủ đề tuyên truyền</h1>
+          <p class="section-subtitle">
+            Hệ thống bốc thăm ngẫu nhiên 1 trong ${offered.length} chủ đề khả dụng cho ${escapeHtml(team.name)}
+          </p>
         </div>
 
         ${
@@ -376,15 +460,44 @@
                 <h2 class="panel-title">Không còn chủ đề khả dụng</h2>
                 <p class="panel-desc">Các chủ đề của đội này đã hoàn thành.</p>
               </div>`
-            : `<div class="packages-grid">
-                ${offered.map((pkg, idx) => renderPkgCard(pkg, idx)).join("")}
-              </div>`
+            : `
+              <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem; margin: 2rem 0;">
+                <button type="button" id="btn-start-lottery" class="btn btn-primary" style="font-size: 1.4rem; font-weight: 800; padding: 1.1rem 2.5rem; border-radius: var(--radius-full); box-shadow: var(--shadow-lg); display: flex; align-items: center; gap: 0.75rem;">
+                  <span>🎲</span>
+                  <span>QUAY SỐ CHỌN CHỦ ĐỀ</span>
+                </button>
+                <div style="color: var(--text-muted); font-size: 0.95rem;">
+                  Đội thi cũng có thể bấm nút Quay số từ xa trên iPad
+                </div>
+
+                <div style="margin-top: 1rem;">
+                  <button type="button" id="btn-toggle-manual" class="btn btn-sm btn-ghost" style="color: var(--text-muted); text-decoration: underline;">
+                    ${showManualPackages ? "▲ Ẩn danh sách chủ đề" : "▼ Chọn chủ đề thủ công"}
+                  </button>
+                </div>
+              </div>
+
+              ${
+                showManualPackages
+                  ? `<div class="packages-grid" style="margin-top: 1.5rem;">
+                      ${offered.map((pkg, idx) => renderPkgCard(pkg, idx)).join("")}
+                    </div>`
+                  : ""
+              }
+            `
         }
       `;
 
       document.getElementById("btn-screen-back")?.addEventListener("click", handleBack);
       document.getElementById("btn-open-rules")?.addEventListener("click", () => {
         showingRules = true;
+        renderStage();
+      });
+      document.getElementById("btn-start-lottery")?.addEventListener("click", () => {
+        runRound1Lottery(teamId);
+      });
+      document.getElementById("btn-toggle-manual")?.addEventListener("click", () => {
+        showManualPackages = !showManualPackages;
         renderStage();
       });
 
@@ -410,10 +523,15 @@
         return;
       }
 
-      const question = pkg.questions?.[0] || pkg;
-      const questionKey = `r1__${pkg.id}`;
+      const phase = session.phase || "prep";
+      const prepSec = Number(quizData.config?.round1_prep_time_seconds) || 180;
+      const perfSec = Number(quizData.config?.round1_time_seconds) || 900;
+      const duration = phase === "prep" ? prepSec : perfSec;
+      const questionKey = `r1__${pkg.id}__${phase}`;
 
-      ensureQuestionTimer(questionKey, question.time_seconds);
+      ensureQuestionTimer(questionKey, duration);
+
+      const question = pkg.questions?.[0] || pkg;
 
       container.innerHTML = `
         <div class="question-stage">
@@ -435,7 +553,7 @@
               </div>
             </div>
 
-            <div class="screen-right-group">
+            <div class="screen-right-group" style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
               <button type="button" id="btn-open-rules" class="btn btn-outline btn-sm">
                 📜 Thể lệ
               </button>
@@ -447,10 +565,29 @@
                 </button>
               </div>
 
+              ${
+                phase === "prep"
+                  ? `<button type="button" id="btn-finish-prep" class="btn btn-primary btn-sm" style="font-weight: 700; background: #0284c7; border-color: #0284c7;">
+                      Hoàn thành chuẩn bị → Thi
+                    </button>`
+                  : ""
+              }
+
               <button type="button" id="btn-screen-continue" class="btn btn-primary btn-lg">
                 Hoàn thành phần thi →
               </button>
             </div>
+          </div>
+
+          <div style="margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+            <div class="meta-pill" style="font-weight: 800; font-size: 0.95rem; padding: 0.4rem 1rem; border-radius: var(--radius-full); ${
+              phase === "prep"
+                ? "background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc;"
+                : "background: #dcfce7; color: #15803d; border: 1px solid #86efac;"
+            }">
+              ${phase === "prep" ? "⏳ GIAI ĐOẠN CHUẨN BỊ (3 PHÚT)" : "🎤 GIAI ĐOẠN THUYẾT TRÌNH (15 PHÚT)"}
+            </div>
+            ${phase === "prep" ? `<div style="font-size: 0.9rem; color: var(--text-muted);">Đội có 3 phút chuẩn bị. Bấm "Hoàn thành chuẩn bị" để thuyết trình ngay.</div>` : ""}
           </div>
 
           <article class="question-card">
@@ -474,6 +611,9 @@
         renderStage();
       });
       document.getElementById("btn-screen-continue")?.addEventListener("click", handleContinue);
+      document.getElementById("btn-finish-prep")?.addEventListener("click", () => {
+        handleFinishPrep();
+      });
       document.getElementById("btn-start-timer")?.addEventListener("click", () => {
         triggerStartTimer();
       });
@@ -511,6 +651,17 @@
       // Synchronise live round to round 1
       update("live", {
         currentRound: "round1"
+      });
+
+      listen("drawRequest", (req) => {
+        if (!req || !req.requestedAt) return;
+        if (req.requestedAt === lastHandledDrawRequest) return;
+        if (req.round !== "round1") return;
+        if (pendingTeamId && (req.teamId === pendingTeamId || req.teamId === "host")) {
+          lastHandledDrawRequest = req.requestedAt;
+          set("drawRequest", null);
+          runRound1Lottery(pendingTeamId);
+        }
       });
 
       // Listen for remote state updates

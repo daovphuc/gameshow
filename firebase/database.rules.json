@@ -57,6 +57,11 @@
           ".write": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'team' && root.child('roles').child(auth.uid).child('ref_id').val() === $teamId && !data.exists() && newData.exists() && $questionKey === root.child('live/round2/questionKey').val() && root.child('live/round2/status').val() === 'open' && (!root.child('live/round2/deadline').exists() || now <= root.child('live/round2/deadline').val()) && newData.child('answeredAt').val() === now"
         }
       }
+    },
+    "drawRequest": {
+      ".read": "auth != null && root.child('roles').child(auth.uid).child('role').val() === 'host'",
+      ".write": "auth != null && ((root.child('roles').child(auth.uid).child('role').val() === 'host') || (root.child('roles').child(auth.uid).child('role').val() === 'team' && (root.child('roles').child(auth.uid).child('ref_id').val() === root.child('live/stageTeamId').val() || root.child('live/currentRound').val() === 'round2')))",
+      ".validate": "newData.hasChildren(['requestedAt']) && (!newData.child('teamId').exists() || newData.child('teamId').val() === root.child('roles').child(auth.uid).child('ref_id').val() || root.child('roles').child(auth.uid).child('role').val() === 'host')"
     }
   }
 }

@@ -235,6 +235,20 @@ test("DEFAULT_CONFIG and normaliseConfig include and preserve rules for all 3 ro
   assert.equal(empty.round3_rules, DEFAULT_CONFIG.round3_rules);
 });
 
+test("config defaults specify short round names and rules texts of at most 6 lines each", () => {
+  assert.equal(DEFAULT_CONFIG.round1_name, "Tuyên truyền");
+  assert.equal(DEFAULT_CONFIG.round2_name, "Kiến thức pháp luật");
+  assert.equal(DEFAULT_CONFIG.round3_name, "Xử lý tình huống");
+
+  const r1Lines = DEFAULT_CONFIG.round1_rules.trim().split("\n");
+  const r2Lines = DEFAULT_CONFIG.round2_rules.trim().split("\n");
+  const r3Lines = DEFAULT_CONFIG.round3_rules.trim().split("\n");
+
+  assert.ok(r1Lines.length <= 6, `round1_rules has ${r1Lines.length} lines, expected <= 6`);
+  assert.ok(r2Lines.length <= 6, `round2_rules has ${r2Lines.length} lines, expected <= 6`);
+  assert.ok(r3Lines.length <= 6, `round3_rules has ${r3Lines.length} lines, expected <= 6`);
+});
+
 test("every file referenced by TEAM_ICONS exists under images/teams/", () => {
   const slugs = Object.keys(TEAM_ICONS);
   assert.equal(slugs.length, 35);

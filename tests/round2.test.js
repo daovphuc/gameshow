@@ -16,9 +16,12 @@ import {
   ROUND2_CSV_HEADER,
   ROUND2_CSV_SAMPLE,
   createInitialRound2LiveState,
+  openRound2QuestionPreview,
   startRound2Question,
   submitRound2Answer,
   lockRound2Question,
+  shouldAutoLockRound2,
+  isRound2AllAnswered,
   revealRound2Question,
   nextRound2Question,
   buildQuestionKey,
@@ -590,5 +593,77 @@ test("validateRound2Csv: reports row-level errors for missing correct, empty cor
     res.errors.some((e) => e.includes("Dòng 4") && e.includes("câu hỏi")),
     `Expected Dòng 4 missing question error, got: ${JSON.stringify(res.errors)}`
   );
+});
+
+test("round 2 auto-lock: true only when all participating teams have answered, false when none/some, ignores non-participating teams", () => {
+  const participating = [
+    { id: "team-a", name: "Đội A" },
+    { id: "team-b", name: "Đội B" },
+    { id: "team-c", name: "Đội C" }
+  ];
+
+  // 1. None answered -> false
+  assert.equal(shouldAutoLockRound2(participating, {}), false);
+  assert.equal(isRound2AllAnswered(participating, {}), false);
+
+  // 2. Some answered -> false
+  const someAnswers = {
+    "team-a": { answer: "A", answeredAt: 1000 },
+    "team-b": { answer: "B", answeredAt: 1200 }
+  };
+  assert.equal(shouldAutoLockRound2(participating, someAnswers), false);
+
+  // 3. All participating answered -> true
+  const allAnswers = {
+    "team-a": { answer: "A", answeredAt: 1000 },
+    "team-b": { answer: "B", answeredAt: 1200 },
+    "team-c": { answer: "C", answeredAt: 1500 }
+  };
+  assert.equal(shouldAutoLockRound2(participating, allAnswers), true);
+  assert.equal(isRound2AllAnswered(participating, allAnswers), true);
+
+  // 4. Ignores non-participating teams:
+  // Non-participating team answered, but team-c has not -> still false
+  const withNonParticipatingIncomplete = {
+    "team-a": { answer: "A" },
+    "team-b": { answer: "B" },
+    "team-extra": { answer: "D" }
+  };
+  assert.equal(shouldAutoLockRound2(participating, withNonParticipatingIncomplete), false);
+
+  // Non-participating team answered and all participating answered -> true
+  const withNonParticipatingComplete = {
+    ...allAnswers,
+    "team-extra": { answer: "D" }
+  };
+  assert.equal(shouldAutoLockRound2(participating, withNonParticipatingComplete), true);
+
+  // Also supports array of string IDs
+  assert.equal(shouldAutoLockRound2(["team-a", "team-b"], { "team-a": { answer: "A" }, "team-b": { answer: "B" } }), true);
+  assert.equal(shouldAutoLockRound2(["team-a", "team-b"], { "team-a": { answer: "A" } }), false);
+
+  // Empty participating teams returns false
+  assert.equal(shouldAutoLockRound2([], allAnswers), false);
+});
+
+test("openRound2QuestionPreview sets status to reading with tablet filtered question and no active timer", () => {
+  const fullQ = {
+    id: "r2_1_1",
+    question: "Câu hỏi 1?",
+    option_a: "A",
+    option_b: "B",
+    correct: "A",
+    explanation: "Giải thích",
+    time_seconds: 30
+  };
+
+  const state = createInitialRound2LiveState();
+  const previewState = openRound2QuestionPreview(state, fullQ);
+
+  assert.equal(previewState.status, "reading");
+  assert.equal(previewState.shownAt, null);
+  assert.equal(previewState.deadline, null);
+  assert.equal(previewState.activeQuestion.question, "Câu hỏi 1?");
+  assert.equal("correct" in previewState.activeQuestion, false);
 });
 

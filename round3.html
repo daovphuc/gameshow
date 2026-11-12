@@ -37,6 +37,7 @@
     } from "./js/state.js";
     import { createTimer, startTimer, tickTimer, formatTimer } from "./js/timer.js";
     import { set, update, listen, getServerTime } from "./js/backend.js";
+    import { showLotteryDrawModal } from "./js/draw-ui.js";
 
     const SELECTED_TEAM_KEY = "gameshow_r3_selected_team";
 
@@ -129,6 +130,8 @@
       }
     }
 
+    let lastHandledDrawRequest = 0;
+
     function setSelectedTeam(teamId) {
       selectedTeamId = teamId;
       if (teamId) {
@@ -145,12 +148,23 @@
     }
 
     function syncLiveState() {
+      const activeTile = gameState.round3.activeTile || null;
       set("live/round3", {
         openedTiles: gameState.round3.openedTiles || [],
-        activeTile: gameState.round3.activeTile || null
+        activeTile
       });
       set("live/currentRound", "round3");
-      set("live/stageTeamId", gameState.round3.activeTile?.selectedTeamId || selectedTeamId || null);
+      set("live/stageTeamId", activeTile?.selectedTeamId || selectedTeamId || null);
+
+      if (!activeTile && selectedTeamId) {
+        set("live/draw", {
+          round: "round3",
+          status: "pending",
+          stageTeamId: selectedTeamId
+        });
+      } else {
+        set("live/draw", null);
+      }
     }
 
     function handleBack() {
@@ -163,6 +177,7 @@
         renderStage();
         return;
       }
+      set("live/draw", null);
       window.location.href = "./round2.html";
     }
 
@@ -176,6 +191,7 @@
         renderStage();
         return;
       }
+      set("live/draw", null);
       window.location.href = "./leaderboard.html";
     }
 
@@ -228,6 +244,62 @@
         .join("");
     }
 
+    function runRound3Lottery() {
+      const allTiles = quizData.round3Questions || [];
+      const opened = gameState.round3.openedTiles || [];
+      const remainingTiles = allTiles.filter((t) => !opened.includes(t.number));
+      if (remainingTiles.length === 0) return;
+
+      const roundTeams = getRoundTeams(quizData.teams, quizData.round_order, "round3");
+      const team = roundTeams.find((t) => t.id === selectedTeamId) || roundTeams[0];
+      const teamId = team ? team.id : selectedTeamId;
+
+      set("live/draw", {
+        round: "round3",
+        status: "rolling",
+        stageTeamId: teamId
+      });
+
+      showLotteryDrawModal({
+        items: allTiles,
+        exclude: opened,
+        title: "BỐC THĂM Ô TÌNH HUỐNG VÒNG 3",
+        subtitle: `Lượt thi của: ${team ? team.name : teamId}`,
+        getLabel: (tile) => `Ô số ${tile.number} (${tile.points}đ)`,
+        onComplete: (drawnTile) => {
+          set("live/draw", {
+            round: "round3",
+            status: "done",
+            stageTeamId: teamId,
+            result: drawnTile.number
+          });
+          openTileByNumber(drawnTile.number, teamId);
+        },
+        onManualOverride: () => {
+          set("live/draw", {
+            round: "round3",
+            status: "pending",
+            stageTeamId: teamId
+          });
+        }
+      });
+    }
+
+    function openTileByNumber(tileNumber, teamId) {
+      const num = Number(tileNumber);
+      const tile = quizData.round3Questions.find((q) => q.number === num);
+      const roundTeams = getRoundTeams(quizData.teams, quizData.round_order, "round3");
+      const targetTeamId = teamId || selectedTeamId || roundTeams[0]?.id || null;
+
+      gameState = openRound3Tile(gameState, num, targetTeamId);
+      if (tile && gameState.round3.activeTile) {
+        gameState.round3.activeTile.question = tile.question;
+      }
+      saveAppState(gameState);
+      syncLiveState();
+      renderStage();
+    }
+
     function renderTileGridStage(container) {
       stopTimerLoop();
       activeTimerKey = null;
@@ -262,7 +334,7 @@
               ${quizData.config?.show_subtitle ? `<div class="stage-cluster-subtitle" style="font-size: 1rem; color: var(--accent); font-weight: 700; margin-bottom: 0.35rem;">${escapeHtml(quizData.config.show_subtitle)}</div>` : ""}
               <h1 class="section-title">${escapeHtml(quizData.config.round3_name)}</h1>
               <p class="section-subtitle">
-                Chọn đội thi từ danh sách, sau đó bấm mở ô câu hỏi tình huống trên bảng để tính giờ.
+                Bấm quay số hoặc chọn trực tiếp ô câu hỏi tình huống trên bảng để tính giờ.
               </p>
             </div>
             <button type="button" id="btn-open-rules" class="btn btn-outline" style="font-weight: 600; font-size: 0.95rem;">
@@ -271,7 +343,7 @@
           </div>
         </div>
 
-        <div class="screen-action-bar" style="margin-bottom: 1.5rem; justify-content: space-between;">
+        <div class="screen-action-bar" style="margin-bottom: 1.5rem; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
           <div class="screen-left-group">
             <div class="question-team-banner">
               ${selectedTeam ? renderAvatarHtml(selectedTeam, "team-avatar-sm") : ""}
@@ -291,7 +363,11 @@
               </select>
             </div>
           </div>
-          <div class="screen-right-group">
+          <div class="screen-right-group" style="display: flex; align-items: center; gap: 0.75rem;">
+            <button type="button" id="btn-start-lottery-r3" class="btn btn-primary" style="font-weight: 800; font-size: 1.05rem; padding: 0.6rem 1.4rem; box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 0.5rem;">
+              <span>🎲</span>
+              <span>QUAY SỐ CHỌN Ô</span>
+            </button>
             <div style="font-weight: 700; color: var(--text-muted); font-size: 0.95rem;">
               Đã mở: <strong style="color: var(--accent); font-size: 1.15rem;">${gameState.round3.openedTiles?.length || 0}</strong> / ${quizData.round3Questions.length} ô
             </div>
@@ -308,6 +384,10 @@
         renderStage();
       });
 
+      document.getElementById("btn-start-lottery-r3")?.addEventListener("click", () => {
+        runRound3Lottery();
+      });
+
       document.getElementById("r3-team-select")?.addEventListener("change", (e) => {
         setSelectedTeam(e.target.value);
         renderStage();
@@ -315,15 +395,7 @@
 
       container.querySelectorAll(".tile-btn:not(.opened)").forEach((btn) => {
         btn.addEventListener("click", () => {
-          const num = Number(btn.dataset.tileNumber);
-          const tile = quizData.round3Questions.find((q) => q.number === num);
-          gameState = openRound3Tile(gameState, num, selectedTeamId || roundTeams[0]?.id || null);
-          if (tile && gameState.round3.activeTile) {
-            gameState.round3.activeTile.question = tile.question;
-          }
-          saveAppState(gameState);
-          syncLiveState();
-          renderStage();
+          openTileByNumber(Number(btn.dataset.tileNumber), selectedTeamId);
         });
       });
     }
@@ -458,6 +530,17 @@
 
       update("live", {
         currentRound: "round3"
+      });
+
+      listen("drawRequest", (req) => {
+        if (!req || !req.requestedAt) return;
+        if (req.requestedAt === lastHandledDrawRequest) return;
+        if (req.round !== "round3") return;
+        if (!gameState.round3.activeTile && (req.teamId === selectedTeamId || req.teamId === "host")) {
+          lastHandledDrawRequest = req.requestedAt;
+          set("drawRequest", null);
+          runRound3Lottery();
+        }
       });
 
       // The database drops empty arrays and null values, so a missing field means

@@ -5,6 +5,7 @@ import {
   createInitialState,
   getAvailableRound1Packages,
   pickRound1Package,
+  startRound1Performance,
   finishRound1Package,
   isTeamLocked,
   openRound3Tile,
@@ -170,4 +171,40 @@ test("computeTeamScores derives round1 and round3 from judges and penalties, rou
   assert.equal(scores["doi-02"].round2, 16.5);
   assert.equal(scores["doi-02"].round3, 20);
   assert.equal(scores["doi-02"].total, 66.5);
+});
+
+test("round 1 phases: prep -> performance, finishing prep early starts performance with full performance time, durations from config", () => {
+  let state = createInitialState(SAMPLE_TEAMS);
+  const config = {
+    round1_prep_time_seconds: 180,
+    round1_time_seconds: 900
+  };
+
+  // Picking package enters prep phase with duration from config (180 s)
+  state = pickRound1Package(state, "t1", "t1::Gói A", config);
+  assert.equal(state.round1.activeSession.phase, "prep");
+  assert.equal(state.round1.activeSession.durationSeconds, 180);
+  assert.equal(state.round1.activeSession.prepSeconds, 180);
+  assert.equal(state.round1.activeSession.performanceSeconds, 900);
+
+  // Finishing prep early (or moving to performance) starts performance phase
+  // with full performance time from config (900 s)
+  state = startRound1Performance(state, config);
+  assert.equal(state.round1.activeSession.phase, "performance");
+  assert.equal(state.round1.activeSession.durationSeconds, 900);
+  assert.equal(state.round1.activeSession.prepFinishedEarly, true);
+
+  // Custom durations from config are respected
+  let customState = createInitialState(SAMPLE_TEAMS);
+  const customConfig = {
+    round1_prep_time_seconds: 120,
+    round1_time_seconds: 600
+  };
+  customState = pickRound1Package(customState, "t2", "t2::Gói A", customConfig);
+  assert.equal(customState.round1.activeSession.phase, "prep");
+  assert.equal(customState.round1.activeSession.durationSeconds, 120);
+
+  customState = startRound1Performance(customState, customConfig);
+  assert.equal(customState.round1.activeSession.phase, "performance");
+  assert.equal(customState.round1.activeSession.durationSeconds, 600);
 });

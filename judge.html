@@ -294,10 +294,21 @@
               <div class="judge-team-hero">
                 ${renderAvatarHtml(activeTeam, "team-avatar-lg")}
                 <div style="flex: 1;">
-                  <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                  <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; flex-wrap: wrap;">
                     <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
                       ${activeTeam.id === stageTeamId ? "Đội đang thi đấu trên sân khấu" : "Đội được chọn để xem lại"}
                     </span>
+                    ${
+                      isR1 && activeTeam.id === stageTeamId
+                        ? `<span class="meta-pill" style="font-size: 0.78rem; font-weight: 800; padding: 0.2rem 0.65rem; border-radius: var(--radius-full); ${
+                            (liveState.round1?.activeSession?.phase || liveState.round1?.phase || "prep") === "prep"
+                              ? "background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc;"
+                              : "background: #dcfce7; color: #15803d; border: 1px solid #86efac;"
+                          }">
+                            ${(liveState.round1?.activeSession?.phase || liveState.round1?.phase || "prep") === "prep" ? "⏳ Đang chuẩn bị (3 phút)" : "🎤 Đang thuyết trình (15 phút)"}
+                          </span>`
+                        : ""
+                    }
                     ${isLocked ? `<span class="badge badge-locked" style="font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; background: rgba(0,0,0,0.06); font-weight: 700;">Đã khóa</span>` : ""}
                   </div>
                   <h1 style="font-family: var(--font-serif); font-size: clamp(1.4rem, 2.8vw, 1.9rem); margin: 0; line-height: 1.2;">

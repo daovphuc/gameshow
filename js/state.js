@@ -132,7 +132,7 @@ export function getAvailableRound1Packages(state, packages, teamId, limit = null
  * @param {string} teamId
  * @param {string} packageId
  */
-export function pickRound1Package(state, teamId, packageId) {
+export function pickRound1Package(state, teamId, packageId, config = {}) {
   const next = cloneState(state);
   ensureTeamEntry(next.scores, teamId);
 
@@ -156,15 +156,54 @@ export function pickRound1Package(state, teamId, packageId) {
   }
   next.round1.teamPackages[teamId] = packageId;
 
+  const prepSeconds = Number(config?.round1_prep_time_seconds) || 180;
+  const performanceSeconds = Number(config?.round1_time_seconds) || 900;
+
   next.round1.activeSession = {
     teamId,
     packageId,
+    phase: "prep",
+    prepSeconds,
+    performanceSeconds,
+    durationSeconds: prepSeconds,
     questionIndex: 0,
     revealed: false
   };
 
   return next;
 }
+
+/**
+ * Transitions the Round 1 session from preparation to performance.
+ * Finishing prep early starts the performance timer with the full performance time
+ * configured (default 900 seconds or round1_time_seconds from config).
+ *
+ * @param {object} state
+ * @param {Record<string, any>} [config]
+ * @returns {object}
+ */
+export function startRound1Performance(state, config = {}) {
+  const next = cloneState(state);
+  if (!next.round1?.activeSession) {
+    return next;
+  }
+  const performanceSeconds =
+    Number(config?.round1_time_seconds) ||
+    Number(next.round1.activeSession.performanceSeconds) ||
+    900;
+
+  next.round1.activeSession = {
+    ...next.round1.activeSession,
+    phase: "performance",
+    durationSeconds: performanceSeconds,
+    performanceSeconds,
+    prepFinishedEarly: next.round1.activeSession.phase === "prep"
+  };
+  return next;
+}
+
+export const advanceRound1Phase = startRound1Performance;
+export const finishRound1Prep = startRound1Performance;
 
 /**
  * Updates the active Round 1 session (e.g. moving to next question or revealing answer).
