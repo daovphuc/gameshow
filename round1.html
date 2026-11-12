@@ -514,18 +514,31 @@
       });
 
       // Listen for remote state updates
+      // The database drops empty arrays and objects, so a missing field means
+      // "empty" (for example right after "Đặt lại trận đấu"), not "unchanged".
+      // Local mode re-delivers this path on every write under "live"; skip repeats
+      // so a stale copy never overwrites a change that is about to be synced.
+      let lastRemoteR1 = undefined;
       listen("live/round1", (remoteR1) => {
-        if (!remoteR1) return;
-        if (Array.isArray(remoteR1.lockedTeams)) {
-          gameState.round1.lockedTeams = remoteR1.lockedTeams;
-        }
-        if (Array.isArray(remoteR1.pickedPackages)) {
-          gameState.round1.pickedPackages = remoteR1.pickedPackages;
-        }
-        if (remoteR1.teamPackages) {
-          gameState.round1.teamPackages = remoteR1.teamPackages;
+        const remoteJson = JSON.stringify(remoteR1 ?? null);
+        if (remoteJson === lastRemoteR1) return;
+        lastRemoteR1 = remoteJson;
+        const r1 = remoteR1 || {};
+        const asList = (v) => (Array.isArray(v) ? v : v && typeof v === "object" ? Object.values(v) : []);
+        const before = JSON.stringify([gameState.round1.lockedTeams, gameState.round1.pickedPackages, gameState.round1.teamPackages]);
+        gameState.round1.lockedTeams = asList(r1.lockedTeams);
+        gameState.round1.pickedPackages = asList(r1.pickedPackages);
+        gameState.round1.teamPackages = r1.teamPackages || {};
+        let changed = before !== JSON.stringify([gameState.round1.lockedTeams, gameState.round1.pickedPackages, gameState.round1.teamPackages]);
+        if (!r1.activeSession && gameState.round1.activeSession) {
+          gameState.round1.activeSession = null;
+          stopTimerLoop();
+          activeTimerKey = null;
+          currentTimer = null;
+          changed = true;
         }
         saveAppState(gameState);
+        if (changed) renderStage();
       });
 
       renderStage();
