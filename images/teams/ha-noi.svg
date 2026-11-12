@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Chùa Một Cột - Hà Nội -->
+  <path d="M8 56h48" stroke="#3B82F6" stroke-width="3" stroke-linecap="round"/>
+  <path d="M14 52c6-3 12-3 18 0 6-3 12-3 18 0" stroke="#60A5FA" stroke-width="2" stroke-linecap="round"/>
+  <!-- Stone pillar -->
+  <rect x="29" y="32" width="6" height="24" rx="1" fill="#94A3B8"/>
+  <path d="M26 34l6-6 6 6H26z" fill="#64748B"/>
+  <!-- Pagoda pavilion -->
+  <rect x="24" y="24" width="16" height="10" rx="1" fill="#B91C1C"/>
+  <path d="M28 26h8v8h-8z" fill="#FEF3C7"/>
+  <!-- Curved roof -->
+  <path d="M12 24c8-3 16-6 20-14 4 8 12 11 20 14-4 2-10 2-20 2s-16 0-20-2z" fill="#F59E0B" stroke="#D97706" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M32 8v-4" stroke="#D97706" stroke-width="2" stroke-linecap="round"/>
+</svg>

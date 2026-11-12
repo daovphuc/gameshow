@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Voi Bản Đôn - Đắk Lắk -->
+  <!-- Elephant body -->
+  <path d="M14 44V34c0-10 8-18 18-18h12c8 0 14 6 14 14v14" fill="#64748B"/>
+  <!-- Front and back sturdy legs -->
+  <rect x="16" y="40" width="7" height="18" rx="2" fill="#475569"/>
+  <rect x="27" y="42" width="6" height="16" rx="2" fill="#334155"/>
+  <rect x="41" y="42" width="6" height="16" rx="2" fill="#334155"/>
+  <rect x="50" y="40" width="7" height="18" rx="2" fill="#475569"/>
+  <!-- Head & Raised curled trunk -->
+  <path d="M18 32c-6 0-12-4-12-12 0-8 8-10 10-2 2 8 0 14 2 14" fill="#64748B"/>
+  <path d="M12 24c-4-8 2-16 6-12 4 4-2 10-6 12z" stroke="#94A3B8" stroke-width="1.5"/>
+  <!-- Curved ivory tusk -->
+  <path d="M14 36c-4 2-8 2-10-4 4 0 8 2 10 4z" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1"/>
+  <!-- Large ear flap -->
+  <path d="M22 22c4 4 4 12 0 16-2-4-2-12 0-16z" fill="#94A3B8"/>
+  <!-- Eye -->
+  <circle cx="17" cy="25" r="1.5" fill="#0F172A"/>
+</svg>

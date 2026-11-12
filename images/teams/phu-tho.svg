@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Đền Hùng - Phú Thọ -->
+  <!-- Stone steps -->
+  <path d="M12 56h40M16 52h32M20 48h24" stroke="#94A3B8" stroke-width="2" stroke-linecap="round"/>
+  <!-- Gate pillars -->
+  <rect x="20" y="28" width="5" height="20" fill="#B91C1C"/>
+  <rect x="39" y="28" width="5" height="20" fill="#B91C1C"/>
+  <!-- Middle gate archway opening -->
+  <rect x="25" y="32" width="14" height="16" fill="#FEF3C7" opacity="0.3"/>
+  <!-- Main lower roof -->
+  <path d="M10 28c8-3 16-4 22-4s14 1 22 4l-4 2H14l-4-2z" fill="#DC2626"/>
+  <!-- Upper pavilion -->
+  <rect x="25" y="16" width="14" height="8" fill="#B91C1C"/>
+  <!-- Upper curved roof -->
+  <path d="M16 16c6-4 12-5 16-5s10 1 16 5l-3 2H19l-3-2z" fill="#F59E0B" stroke="#D97706" stroke-width="1"/>
+  <!-- Bronze drum star finial -->
+  <polygon points="32,5 33,8 36,8 33.5,9.5 34.5,12 32,10.5 29.5,12 30.5,9.5 28,8 31,8" fill="#FBBF24"/>
+</svg>

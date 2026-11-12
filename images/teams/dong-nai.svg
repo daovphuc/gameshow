@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Nai vàng Cát Tiên - Đồng Nai -->
+  <!-- Ground grass -->
+  <path d="M10 58h44" stroke="#15803D" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Slender deer legs -->
+  <path d="M26 44v14M32 44v14M42 42v16M48 42v16" stroke="#92400E" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Body & rump -->
+  <path d="M22 42c0-8 6-12 16-12h10c6 0 8 4 8 10 0 4-4 6-10 6H28c-4 0-6-2-6-4z" fill="#D97706"/>
+  <!-- Short white tail -->
+  <path d="M56 38l4-2-2 6z" fill="#FEF3C7"/>
+  <!-- Slender neck & graceful head -->
+  <path d="M28 34l-6-14c0-4 4-6 6-4l6 14-6 4z" fill="#D97706"/>
+  <polygon points="20,18 24,14 26,20" fill="#B45309"/>
+  <!-- Deer ear -->
+  <path d="M26 14c2-4 6-4 6 0" fill="#FBBF24"/>
+  <!-- Antlers (branching gạc nai) -->
+  <path d="M24 14l-4-8 4 2 2-4M26 14l2-8 3 2 1-3" stroke="#78350F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Eye -->
+  <circle cx="23" cy="18" r="1.5" fill="#0F172A"/>
+</svg>

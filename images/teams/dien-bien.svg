@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Tượng đài Chiến thắng Điện Biên Phủ -->
+  <!-- Base pedestal -->
+  <path d="M14 56h36l-4-8H18l-4 8z" fill="#64748B"/>
+  <!-- Soldiers & child victory statue silhouette -->
+  <path d="M26 48V32l6-4 6 4v16H26z" fill="#B45309"/>
+  <circle cx="32" cy="24" r="4" fill="#B45309"/>
+  <!-- Raised Victory Flag -->
+  <path d="M34 26l12-16v12l-12 6" fill="#DC2626"/>
+  <!-- Flag staff -->
+  <path d="M34 44V8" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+  <!-- Golden star on flag -->
+  <polygon points="40,14 41,17 44,17 41.5,19 42.5,22 40,20 37.5,22 38.5,19 36,17 39,17" fill="#FDE047"/>
+</svg>

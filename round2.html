@@ -55,7 +55,7 @@
       calculateRound2AnswerTime
     } from "./js/round2.js";
     import { formatTimer } from "./js/timer.js";
-    import { formatSeconds } from "./js/leaderboard.js";
+    import { formatSeconds, shortenTeamName } from "./js/leaderboard.js";
     import { get, set, update, listen, getServerTime } from "./js/backend.js";
 
     let quizData = null;
@@ -110,17 +110,18 @@
             ? calculateRound2AnswerTime(liveR2.shownAt, ansRecord.answeredAt)
             : (hasAnswered && Number.isFinite(ansRecord.responseTimeMs) ? ansRecord.responseTimeMs : null);
           const timeStr = timeMs !== null ? formatSeconds(timeMs / 1000) : "";
+          const shortName = shortenTeamName(t.name) || t.name;
           return `
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.85rem; border-radius: var(--radius-sm); border: 1px solid ${hasAnswered ? "rgba(46, 125, 79, 0.45)" : "var(--border)"}; background-color: ${hasAnswered ? "rgba(46, 125, 79, 0.08)" : "var(--surface)"};">
-              <div style="display: flex; align-items: center; gap: 0.5rem; overflow: hidden;">
+            <div class="r2-live-team-cell ${hasAnswered ? "answered" : ""}" title="${escapeHtml(t.name)}">
+              <div class="r2-live-team-info">
                 ${renderAvatarHtml(t, "team-avatar-sm")}
-                <span style="font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(t.name)}</span>
+                <span class="r2-live-team-name">${escapeHtml(shortName)}</span>
               </div>
-              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.9rem;">
+              <div class="r2-live-team-status">
                 ${
                   hasAnswered
                     ? `<span style="color: #2E7D4F;">✓ ${timeStr}</span>`
-                    : `<span style="color: var(--text-muted); font-size: 0.82rem;">Chưa gửi</span>`
+                    : `<span style="color: var(--text-muted); font-size: 0.78rem;">Chưa gửi</span>`
                 }
               </div>
             </div>
@@ -569,8 +570,8 @@
           return `
             <div class="r2-option-card opt-${opt.letter.toLowerCase()} ${isCorrect ? "revealed-correct" : ""}">
               <span class="opt-letter">${opt.letter}</span>
-              <span style="flex: 1;">${escapeHtml(opt.text)}</span>
-              ${isCorrect ? `<span style="font-weight: 800; color: #2E7D4F;">✓ ĐÁP ÁN ĐÚNG</span>` : ""}
+              <span class="opt-text">${escapeHtml(opt.text)}</span>
+              ${isCorrect ? `<span style="font-weight: 800; color: #2E7D4F; flex-shrink: 0;">✓ ĐÁP ÁN ĐÚNG</span>` : ""}
             </div>
           `;
         })
@@ -657,7 +658,7 @@
             <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0 0 0.85rem;">
               ⚡ Tiến độ trả lời của các đội (${answeredCount}/${participatingTeams.length}):
             </h3>
-            <div id="r2-live-teams-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.65rem;">
+            <div id="r2-live-teams-grid" class="r2-live-teams-grid">
               ${renderLiveTeamsAnswersHtml()}
             </div>
           </div>

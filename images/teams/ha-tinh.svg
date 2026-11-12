@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Tượng đài Ngã ba Đồng Lộc - Hà Tĩnh -->
+  <!-- Base pedestal -->
+  <rect x="16" y="50" width="32" height="6" rx="1" fill="#475569"/>
+  <!-- Pylon column with bell frame -->
+  <path d="M22 50V18h20v32" stroke="#64748B" stroke-width="4" stroke-linecap="round"/>
+  <!-- Top memorial flame beam -->
+  <path d="M18 18h28" stroke="#DC2626" stroke-width="4" stroke-linecap="round"/>
+  <!-- Memorial Bell suspended in center -->
+  <path d="M28 24h8l2 16h-12l2-16z" fill="#D97706" stroke="#92400E" stroke-width="1.5"/>
+  <ellipse cx="32" cy="40" rx="6" ry="2" fill="#F59E0B"/>
+  <!-- 10 Stars representing 10 heroines -->
+  <circle cx="32" cy="10" r="4" fill="#FBBF24"/>
+  <circle cx="24" cy="12" r="2" fill="#FDE047"/>
+  <circle cx="40" cy="12" r="2" fill="#FDE047"/>
+</svg>

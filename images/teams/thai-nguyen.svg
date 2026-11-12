@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Búp chè Tân Cương - Thái Nguyên -->
+  <!-- Stem -->
+  <path d="M32 58V32" stroke="#15803D" stroke-width="3" stroke-linecap="round"/>
+  <!-- Central young bud -->
+  <path d="M32 10c-4 8-4 16 0 22 4-6 4-14 0-22z" fill="#22C55E"/>
+  <path d="M32 10v22" stroke="#16A34A" stroke-width="1.5"/>
+  <!-- Left tea leaf -->
+  <path d="M32 36c-18-2-24-14-22-22 8 2 18 10 22 22z" fill="#16A34A"/>
+  <path d="M14 20c8 6 14 12 18 16" stroke="#15803D" stroke-width="1.5"/>
+  <!-- Right tea leaf -->
+  <path d="M32 36c18-2 24-14 22-22-8 2-18 10-22 22z" fill="#15803D"/>
+  <path d="M50 20c-8 6-14 12-18 16" stroke="#14532D" stroke-width="1.5"/>
+</svg>

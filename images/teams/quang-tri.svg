@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Cầu Hiền Lương - Quảng Trị -->
+  <!-- Ben Hai river -->
+  <path d="M4 56c12-3 24-2 56 0" stroke="#0284C7" stroke-width="3" stroke-linecap="round"/>
+  <!-- Two-tone bridge painted blue and yellow on each half -->
+  <path d="M4 42h28" stroke="#1D4ED8" stroke-width="4"/>
+  <path d="M32 42h28" stroke="#EAB308" stroke-width="4"/>
+  <!-- Demarcation center line -->
+  <path d="M32 38v10" stroke="#DC2626" stroke-width="2"/>
+  <!-- Steel overhead structure -->
+  <path d="M8 42l10-14 14 14M32 42l14-14 10 14" stroke="#64748B" stroke-width="2"/>
+  <!-- National Flag tower on northern bank -->
+  <path d="M12 28V10" stroke="#94A3B8" stroke-width="2"/>
+  <path d="M12 10l10 4-10 4V10z" fill="#DC2626"/>
+  <polygon points="16,13 16.5,14 17.5,14 16.7,14.6 17,15.5 16,15 15,15.5 15.3,14.6 14.5,14 15.5,14" fill="#FDE047"/>
+</svg>

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Cổng Tò Vò Lý Sơn - Quảng Ngãi -->
+  <!-- Ocean water -->
+  <path d="M4 56c8-3 18 0 28-2s18-1 28 2" stroke="#0284C7" stroke-width="3" stroke-linecap="round"/>
+  <!-- Sun setting through the arch -->
+  <circle cx="34" cy="40" r="8" fill="#F59E0B"/>
+  <!-- Basalt volcanic rock arch -->
+  <path d="M6 56L12 30c4-12 16-16 28-10 8 4 14 14 16 36h-8c-2-12-6-18-14-20-8-2-14 4-16 20H6z" fill="#334155"/>
+  <!-- Rock texture highlights -->
+  <path d="M12 30c4-8 12-10 20-6" stroke="#64748B" stroke-width="2"/>
+  <!-- Sea horizon line inside arch -->
+  <path d="M22 46h24" stroke="#38BDF8" stroke-width="1.5"/>
+</svg>

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Cột cờ Phai Vệ - Lạng Sơn -->
+  <!-- Mountain rocky peak -->
+  <path d="M8 56l24-28 24 28H8z" fill="#475569"/>
+  <!-- Stone tower base -->
+  <rect x="27" y="22" width="10" height="8" rx="1" fill="#94A3B8"/>
+  <rect x="29" y="16" width="6" height="6" fill="#CBD5E1"/>
+  <!-- Tall flagpole -->
+  <path d="M32 20V4" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+  <!-- Vietnam flag fluttering -->
+  <path d="M32 6l14 4-14 4V6z" fill="#DC2626"/>
+  <polygon points="38,8.5 38.5,10 40,10 38.8,11 39.2,12.5 38,11.5 36.8,12.5 37.2,11 36,10 37.5,10" fill="#FDE047"/>
+</svg>

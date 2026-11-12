@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Nhà rông Tây Nguyên - Gia Lai -->
+  <!-- Ground -->
+  <path d="M8 58h48" stroke="#78350F" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Stilts -->
+  <path d="M22 46v12M28 46v12M36 46v12M42 46v12" stroke="#92400E" stroke-width="2.5"/>
+  <!-- Floor deck & entrance ladder -->
+  <rect x="18" y="42" width="28" height="4" fill="#B45309"/>
+  <!-- Soaring axe-blade roof -->
+  <path d="M14 42L28 8h8l14 34H14z" fill="#D97706" stroke="#B45309" stroke-width="1.5"/>
+  <!-- Thatch patterns on roof -->
+  <path d="M22 28h20M24 20h16M26 14h12" stroke="#FBBF24" stroke-width="1.5"/>
+  <!-- Crest ornament on roof top -->
+  <circle cx="32" cy="6" r="2.5" fill="#DC2626"/>
+</svg>

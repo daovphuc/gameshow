@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Bến Nhà Rồng - TP. Hồ Chí Minh -->
+  <!-- River waves -->
+  <path d="M6 56c8-3 16 0 26-2s18-2 26 1" stroke="#38BDF8" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Building base and colonnade -->
+  <rect x="12" y="32" width="40" height="20" rx="1" fill="#FEF3C7" stroke="#D97706" stroke-width="1.5"/>
+  <!-- Arched doors -->
+  <path d="M18 52v-8a4 4 0 0 1 8 0v8h-8zM38 52v-8a4 4 0 0 1 8 0v8h-8zM28 52v-10a4 4 0 0 1 8 0v10h-8z" fill="#B45309"/>
+  <!-- Roof -->
+  <path d="M8 32l8-10h32l8 10H8z" fill="#B91C1C"/>
+  <!-- Twin dragons on roof -->
+  <path d="M18 18c3-4 7-2 10 2" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+  <path d="M46 18c-3-4-7-2-10 2" stroke="#F59E0B" stroke-width="2" stroke-linecap="round"/>
+  <!-- Center pearl/globe -->
+  <circle cx="32" cy="18" r="3" fill="#FBBF24"/>
+</svg>

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Cầu Mỹ Thuận - Vĩnh Long -->
+  <!-- Tien River -->
+  <path d="M4 56c12-3 24-2 56 0" stroke="#0284C7" stroke-width="3" stroke-linecap="round"/>
+  <!-- Road bridge beam -->
+  <path d="M4 42h56" stroke="#475569" stroke-width="3.5"/>
+  <!-- Diamond / H-frame cable pylon tower -->
+  <path d="M22 12l-6 30h4l4-22 4 22h4l-6-30h-4z" fill="#DC2626"/>
+  <path d="M42 12l-6 30h4l4-22 4 22h4l-6-30h-4z" fill="#DC2626"/>
+  <!-- Cable fan stays (harp/fan cables) -->
+  <path d="M22 16L6 42M22 20L10 42M22 24L14 42M22 16L30 42M22 20L28 42" stroke="#FDE047" stroke-width="1.2"/>
+  <path d="M42 16L58 42M42 20L54 42M42 24L50 42M42 16L34 42M42 20L36 42" stroke="#FDE047" stroke-width="1.2"/>
+</svg>

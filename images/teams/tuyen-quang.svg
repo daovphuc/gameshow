@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Cây đa Tân Trào - Tuyên Quang -->
+  <!-- Ground -->
+  <path d="M8 56h48" stroke="#15803D" stroke-width="3" stroke-linecap="round"/>
+  <!-- Sturdy trunk and roots -->
+  <path d="M28 56c0-10-2-16-4-24 6 2 12 2 16 0-2 8-4 14-4 24" fill="#78350F"/>
+  <!-- Aerial roots -->
+  <path d="M20 40c2 6 2 10 2 16M44 40c-2 6-2 10-2 16" stroke="#92400E" stroke-width="2"/>
+  <!-- Broad lush canopy -->
+  <circle cx="32" cy="22" r="14" fill="#15803D"/>
+  <circle cx="22" cy="26" r="10" fill="#16A34A"/>
+  <circle cx="42" cy="26" r="10" fill="#16A34A"/>
+  <circle cx="32" cy="14" r="8" fill="#22C55E"/>
+</svg>
