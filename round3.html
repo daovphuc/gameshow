@@ -460,15 +460,31 @@
         currentRound: "round3"
       });
 
+      // The database drops empty arrays and null values, so a missing field means
+      // "empty" (for example right after "Đặt lại trận đấu"), not "unchanged".
+      // Local mode re-delivers this path on every write under "live"; skip repeats
+      // so a stale copy never overwrites a change that is about to be synced.
+      let lastRemoteR3 = undefined;
       listen("live/round3", (remoteR3) => {
-        if (!remoteR3) return;
-        if (Array.isArray(remoteR3.openedTiles)) {
-          gameState.round3.openedTiles = remoteR3.openedTiles;
-        }
-        if (remoteR3.activeTile !== undefined) {
-          gameState.round3.activeTile = remoteR3.activeTile;
+        const remoteJson = JSON.stringify(remoteR3 ?? null);
+        if (remoteJson === lastRemoteR3) return;
+        lastRemoteR3 = remoteJson;
+        const r3 = remoteR3 || {};
+        const opened = Array.isArray(r3.openedTiles)
+          ? r3.openedTiles
+          : r3.openedTiles && typeof r3.openedTiles === "object" ? Object.values(r3.openedTiles) : [];
+        const before = JSON.stringify(gameState.round3.openedTiles || []);
+        gameState.round3.openedTiles = opened;
+        let changed = before !== JSON.stringify(opened);
+        if (r3.activeTile) {
+          gameState.round3.activeTile = r3.activeTile;
+        } else if (gameState.round3.activeTile) {
+          gameState.round3.activeTile = null;
+          stopTimerLoop();
+          changed = true;
         }
         saveAppState(gameState);
+        if (changed) renderStage();
       });
 
       renderStage();
