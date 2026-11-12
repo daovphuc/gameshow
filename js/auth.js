@@ -17,7 +17,8 @@ export const PORTAL_URLS = {
   host: "./host.html",
   judge: "./judge.html",
   team: "./team.html",
-  head_judge: "./judge.html"
+  head_judge: "./judge.html",
+  draw: "./draw.html"
 };
 
 export const AUTH_STORAGE_KEY = "gameshow_auth_session";
@@ -81,6 +82,9 @@ export function isRoleAllowedForPortal(role, portal) {
   }
   if (cleanPortal === "team") {
     return cleanRole === "team";
+  }
+  if (cleanPortal === "draw") {
+    return cleanRole === "host" || cleanRole === "team";
   }
   return false;
 }

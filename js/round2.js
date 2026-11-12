@@ -480,6 +480,23 @@ export function createInitialRound2LiveState() {
 }
 
 /**
+ * Opens a question for reading/preview without starting the timer or answering.
+ * Stage, host, and team iPads show question and options, with answering disabled.
+ */
+export function openRound2QuestionPreview(state, fullQuestion) {
+  const { correct: _omittedCorrect, explanation: _omittedExplanation, ...restState } = state || {};
+  return {
+    ...restState,
+    status: "reading",
+    activeQuestion: filterQuestionForTablet(fullQuestion),
+    shownAt: null,
+    deadline: null,
+    answers: {},
+    results: null
+  };
+}
+
+/**
  * Opens a question for all tablets at once and starts the synced countdown.
  */
 export function startRound2Question(state, fullQuestion, serverTime = Date.now()) {
@@ -544,6 +561,38 @@ export function lockRound2Question(state) {
     status: "locked"
   };
 }
+
+/**
+ * Pure helper to determine whether Round 2 should auto-lock:
+ * - returns true ONLY when all participating teams have answered.
+ * - returns false when none or only some participating teams have answered.
+ * - ignores non-participating teams.
+ *
+ * @param {Array<string|{id: string}>} participatingTeams
+ * @param {Record<string, any>} answers
+ * @returns {boolean}
+ */
+export function shouldAutoLockRound2(participatingTeams = [], answers = {}) {
+  if (!Array.isArray(participatingTeams) || participatingTeams.length === 0) {
+    return false;
+  }
+  if (!answers || typeof answers !== "object") {
+    return false;
+  }
+  return participatingTeams.every((team) => {
+    const id = typeof team === "string" ? team : team?.id;
+    if (!id) return true;
+    const ans = answers[id];
+    if (ans === undefined || ans === null) return false;
+    if (typeof ans === "string") return ans.trim() !== "";
+    if (ans.answer !== undefined && ans.answer !== null) {
+      return String(ans.answer).trim() !== "";
+    }
+    return false;
+  });
+}
+
+export const isRound2AllAnswered = shouldAutoLockRound2;
 
 /**
  * Reveals the correct answer and computes each team's score.

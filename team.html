@@ -273,6 +273,17 @@
             isMyTurn
               ? `
                 <div style="font-size: 3.5rem; margin-bottom: 0.8rem;">🔔</div>
+                ${
+                  isR1
+                    ? `<div class="meta-pill" style="margin-bottom: 0.8rem; font-weight: 800; font-size: 1rem; ${
+                        (liveState.round1?.activeSession?.phase || liveState.round1?.phase || "prep") === "prep"
+                          ? "background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc;"
+                          : "background: #dcfce7; color: #15803d; border: 1px solid #86efac;"
+                      }">
+                        ${(liveState.round1?.activeSession?.phase || liveState.round1?.phase || "prep") === "prep" ? "⏳ GIAI ĐOẠN CHUẨN BỊ (3 PHÚT)" : "🎤 GIAI ĐOẠN THUYẾT TRÌNH (15 PHÚT)"}
+                      </div>`
+                    : ""
+                }
                 <h2 style="font-family: var(--font-serif); font-size: clamp(1.6rem, 3.2vw, 2.2rem); margin: 0 0 0.8rem; color: var(--accent);">
                   ĐẾN LƯỢT ĐỘI CỦA BẠN LÊN SÂN KHẤU!
                 </h2>
@@ -296,6 +307,17 @@
               : stageTeam
                 ? `
                   <div style="font-size: 3.2rem; margin-bottom: 1rem;">🎤</div>
+                  ${
+                    isR1
+                      ? `<div class="meta-pill" style="margin-bottom: 0.8rem; font-weight: 800; font-size: 0.95rem; ${
+                          (liveState.round1?.activeSession?.phase || liveState.round1?.phase || "prep") === "prep"
+                            ? "background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc;"
+                            : "background: #dcfce7; color: #15803d; border: 1px solid #86efac;"
+                        }">
+                          ${(liveState.round1?.activeSession?.phase || liveState.round1?.phase || "prep") === "prep" ? "⏳ Đang chuẩn bị (3 phút)" : "🎤 Đang thuyết trình (15 phút)"}
+                        </div>`
+                      : ""
+                  }
                   <h2 style="font-family: var(--font-serif); font-size: 1.6rem; margin: 0 0 0.6rem;">
                     Đang thi đấu: <strong>${escapeHtml(stageTeam.name)}</strong>
                   </h2>
@@ -358,6 +380,7 @@
         : (typeof mySavedAnswer === "object" && Number.isFinite(mySavedAnswer?.responseTimeMs) ? mySavedAnswer.responseTimeMs : null);
       const timeStr = responseTimeMs !== null ? ` — Đã trả lời sau ${formatSeconds(responseTimeMs / 1000)}` : "";
 
+      const isReading = r2.status === "reading";
       const isRevealed = r2.status === "revealed";
       const isLocked = r2.status === "locked" || isRevealed;
 
@@ -385,7 +408,7 @@
             }
           }
 
-          const shouldDisable = hasAnswered || isLocked;
+          const shouldDisable = hasAnswered || isLocked || isReading;
 
           return `
             <button
@@ -414,7 +437,11 @@
             <span class="meta-pill accent">Câu hỏi #${q.number || 1}</span>
 
             <div id="team-timer-box" class="top-timer-box">
-              <span id="team-timer-digits" class="top-timer-digits">00:00</span>
+              <span id="team-timer-digits" class="top-timer-digits">${
+                isReading
+                  ? formatTimer(q.time_seconds || 30)
+                  : "00:00"
+              }</span>
             </div>
           </div>
 
@@ -448,13 +475,17 @@
                         : ""
                     }
                   </div>`
-                : hasAnswered
-                  ? `<div style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.25rem; border-radius: 100px; background-color: rgba(46, 125, 79, 0.12); color: #2E7D4F; font-weight: 700;">
-                      <span>✓ Đã ghi nhận đáp án: <strong>${chosenLetter}</strong>${timeStr}</span>
+                : isReading
+                  ? `<div style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.25rem; border-radius: 100px; background-color: rgba(3, 105, 161, 0.12); color: #0284c7; font-weight: 700;">
+                      <span>📖 Đang đọc câu hỏi... Chờ hiệu lệnh bắt đầu</span>
                     </div>`
-                  : isLocked
-                    ? `<div style="color: var(--text-muted); font-weight: 700; font-size: 1.05rem;">Đã hết giờ làm bài</div>`
-                    : `<div style="color: var(--text-muted); font-weight: 600; font-size: 1.05rem;">Chạm vào phương án bên dưới để trả lời:</div>`
+                  : hasAnswered
+                    ? `<div style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.65rem 1.25rem; border-radius: 100px; background-color: rgba(46, 125, 79, 0.12); color: #2E7D4F; font-weight: 700;">
+                        <span>✓ Đã ghi nhận đáp án: <strong>${chosenLetter}</strong>${timeStr}</span>
+                      </div>`
+                    : isLocked
+                      ? `<div style="color: var(--text-muted); font-weight: 700; font-size: 1.05rem;">Đã hết giờ làm bài</div>`
+                      : `<div style="color: var(--text-muted); font-weight: 600; font-size: 1.05rem;">Chạm vào phương án bên dưới để trả lời:</div>`
             }
           </div>
 
@@ -467,7 +498,7 @@
 
       wireHeaderControls();
 
-      if (!hasAnswered && !isLocked) {
+      if (!hasAnswered && !isLocked && !isReading) {
         root.querySelectorAll(".team-btn-choice").forEach((btn) => {
           btn.addEventListener("click", () => {
             handleChoice(btn.dataset.choice);
@@ -509,7 +540,7 @@
 
       if (curRound === "round2") {
         const r2 = liveState.round2;
-        if (r2?.status === "open" || r2?.status === "locked" || r2?.status === "revealed") {
+        if (r2?.status === "reading" || r2?.status === "open" || r2?.status === "locked" || r2?.status === "revealed") {
           renderQuestionScreen(root);
         } else {
           renderRound2WaitingScreen(root);

@@ -115,3 +115,49 @@ test("answers root read excludes team and allows matching team ref_id per questi
   assert.ok(teamReadRule.includes("ref_id"), "must check ref_id");
   assert.ok(teamReadRule.includes("$teamId"), "must match $teamId");
 });
+
+test("draw request write policy allows host and active stage team only, excludes other teams and judges; live remains unwritable by teams", () => {
+  const parsed = JSON.parse(fs.readFileSync(path.resolve("firebase/database.rules.json"), "utf8"));
+
+  // Teams cannot write to live
+  const liveWrite = parsed.rules?.live?.[".write"];
+  assert.ok(typeof liveWrite === "string", "live/.write must exist");
+  assert.ok(liveWrite.includes("'host'"), "live/.write must allow host");
+  assert.ok(!liveWrite.includes("'team'"), "live/.write must not allow team");
+
+  // Nor can teams write any live subpath
+  function assertNoTeamWrite(node, currentPath = "live") {
+    if (!node || typeof node !== "object") return;
+    for (const [key, value] of Object.entries(node)) {
+      if (key === ".write" && typeof value === "string") {
+        assert.ok(!value.includes("'team'"), `Found team in .write at ${currentPath}`);
+      } else if (typeof value === "object" && value !== null) {
+        assertNoTeamWrite(value, `${currentPath}.${key}`);
+      }
+    }
+  }
+  assertNoTeamWrite(parsed.rules?.live);
+
+  // drawRequest
+  const drawRule = parsed.rules?.drawRequest;
+  assert.ok(drawRule, "rules.drawRequest must exist");
+
+  const drawRead = drawRule?.[".read"];
+  assert.ok(typeof drawRead === "string", "drawRequest/.read must exist");
+  assert.ok(drawRead.includes("'host'"), "drawRequest/.read must allow host");
+  assert.ok(!drawRead.includes("'team'") && !drawRead.includes("'judge'"), "drawRequest/.read must exclude team/judge");
+
+  const drawWrite = drawRule?.[".write"];
+  assert.ok(typeof drawWrite === "string", "drawRequest/.write must exist");
+  assert.ok(drawWrite.includes("'host'"), "drawRequest/.write must allow host");
+  assert.ok(drawWrite.includes("'team'"), "drawRequest/.write must allow team");
+  assert.ok(drawWrite.includes("ref_id"), "drawRequest/.write must check ref_id");
+  assert.ok(drawWrite.includes("stageTeamId"), "drawRequest/.write must check against stageTeamId");
+  assert.ok(drawWrite.includes("live/currentRound').val() === 'round2'"), "drawRequest/.write must let any team request the round 2 set draw");
+  assert.ok(!drawWrite.includes("'judge'"), "drawRequest/.write must exclude judge");
+
+  // Validated shape
+  const drawValidate = drawRule?.[".validate"];
+  assert.ok(typeof drawValidate === "string" && drawValidate.length > 0, "drawRequest/.validate must exist");
+  assert.ok(drawValidate.includes("requestedAt"), "drawRequest/.validate must check requestedAt");
+});

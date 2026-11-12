@@ -559,6 +559,7 @@ export function wireStageLayout({
   const sidebar = document.getElementById("app-sidebar");
   if (sidebar) {
     const navItems = [
+      { id: "intro", href: "./intro.html", icon: "✦", label: "Giới thiệu" },
       { id: "home", href: "./host.html", icon: "⌂", label: "Tổng quan" },
       { id: "round1", href: "./round1.html", icon: "①", label: "Vòng 1" },
       { id: "round2", href: "./round2.html", icon: "②", label: "Vòng 2" },
@@ -613,6 +614,30 @@ export function wireStageLayout({
             )
             .join("")}
         </nav>
+
+        <div class="sidebar-settings-section">
+          <div class="sidebar-section-title" style="padding: 0.5rem 0.85rem 0.25rem; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">
+            Màn hình bổ trợ
+          </div>
+          <a
+            href="./stage-timer.html"
+            target="_blank"
+            class="sidebar-link ${activePage === "stage-timer" ? "active" : ""}"
+            title="Đồng hồ sân khấu (mở tab mới)"
+          >
+            <span class="sidebar-link-icon">⏱</span>
+            <span class="sidebar-link-label">Đồng hồ sân khấu</span>
+          </a>
+          <a
+            href="./draw.html"
+            target="_blank"
+            class="sidebar-link ${activePage === "draw" ? "active" : ""}"
+            title="Nút quay số (mở tab mới)"
+          >
+            <span class="sidebar-link-icon">🎲</span>
+            <span class="sidebar-link-label">Nút quay số từ xa</span>
+          </a>
+        </div>
 
         <div class="sidebar-settings-section">
           <div class="sidebar-section-title" style="padding: 0.5rem 0.85rem 0.25rem; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">

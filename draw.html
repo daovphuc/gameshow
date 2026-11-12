@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Nút Quay Số Từ Xa - Hội Thi PCCC &amp; CNCH</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Noto+Serif:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body style="background: var(--bg); color: var(--text); margin: 0; padding: 0;">
+  <div class="draw-remote-viewport">
+    <!-- Header -->
+    <header style="width: 100%; max-width: 600px; display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1.25rem; background: var(--surface-elevated); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div id="draw-user-avatar"></div>
+        <div style="text-align: left;">
+          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">
+            Tài khoản
+          </div>
+          <div id="draw-user-name" style="font-weight: 800; font-size: 1.05rem;">Đang tải...</div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 0.65rem;">
+        <div id="draw-conn-badge" class="conn-status-badge local" title="Trạng thái">
+          <span class="conn-status-dot"></span>
+          <span id="draw-conn-label" style="font-size: 0.78rem;">Đang kết nối</span>
+        </div>
+        <button type="button" id="btn-draw-logout" class="btn btn-sm">⎋ Đăng xuất</button>
+      </div>
+    </header>
+
+    <!-- Center Card -->
+    <main class="draw-remote-card">
+      <div>
+        <div id="draw-round-pill" class="meta-pill accent" style="margin-bottom: 0.75rem;">VÒNG THI</div>
+        <h1 id="draw-action-title" style="font-family: var(--font-serif); font-size: clamp(1.6rem, 3.8vw, 2.4rem); margin: 0 0 0.5rem;">
+          Bốc Thăm Quay Số
+        </h1>
+        <p id="draw-action-desc" style="color: var(--text-muted); font-size: 1.05rem; margin: 0;">
+          Bấm nút bên dưới để bắt đầu lồng quay số ngẫu nhiên trên màn hình sân khấu.
+        </p>
+      </div>
+
+      <!-- Giant Draw Button -->
+      <div>
+        <button type="button" id="btn-giant-draw" class="btn-giant-draw" disabled>
+          <span>QUAY SỐ</span>
+          <span style="font-size: 0.95rem; font-family: var(--font-sans); font-weight: 700; opacity: 0.9;">Bấm để quay</span>
+        </button>
+      </div>
+
+      <!-- Status Reason Banner -->
+      <div id="draw-status-box" class="draw-status-message">
+        Đang kiểm tra trạng thái lượt quay...
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer style="color: var(--text-muted); font-size: 0.85rem; padding: 0.75rem;">
+      Hội thi cán bộ tuyên truyền, kiểm tra giỏi về PCCC &amp; CNCH
+    </footer>
+  </div>
+
+  <script type="module">
+    import { fetchQuizData, renderAvatarHtml, escapeHtml, logoutUser, showToast } from "./js/app.js";
+    import { set, listen, serverTimestamp, onStatusChange } from "./js/backend.js";
+    import { getActiveSession } from "./js/auth.js";
+
+    let quizData = null;
+    let liveState = null;
+    let session = null;
+    let isRequesting = false;
+
+    async function initDrawPage() {
+      // Logins are stored per role (and, on Firebase, per portal app), so reuse
+      // the MC login when this device has one, otherwise the team login.
+      const portal = getActiveSession(undefined, "host") ? "host" : "team";
+      quizData = await fetchQuizData({ portal });
+      session = quizData.session;
+
+      if (!session) {
+        window.location.href = "./index.html";
+        return;
+      }
+
+      const userNameEl = document.getElementById("draw-user-name");
+      const userAvatarEl = document.getElementById("draw-user-avatar");
+      if (userNameEl) {
+        userNameEl.textContent = session.display_name || session.username || "Người dùng";
+      }
+      if (userAvatarEl) {
+        if (session.role === "team") {
+          const team = (quizData.allTeams || quizData.teams || []).find((t) => t.id === session.ref_id) || { name: session.display_name || session.username };
+          userAvatarEl.innerHTML = renderAvatarHtml(team, "team-avatar-sm");
+        } else {
+          userAvatarEl.innerHTML = `<div class="team-avatar team-avatar-sm" style="--team-color: var(--accent); background: var(--accent);">🖥</div>`;
+        }
+      }
+
+      document.getElementById("btn-draw-logout")?.addEventListener("click", () => {
+        logoutUser(session.role);
+      });
+
+      onStatusChange((status) => {
+        const badge = document.getElementById("draw-conn-badge");
+        const label = document.getElementById("draw-conn-label");
+        if (badge) badge.className = `conn-status-badge ${status.code || "local"}`;
+        if (label) label.textContent = status.label || "Trực tuyến";
+      });
+
+      // Listen to live state
+      listen("live", (data) => {
+        liveState = data || {};
+        updateDrawUI();
+      });
+
+      document.getElementById("btn-giant-draw")?.addEventListener("click", handleTriggerDraw);
+    }
+
+    function updateDrawUI() {
+      if (!liveState || !session) return;
+      const btn = document.getElementById("btn-giant-draw");
+      const statusBox = document.getElementById("draw-status-box");
+      const roundPill = document.getElementById("draw-round-pill");
+      const titleEl = document.getElementById("draw-action-title");
+
+      const currentRound = liveState.currentRound || "round1";
+      const cfg = quizData?.config || {};
+      const roundName = currentRound === "round1"
+        ? (cfg.round1_name || "Tuyên truyền")
+        : currentRound === "round2"
+          ? (cfg.round2_name || "Kiến thức pháp luật")
+          : (cfg.round3_name || "Xử lý tình huống");
+
+      if (roundPill) roundPill.textContent = `VÒNG THI: ${roundName.toUpperCase()}`;
+      if (titleEl) {
+        titleEl.textContent = currentRound === "round1"
+          ? "Quay Số Chủ Đề Tuyên Truyền"
+          : currentRound === "round2"
+            ? "Quay Số Bộ Đề Trắc Nghiệm"
+            : "Quay Số Tình Huống";
+      }
+
+      const draw = liveState.draw || {};
+      const stageTeamId = liveState.stageTeamId || liveState.round1?.activeSession?.teamId || liveState.round3?.activeTile?.selectedTeamId;
+      const stageTeam = stageTeamId ? (quizData.allTeams || quizData.teams || []).find((t) => t.id === stageTeamId) : null;
+      const isHost = session.role === "host";
+      const isMyTeamOnStage = session.role === "team" && stageTeamId && session.ref_id === stageTeamId;
+
+      let allowed = false;
+      let reason = "";
+
+      if (isRequesting) {
+        allowed = false;
+        reason = "Đang gửi lệnh quay số tới máy chủ...";
+      } else if (draw.status === "rolling") {
+        allowed = false;
+        reason = "Lồng quay đang hoạt động trên màn hình chính!";
+      } else if (draw.status === "done") {
+        allowed = false;
+        reason = "Đã hoàn thành lượt quay số. Vui lòng theo dõi màn hình chính.";
+      } else if (draw.status !== "pending") {
+        allowed = false;
+        reason = "Chưa có lượt quay số từ Ban tổ chức.";
+      } else {
+        // draw is pending
+        if (isHost) {
+          allowed = true;
+          reason = "Lượt quay số đã sẵn sàng. Bấm nút QUAY SỐ để bắt đầu!";
+        } else if (currentRound === "round2") {
+          allowed = true;
+          reason = "Lượt quay bộ đề Vòng 2 sẵn sàng. Bấm nút QUAY SỐ để bắt đầu!";
+        } else if (isMyTeamOnStage) {
+          allowed = true;
+          reason = "Đến lượt đội của bạn! Bấm nút QUAY SỐ để chọn đề thi!";
+        } else {
+          allowed = false;
+          const currentName = stageTeam ? stageTeam.name : (stageTeamId || "đội khác");
+          reason = `Chưa đến lượt quay của đội bạn. (Đang là lượt của: ${currentName})`;
+        }
+      }
+
+      if (btn) btn.disabled = !allowed;
+      if (statusBox) {
+        statusBox.textContent = reason;
+        statusBox.style.color = allowed ? "var(--success)" : "var(--text-muted)";
+      }
+    }
+
+    async function handleTriggerDraw() {
+      if (isRequesting) return;
+      isRequesting = true;
+      updateDrawUI();
+
+      try {
+        const payload = {
+          requestedAt: serverTimestamp(),
+          teamId: session.ref_id || "host",
+          round: liveState?.currentRound || "round1"
+        };
+        await set("drawRequest", payload);
+        showToast("Đã kích hoạt quay số thành công!");
+      } catch (err) {
+        showToast("Lỗi khi gửi lệnh quay số. Vui lòng thử lại!");
+      } finally {
+        setTimeout(() => {
+          isRequesting = false;
+          updateDrawUI();
+        }, 1200);
+      }
+    }
+
+    initDrawPage();
+  </script>
+</body>
+</html>

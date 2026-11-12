@@ -52,11 +52,14 @@
       filterQuestionForTablet,
       buildQuestionKey,
       recomputeRound2FromAnswers,
-      calculateRound2AnswerTime
+      calculateRound2AnswerTime,
+      openRound2QuestionPreview,
+      shouldAutoLockRound2
     } from "./js/round2.js";
     import { formatTimer } from "./js/timer.js";
     import { formatSeconds, shortenTeamName } from "./js/leaderboard.js";
     import { get, set, update, listen, getServerTime } from "./js/backend.js";
+    import { showLotteryDrawModal } from "./js/draw-ui.js";
 
     let quizData = null;
     let setsGrouped = {};
@@ -80,6 +83,8 @@
 
     let timerInterval = null;
     let currentAnswersUnsub = null;
+    let autoLockRevealing = false;
+    let lastHandledDrawRequest = 0;
 
     function subscribeToQuestionAnswers(questionKey) {
       if (currentAnswersUnsub) {
@@ -87,7 +92,7 @@
         currentAnswersUnsub = null;
       }
       if (!questionKey) return;
-      currentAnswersUnsub = listen(`answers/${questionKey}`, (incomingAnswers) => {
+      currentAnswersUnsub = listen(`answers/${questionKey}`, async (incomingAnswers) => {
         liveR2.answers = incomingAnswers || {};
         const counterEl = document.getElementById("r2-answered-counter");
         if (counterEl && quizData) {
@@ -96,7 +101,24 @@
           counterEl.textContent = `${count}/${participatingTeams.length} đội đã trả lời`;
         }
         updateLiveAnswersDisplay();
+
+        // Auto-lock and auto-reveal when all participating teams answer
+        if (quizData && liveR2.status === "open" && !autoLockRevealing) {
+          const participatingTeams = getRoundTeams(quizData.teams, quizData.round_order, "round2");
+          if (shouldAutoLockRound2(participatingTeams, liveR2.answers)) {
+            autoLockRevealing = true;
+            await handleAutoLockAndReveal();
+            autoLockRevealing = false;
+          }
+        }
       });
+    }
+
+    async function handleAutoLockAndReveal() {
+      stopTimerTick();
+      await handleLockQuestion();
+      await handleRevealQuestion();
+      showToast("Tất cả các đội đã trả lời! Đã tự động khóa và công bố đáp án.");
     }
 
     function renderLiveTeamsAnswersHtml() {
@@ -201,10 +223,13 @@
 
         updateTimerDisplay(remainingSec);
 
-        // Auto-lock when time is up
-        if (remainingMs <= 0 && liveR2.status === "open") {
+        // Auto-lock and auto-reveal when time is up
+        if (remainingMs <= 0 && liveR2.status === "open" && !autoLockRevealing) {
           stopTimerTick();
-          handleLockQuestion();
+          autoLockRevealing = true;
+          handleAutoLockAndReveal().finally(() => {
+            autoLockRevealing = false;
+          });
         }
       }, 100);
     }
@@ -224,7 +249,13 @@
       box.classList.toggle("finished", isZero || liveR2.status === "locked" || liveR2.status === "revealed");
 
       if (warnText) {
-        warnText.textContent = isZero ? "HẾT GIỜ!" : isWarn ? `⚠ Còn ${remainingSec}s!` : "";
+        warnText.textContent = isZero
+          ? "HẾT GIỜ!"
+          : isWarn
+            ? `⚠ Còn ${remainingSec}s!`
+            : liveR2.status === "reading"
+              ? "ĐANG ĐỌC ĐỀ"
+              : "";
       }
     }
 
@@ -324,27 +355,82 @@
       await update("live", updates);
     }
 
-    async function handleNextQuestion() {
-      currentQuestionIdx += 1;
-      liveR2.status = "idle";
-      liveR2.activeQuestion = null;
-      liveR2.answers = {};
-      liveR2.results = null;
-      delete liveR2.correct;
-      delete liveR2.explanation;
+    async function handleOpenQuestionPreview() {
+      const q = getCurrentQuestion();
+      if (!q) {
+        renderStage();
+        return;
+      }
+
+      stopTimerTick();
+      autoLockRevealing = false;
+      liveR2 = openRound2QuestionPreview(liveR2, q);
+      const questionKey = buildQuestionKey(selectedSet, currentQuestionIdx);
+      liveR2.questionKey = questionKey;
+      if (!liveR2.questionsMeta) liveR2.questionsMeta = {};
+
+      const tabletQuestion = filterQuestionForTablet(q);
 
       await update("live/round2", {
-        status: "idle",
+        status: "reading",
         questionIndex: currentQuestionIdx,
-        questionKey: null,
-        activeQuestion: null,
+        questionKey,
+        activeQuestion: tabletQuestion,
         correct: null,
         explanation: null,
-        results: null,
-        stats: null
+        shownAt: null,
+        deadline: null
       });
 
+      subscribeToQuestionAnswers(questionKey);
       renderStage();
+    }
+
+    async function startSet(setKey) {
+      selectedSet = setKey;
+      currentQuestionIdx = 0;
+      liveR2.activeSet = selectedSet;
+      liveR2.setStarted = true;
+      liveR2.history = [];
+      await update("live", {
+        currentRound: "round2",
+        draw: null
+      });
+      await update("live/round2", {
+        set: selectedSet,
+        setStarted: true,
+        questionIndex: 0
+      });
+      await handleOpenQuestionPreview();
+    }
+
+    async function handleNextQuestion() {
+      currentQuestionIdx += 1;
+      const questions = getQuestionsInActiveSet();
+      if (currentQuestionIdx >= questions.length) {
+        liveR2.status = "idle";
+        liveR2.activeQuestion = null;
+        liveR2.answers = {};
+        liveR2.results = null;
+        delete liveR2.correct;
+        delete liveR2.explanation;
+
+        await update("live/round2", {
+          status: "idle",
+          questionIndex: currentQuestionIdx,
+          questionKey: null,
+          activeQuestion: null,
+          correct: null,
+          explanation: null,
+          results: null,
+          stats: null
+        });
+
+        renderStage();
+        return;
+      }
+
+      await handleOpenQuestionPreview();
     }
 
     function buildRound2RankingData() {
@@ -429,7 +515,52 @@
       if (modal) modal.style.display = "none";
     }
 
+    function runRound2Lottery() {
+      const drawable = availableSets.filter((s) => !/^ch[aạ]y\s*th[uử]$/i.test(String(s).trim()));
+      const pool = drawable.length > 0 ? drawable : availableSets;
+      if (pool.length === 0) return;
+
+      set("live/draw", {
+        round: "round2",
+        status: "rolling",
+        stageTeamId: null
+      });
+
+      showLotteryDrawModal({
+        items: pool,
+        title: "BỐC THĂM BỘ ĐỀ VÒNG 2",
+        subtitle: `Quay số ngẫu nhiên 1 trong ${pool.length} bộ đề thi trắc nghiệm`,
+        excludeRehearsal: true,
+        getLabel: (setKey) => `Bộ đề số ${setKey}`,
+        onComplete: (drawnSet) => {
+          set("live/draw", {
+            round: "round2",
+            status: "done",
+            stageTeamId: null,
+            result: drawnSet
+          });
+          startSet(drawnSet);
+        },
+        onManualOverride: () => {
+          set("live/draw", {
+            round: "round2",
+            status: "pending",
+            stageTeamId: null
+          });
+        }
+      });
+    }
+
     function renderSetChooser(container) {
+      update("live", {
+        currentRound: "round2",
+        draw: {
+          round: "round2",
+          status: "pending",
+          stageTeamId: null
+        }
+      });
+
       const optionsHtml = availableSets
         .map(
           (setKey) => `
@@ -447,7 +578,7 @@
               ${quizData.config?.show_subtitle ? `<div class="stage-cluster-subtitle" style="font-size: 1rem; color: var(--accent); font-weight: 700; margin-bottom: 0.35rem;">${escapeHtml(quizData.config.show_subtitle)}</div>` : ""}
               <h1 class="section-title">${escapeHtml(quizData.config.round2_name)}</h1>
               <p class="section-subtitle">
-                Chọn bộ đề 10 câu hỏi trắc nghiệm hoặc bấm "Chọn ngẫu nhiên".
+                Bốc thăm quay số chọn bộ đề 10 câu hỏi trắc nghiệm hoặc chọn thủ công bên dưới.
               </p>
             </div>
 
@@ -455,10 +586,10 @@
               <button type="button" id="btn-open-rules" class="btn btn-outline" style="font-weight: 600; font-size: 0.95rem;">
                 📜 Thể lệ phần thi
               </button>
-              <button type="button" id="btn-random-set" class="btn btn-secondary">
-                🎲 Chọn ngẫu nhiên bộ đề
+              <button type="button" id="btn-lottery-set" class="btn btn-primary" style="font-weight: 800; font-size: 1.15rem; padding: 0.7rem 1.75rem; box-shadow: var(--shadow-md);">
+                🎲 QUAY SỐ BỘ ĐỀ
               </button>
-              <button type="button" id="btn-start-set" class="btn btn-primary">
+              <button type="button" id="btn-start-set" class="btn btn-secondary">
                 Bắt đầu với Bộ đề #${escapeHtml(selectedSet)} →
               </button>
             </div>
@@ -466,7 +597,10 @@
         </div>
 
         <div class="panel-card" style="margin-top: 1.5rem;">
-          <h2 class="panel-title">Danh sách các bộ đề có sẵn:</h2>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+            <h2 class="panel-title" style="margin: 0;">Danh sách các bộ đề (chọn thủ công):</h2>
+            <span style="font-size: 0.9rem; color: var(--text-muted);">Đội thi cũng có thể bấm nút Quay số từ xa trên iPad</span>
+          </div>
           <div style="display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap;">
             ${optionsHtml}
           </div>
@@ -478,6 +612,10 @@
         renderStage();
       });
 
+      document.getElementById("btn-lottery-set")?.addEventListener("click", () => {
+        runRound2Lottery();
+      });
+
       container.querySelectorAll("[data-pick-set]").forEach((btn) => {
         btn.addEventListener("click", () => {
           selectedSet = btn.dataset.pickSet;
@@ -485,26 +623,8 @@
         });
       });
 
-      document.getElementById("btn-random-set")?.addEventListener("click", () => {
-        // Never draw the rehearsal set ("Chạy thử") at random; it can still be picked by hand.
-        const drawable = availableSets.filter((s) => !/^ch[aạ]y\s*th[uử]$/i.test(String(s).trim()));
-        const pool = drawable.length > 0 ? drawable : availableSets;
-        if (pool.length > 0) {
-          const rand = pool[Math.floor(Math.random() * pool.length)];
-          selectedSet = rand;
-          showToast(`Đã chọn ngẫu nhiên Bộ đề #${rand}`);
-          renderStage();
-        }
-      });
-
-      document.getElementById("btn-start-set")?.addEventListener("click", async () => {
-        currentQuestionIdx = 0;
-        liveR2.status = "idle";
-        liveR2.activeSet = selectedSet;
-        liveR2.setStarted = true;
-        liveR2.history = [];
-        renderStage();
-        await update("live/round2", { set: selectedSet, setStarted: true, questionIndex: 0, status: "idle", activeQuestion: null, correct: null, explanation: null });
+      document.getElementById("btn-start-set")?.addEventListener("click", () => {
+        startSet(selectedSet);
       });
     }
 
@@ -705,9 +825,9 @@
               </div>
 
               ${
-                liveR2.status === "idle"
-                  ? `<button type="button" id="btn-open-question" class="btn btn-primary btn-lg">
-                      ▶ Hiện câu hỏi &amp; Bắt đầu giờ
+                (liveR2.status === "idle" || liveR2.status === "reading")
+                  ? `<button type="button" id="btn-open-question" class="btn btn-primary btn-lg" style="font-weight: 800;">
+                      ▶ Bắt đầu tính giờ
                     </button>`
                   : liveR2.status === "open"
                     ? `<button type="button" id="btn-lock-question" class="btn btn-danger btn-lg">
@@ -735,7 +855,7 @@
                     Sẵn Sàng Cho Câu Hỏi Số ${currentQuestionIdx + 1}
                   </h2>
                   <p style="color: var(--text-muted); font-size: 1.15rem; max-width: 520px; margin: 0 auto;">
-                    Nội dung câu hỏi và 4 phương án trả lời đang được ẩn. Bấm <strong>"▶ Hiện câu hỏi &amp; Bắt đầu giờ"</strong> để bắt đầu tính giờ và hiển thị câu hỏi lên màn hình máy chiếu cùng máy tính bảng các đội.
+                    Bấm <strong>"▶ Bắt đầu tính giờ"</strong> để bắt đầu đếm ngược thời gian và cho phép các đội bấm trả lời.
                   </p>
                 </div>`
               : `<article class="question-card" style="margin-top: 1rem;">
@@ -849,7 +969,7 @@
       liveR2.deadline = remoteR2.deadline || null;
       liveR2.questionKey = remoteR2.questionKey || buildQuestionKey(selectedSet, currentQuestionIdx);
 
-      if (liveR2.status === "open" || liveR2.status === "locked" || liveR2.status === "revealed") {
+      if (liveR2.status === "reading" || liveR2.status === "open" || liveR2.status === "locked" || liveR2.status === "revealed") {
         liveR2.activeQuestion = remoteR2.activeQuestion || getCurrentQuestion();
         if (remoteR2.results) liveR2.results = remoteR2.results;
         if (remoteR2.stats) liveR2.stats = remoteR2.stats;
@@ -863,6 +983,17 @@
       await update("live", { currentRound: "round2" });
       // Republish totals rebuilt from stored answers
       await updateAccumulatedScores();
+
+      listen("drawRequest", (req) => {
+        if (!req || !req.requestedAt) return;
+        if (req.requestedAt === lastHandledDrawRequest) return;
+        if (req.round !== "round2") return;
+        if (!liveR2.setStarted) {
+          lastHandledDrawRequest = req.requestedAt;
+          set("drawRequest", null);
+          runRound2Lottery();
+        }
+      });
 
       listen("live", (remoteLive) => {
         if (!remoteLive) return;

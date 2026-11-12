@@ -71,3 +71,33 @@ test("every named import in pages and js/ modules resolves", () => {
   }
   assert.deepEqual(missing, []);
 });
+
+test("new pages exist and all pages use relative paths and load Firebase SDK only via the adapter", () => {
+  const newPages = ["intro.html", "stage-timer.html", "draw.html"];
+  for (const np of newPages) {
+    assert.ok(fs.existsSync(path.join(root, np)), `Expected ${np} to exist`);
+  }
+
+  const allHtml = fs.readdirSync(root).filter((f) => f.endsWith(".html"));
+  for (const page of allHtml) {
+    const src = fs.readFileSync(path.join(root, page), "utf8");
+
+    // Must not import Firebase SDK directly from gstatic CDN (only via adapter ./js/backend.js)
+    assert.ok(
+      !src.includes("www.gstatic.com/firebasejs"),
+      `${page} must not import Firebase JS SDK directly; only adapter js/backend.js may`
+    );
+
+    // Links to css and scripts must be relative (./ or relative filename, not starting with /)
+    for (const match of src.matchAll(/<(?:link|script|a)\s+[^>]*(?:href|src)=["']([^"']+)["']/g)) {
+      const url = match[1];
+      if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("#") || url.startsWith("data:")) {
+        continue;
+      }
+      assert.ok(
+        !url.startsWith("/") || url.startsWith("//"),
+        `${page} has non-relative path: ${url}`
+      );
+    }
+  }
+});
