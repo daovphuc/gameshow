@@ -68,11 +68,70 @@
     import { fetchQuizData, renderAvatarHtml, escapeHtml, logoutUser, showToast } from "./js/app.js";
     import { set, listen, serverTimestamp, onStatusChange } from "./js/backend.js";
     import { getActiveSession, isRoleAllowedForPortal } from "./js/auth.js";
+    import { showLotteryDrawModal } from "./js/draw-ui.js";
+    import { getRound1TopicLabel } from "./js/data.js";
+    import { isRehearsalSet } from "./js/draw.js";
 
     let quizData = null;
     let liveState = null;
     let session = null;
     let isRequesting = false;
+    let currentAnimatedResultKey = null;
+
+    function checkAndRunSyncedLottery(draw) {
+      if (!draw) {
+        currentAnimatedResultKey = null;
+        return;
+      }
+      if (draw.status === "pending") {
+        currentAnimatedResultKey = null;
+        return;
+      }
+      if (!draw.result && draw.status !== "rolling") {
+        return;
+      }
+
+      const resultKey = `${draw.round}_${draw.result}`;
+      if (currentAnimatedResultKey === resultKey) {
+        return;
+      }
+      currentAnimatedResultKey = resultKey;
+
+      const round = draw.round || liveState?.currentRound || "round1";
+      let items = [];
+      let fixedItem = draw.result;
+      let title = "BỐC THĂM QUAY SỐ";
+      let getLabel = (it) => (it?.label || it?.name || it?.id || String(it));
+
+      if (round === "round1") {
+        items = quizData?.round1Packages || [];
+        fixedItem = items.find((p) => p.id === draw.result) || { id: draw.result };
+        title = "BỐC THĂM CHỦ ĐỀ VÒNG 1";
+        getLabel = (pkg) => getRound1TopicLabel(pkg);
+      } else if (round === "round2") {
+        const questions = quizData?.round2Questions || [];
+        const sets = [...new Set(questions.map((q) => q.set))].filter((s) => !isRehearsalSet(s));
+        items = sets.length > 0 ? sets : [draw.result];
+        fixedItem = draw.result;
+        title = "BỐC THĂM BỘ ĐỀ VÒNG 2";
+        getLabel = (setKey) => (typeof setKey === "object" ? (setKey.label || setKey.id || "Bộ đề") : `Bộ đề số ${setKey}`);
+      } else if (round === "round3") {
+        items = quizData?.round3Questions || [];
+        fixedItem = items.find((q) => q.number === Number(draw.result)) || { number: draw.result, points: 30 };
+        title = "BỐC THĂM Ô TÌNH HUỐNG VÒNG 3";
+        getLabel = (tile) => `Ô số ${tile.number ?? tile} (${tile.points ?? 30}đ)`;
+      }
+
+      showLotteryDrawModal({
+        items,
+        fixedItem,
+        title,
+        getLabel,
+        onComplete: () => {
+          updateDrawUI();
+        }
+      });
+    }
 
     async function initDrawPage() {
       // Logins are stored per role (and, on Firebase, per portal app), so reuse
@@ -120,6 +179,7 @@
       listen("live", (data) => {
         liveState = data || {};
         updateDrawUI();
+        checkAndRunSyncedLottery(liveState.draw);
       });
 
       document.getElementById("btn-giant-draw")?.addEventListener("click", handleTriggerDraw);

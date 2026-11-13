@@ -139,3 +139,26 @@ test("brief acceptance requirements: 5 portals, sidebar links removed, ceremony 
     );
   }
 });
+
+test("brief acceptance requirements: round 3 has no tile grid markup, draw.html uses shared lottery animation, lottery markup has no 'LỒNG QUAY SỐ' or 'Lượt thi của'", () => {
+  // 1. round 3 host page has no tile grid markup
+  const round3Html = fs.readFileSync(path.join(root, "round3.html"), "utf8");
+  assert.ok(!round3Html.includes("tiles-grid"), "round3.html must not contain 'tiles-grid'");
+  assert.ok(!round3Html.includes("tile-btn"), "round3.html must not contain 'tile-btn'");
+
+  // 2. draw.html uses the shared lottery animation
+  const drawHtml = fs.readFileSync(path.join(root, "draw.html"), "utf8");
+  assert.ok(drawHtml.includes("showLotteryDrawModal"), "draw.html must import or call showLotteryDrawModal");
+
+  // 3. lottery markup in js/draw-ui.js and all html pages no longer contains 'LỒNG QUAY SỐ' or 'Lượt thi của'
+  const drawUiJs = fs.readFileSync(path.join(root, "js", "draw-ui.js"), "utf8");
+  assert.ok(!drawUiJs.includes("LỒNG QUAY SỐ"), "js/draw-ui.js must not contain 'LỒNG QUAY SỐ'");
+  assert.ok(!drawUiJs.includes("Lượt thi của"), "js/draw-ui.js must not contain 'Lượt thi của'");
+
+  for (const page of fs.readdirSync(root).filter((f) => f.endsWith(".html"))) {
+    const src = fs.readFileSync(path.join(root, page), "utf8");
+    assert.ok(!src.includes("LỒNG QUAY SỐ"), `${page} must not contain 'LỒNG QUAY SỐ'`);
+    assert.ok(!src.includes("Lượt thi của"), `${page} must not contain 'Lượt thi của'`);
+  }
+});
+

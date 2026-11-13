@@ -7,7 +7,14 @@ import { getActiveSession, saveActiveSession, clearActiveSession, validateSessio
 import { normaliseAllData, resolveImageUrl, resolveTeamIcon } from "./data.js";
 import { contentToQuizData, isContentEmpty, getContestTeams, ALLOWED_TEAM_CONTENT_KEYS, assembleTeamContent } from "./content.js";
 import { createInitialState, syncStateWithTeams, exportState, importState, computeTeamScores } from "./state.js";
-import { getTeamInitials, computeLeaderboard, diffLeaderboard, shortenTeamName } from "./leaderboard.js";
+import {
+  getTeamInitials,
+  computeLeaderboard,
+  diffLeaderboard,
+  shortenTeamName,
+  buildScoreboardRows,
+  renderScoreboardTableHtml
+} from "./leaderboard.js";
 import { LIGHT_THEME, mergeTheme, themeToCssVars } from "./theme.js";
 import {
   initBackend,
@@ -370,21 +377,7 @@ export function saveAppState(state) {
   return state;
 }
 
-export function renderAvatarHtml(team, sizeClass = "") {
-  const initials = escapeHtml(getTeamInitials(team?.name || "?"));
-  const color = escapeHtml(team?.color || "#D97757");
-  const resolvedUrl = resolveTeamIcon(team);
-  const isSvg = Boolean(resolvedUrl && /\.svg(?:$|[?#])/i.test(resolvedUrl));
-  const cls = ["team-avatar", sizeClass, isSvg ? "has-svg" : ""].filter(Boolean).join(" ");
-  if (resolvedUrl) {
-    const imgUrl = escapeHtml(resolvedUrl);
-    return `<div class="${cls}" style="--team-color: ${color}; border-color: ${color}; background-color: ${color}">
-      <span class="team-avatar-initials">${initials}</span>
-      <img class="${isSvg ? "team-avatar-svg" : ""}" src="${imgUrl}" alt="" onload="this.parentElement.classList.add('has-image');if(this.previousElementSibling)this.previousElementSibling.style.display='none'" onerror="this.remove()" />
-    </div>`;
-  }
-  return `<div class="${cls}" style="--team-color: ${color}; border-color: ${color}; background-color: ${color}">${initials}</div>`;
-}
+export { renderAvatarHtml } from "./leaderboard.js";
 
 export function showToast(message, durationMs = 2800) {
   let container = document.querySelector(".toast-container");
@@ -470,69 +463,26 @@ export function wireLiveLeaderboardPanel({ teams = [], getLiveScores } = {}) {
     setDrawerOpen(!drawer.classList.contains("open"));
   };
 
-  function updateLeaderboardRows(currentScores) {
+  function updateLeaderboardRows(currentScores, liveState) {
     const container = document.getElementById("drawer-ranking-list");
     if (!container || !teams || teams.length === 0) return;
 
-    const ranked = computeLeaderboard(teams, currentScores, "total", { tieBreak: true });
-    const diff = diffLeaderboard(lastLeaderboardEntries, ranked);
-
-    // FLIP FIRST: record initial DOM bounding rects
-    const prevRects = new Map();
-    container.querySelectorAll(".drawer-ranking-row").forEach((el) => {
-      const id = el.dataset.teamId;
-      if (id) {
-        prevRects.set(id, el.getBoundingClientRect());
-      }
+    const rows = buildScoreboardRows(teams, currentScores, {
+      round2Stats: liveState?.round2Stats || {}
     });
 
-    const changedScoreIds = new Set(diff.changedScores.map((c) => c.id));
-
-    // Render new DOM order
-    container.innerHTML = ranked
-      .map(
-        (entry) => `
-        <div
-          class="drawer-ranking-row ${changedScoreIds.has(entry.id) ? "score-tick" : ""}"
-          data-team-id="${escapeHtml(entry.id)}"
-        >
-          <span class="drawer-rank ${entry.rank === 1 ? "top-1" : ""}">${entry.rank != null ? `#${entry.rank}` : "–"}</span>
-          ${renderAvatarHtml(entry, "team-avatar-sm")}
-          <span class="drawer-team-name" title="${escapeHtml(entry.name)}">${escapeHtml(shortenTeamName(entry.name))}</span>
-          <span class="drawer-team-score">${entry.score}đ</span>
-        </div>
-      `
-      )
-      .join("");
-
-    // FLIP LAST & INVERT & PLAY: animate movements smoothly
-    if (diff.hasChanged && prevRects.size > 0) {
-      container.querySelectorAll(".drawer-ranking-row").forEach((el) => {
-        const id = el.dataset.teamId;
-        const prevRect = prevRects.get(id);
-        if (prevRect) {
-          const currentRect = el.getBoundingClientRect();
-          const deltaY = prevRect.top - currentRect.top;
-          if (deltaY !== 0) {
-            el.style.transform = `translateY(${deltaY}px)`;
-            el.style.transition = "none";
-            requestAnimationFrame(() => {
-              el.style.transition = "transform 0.45s cubic-bezier(0.2, 0, 0, 1)";
-              el.style.transform = "";
-            });
-          }
-        }
-      });
-    }
-
-    lastLeaderboardEntries = ranked;
+    container.innerHTML = renderScoreboardTableHtml(rows, {
+      tableClass: "scoreboard-table drawer-scoreboard-table",
+      wrapClass: "scoreboard-table-wrap drawer-scoreboard-wrap",
+      shortenName: true
+    });
   }
 
   // Subscribe to live state updates
   listen("live", (liveState) => {
     if (!liveState) return;
     const scores = computeTeamScores({ teams, live: liveState });
-    updateLeaderboardRows(scores);
+    updateLeaderboardRows(scores, liveState);
   });
 }
 

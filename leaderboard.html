@@ -51,7 +51,13 @@
       wireStageLayout,
       showToast
     } from "./js/app.js";
-    import { computeLeaderboard, buildPodiumSlots, formatSeconds } from "./js/leaderboard.js";
+    import {
+      computeLeaderboard,
+      buildPodiumSlots,
+      formatSeconds,
+      buildScoreboardRows,
+      renderScoreboardTableHtml
+    } from "./js/leaderboard.js";
     import { computeTeamScores } from "./js/state.js";
     import { listen, get } from "./js/backend.js";
     import { buildReportCsv } from "./js/report.js";
@@ -455,29 +461,16 @@
         }
       }
 
-      listEl.innerHTML = rest
-        .map(
-          (entry) => `
-          <div class="leaderboard-row">
-            <div class="rank-number">${entry.rank != null ? `#${entry.rank}` : "–"}</div>
-            <div class="leaderboard-team-info">
-              ${renderAvatarHtml(entry)}
-              <div class="leaderboard-team-name">${escapeHtml(entry.name)}</div>
-            </div>
-            <div class="leaderboard-subscores">
-              <span>V1: <strong>${entry.round1}</strong></span>
-              <span>V2: <strong>${entry.round2}</strong></span>
-              <span>V3: <strong>${entry.round3}</strong></span>
-              <span>Tổng: <strong>${entry.total}</strong></span>
-            </div>
-            <div class="leaderboard-main-score">
-              ${entry.score} đ
-              ${currentMode === "round2" && entry.round2Seconds ? `<span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-left: 0.35rem;">(${formatSeconds(entry.round2Seconds)})</span>` : ""}
-            </div>
-          </div>
-        `
-        )
-        .join("");
+      const scoreboardRows = buildScoreboardRows(quizData.teams, derivedScores, {
+        round2Stats: gameState?.round2Stats || {},
+        mode: currentMode
+      });
+
+      listEl.innerHTML = renderScoreboardTableHtml(scoreboardRows, {
+        highlightMode: currentMode,
+        tableClass: "scoreboard-table",
+        wrapClass: "scoreboard-table-wrap"
+      });
     }
 
     async function initLeaderboard(forceRefresh = false) {

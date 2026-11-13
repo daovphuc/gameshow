@@ -19,11 +19,11 @@
   </div>
 
   <!-- Modal Thống Kê Vòng 2 -->
-  <div id="r2-stats-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 9999; align-items: center; justify-content: center; padding: 1.5rem;">
-    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 1.5rem; box-shadow: var(--shadow-xl);">
-      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; margin-bottom: 1rem;">
-        <h2 style="font-family: var(--font-serif); font-size: 1.4rem; margin: 0;">📊 Bảng Thống Kê Vòng 2</h2>
-        <button type="button" id="btn-close-r2-stats-modal" class="btn btn-sm">✕ Đóng</button>
+  <div id="r2-stats-modal" class="scoreboard-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 9999; align-items: center; justify-content: center; padding: clamp(1rem, 2vw, 2.5rem);">
+    <div class="scoreboard-modal-card" style="background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius-lg); max-width: min(1200px, 94vw); width: 100%; max-height: 90vh; overflow-y: auto; padding: clamp(1.2rem, 2.5vw, 2rem); box-shadow: var(--shadow-xl);">
+      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--border); padding-bottom: 1rem; margin-bottom: 1.25rem;">
+        <h2 style="font-family: var(--font-serif); font-size: clamp(1.3rem, 2.2vw, 1.8rem); margin: 0; color: var(--text);">📊 Bảng Thống Kê Điểm Số &amp; Thứ Hạng Vòng 2</h2>
+        <button type="button" id="btn-close-r2-stats-modal" class="btn btn-outline" style="font-weight: 700;">✕ Đóng</button>
       </div>
       <div id="r2-stats-modal-body"></div>
     </div>
@@ -57,7 +57,8 @@
       shouldAutoLockRound2
     } from "./js/round2.js";
     import { formatTimer } from "./js/timer.js";
-    import { formatSeconds, shortenTeamName } from "./js/leaderboard.js";
+    import { formatSeconds, shortenTeamName, buildScoreboardRows, renderScoreboardTableHtml } from "./js/leaderboard.js";
+    import { computeTeamScores } from "./js/state.js";
     import { get, set, update, listen, getServerTime } from "./js/backend.js";
     import { showLotteryDrawModal } from "./js/draw-ui.js";
     import { isRehearsalSet } from "./js/draw.js";
@@ -85,6 +86,8 @@
     let timerInterval = null;
     let currentAnswersUnsub = null;
     let autoLockRevealing = false;
+    // Latest snapshot of live/ (scores and round 2 stats) for the stats modal.
+    let latestLive = null;
     let lastHandledDrawRequest = 0;
 
     function subscribeToQuestionAnswers(questionKey) {
@@ -459,48 +462,54 @@
     }
 
     function renderRound2StatsTableHtml() {
-      const ranked = buildRound2RankingData();
-      const questions = getQuestionsInActiveSet();
+      const derivedScores = computeTeamScores({
+        teams: quizData.teams,
+        live: latestLive || {},
+        config: quizData.config
+      });
 
-      return `
-        <table class="scores-table" style="width: 100%;">
-          <thead>
-            <tr>
-              <th style="width: 80px;">Thứ hạng</th>
-              <th>Đội thi</th>
-              <th>Điểm số</th>
-              <th>Số câu đúng</th>
-              <th>Tổng thời gian câu đúng</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${ranked
-              .map(
-                (entry) => `
-                <tr>
-                  <td><strong>#${entry.rank}</strong></td>
-                  <td>
-                    <div style="display: flex; align-items: center; gap: 0.65rem;">
-                      ${renderAvatarHtml(entry, "team-avatar-sm")}
-                      <strong>${escapeHtml(entry.name)}</strong>
-                    </div>
-                  </td>
-                  <td style="font-family: var(--font-mono); font-weight: 900; font-size: 1.25rem; color: var(--accent);">
-                    ${entry.points}đ <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-muted); margin-left: 0.35rem;">(${formatSeconds(entry.totalCorrectTimeMs / 1000)})</span>
-                  </td>
-                  <td style="font-family: var(--font-mono); font-weight: 700;">
-                    ${entry.correctCount}/${questions.length || 10}
-                  </td>
-                  <td style="font-family: var(--font-mono); font-size: 1.05rem;">
-                    ${formatSeconds(entry.totalCorrectTimeMs / 1000)}
-                  </td>
-                </tr>
-              `
-              )
-              .join("")}
-          </tbody>
-        </table>
-      `;
+      const participatingTeams = getRoundTeams(quizData.teams, quizData.round_order, "round2");
+      const teamStats = { ...(latestLive?.round2Stats || {}) };
+      for (const t of participatingTeams) {
+        if (!teamStats[t.id]) {
+          teamStats[t.id] = { points: 0, correctCount: 0, totalCorrectTimeMs: 0 };
+        }
+      }
+      if (liveR2?.history) {
+        for (const h of liveR2.history) {
+          if (!h.results) continue;
+          for (const [tId, res] of Object.entries(h.results)) {
+            if (!teamStats[tId]) {
+              teamStats[tId] = { points: 0, correctCount: 0, totalCorrectTimeMs: 0 };
+            }
+            if (res.isCorrect) {
+              teamStats[tId].points = (teamStats[tId].points || 0) + (Number(res.points) || 0);
+              teamStats[tId].correctCount = (teamStats[tId].correctCount || 0) + 1;
+              teamStats[tId].totalCorrectTimeMs = (teamStats[tId].totalCorrectTimeMs || 0) + (Number(res.responseTimeMs) || 0);
+            }
+          }
+        }
+      }
+
+      for (const [tId, stat] of Object.entries(teamStats)) {
+        if (stat.points && derivedScores[tId]) {
+          if (!derivedScores[tId].round2) {
+            derivedScores[tId].round2 = stat.points;
+            derivedScores[tId].total = Math.round(((derivedScores[tId].round1 || 0) + stat.points + (derivedScores[tId].round3 || 0)) * 100) / 100;
+          }
+        }
+      }
+
+      const rows = buildScoreboardRows(quizData.teams, derivedScores, {
+        round2Stats: teamStats,
+        mode: "round2"
+      });
+
+      return renderScoreboardTableHtml(rows, {
+        highlightMode: "round2",
+        tableClass: "scoreboard-table modal-scoreboard-table",
+        wrapClass: "scoreboard-table-wrap modal-scoreboard-wrap"
+      });
     }
 
     function openStatsModal() {
@@ -521,18 +530,19 @@
       const pool = drawable.length > 0 ? drawable : availableSets;
       if (pool.length === 0) return;
 
-      set("live/draw", {
-        round: "round2",
-        status: "rolling",
-        stageTeamId: null
-      });
-
       showLotteryDrawModal({
         items: pool,
         title: "BỐC THĂM BỘ ĐỀ VÒNG 2",
-        subtitle: `Quay số ngẫu nhiên 1 trong ${pool.length} bộ đề thi trắc nghiệm`,
         excludeRehearsal: true,
         getLabel: (setKey) => `Bộ đề số ${setKey}`,
+        onRolling: (drawnSet) => {
+          set("live/draw", {
+            round: "round2",
+            status: "rolling",
+            stageTeamId: null,
+            result: drawnSet
+          });
+        },
         onComplete: (drawnSet) => {
           set("live/draw", {
             round: "round2",
@@ -994,6 +1004,7 @@
 
       listen("live", (remoteLive) => {
         if (!remoteLive) return;
+        latestLive = remoteLive;
         if (remoteLive.currentRound === "round1" && !remoteLive.round2?.setStarted && remoteLive.round2?.status === "idle") {
           stopTimerTick();
           currentQuestionIdx = 0;
