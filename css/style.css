@@ -4562,3 +4562,10 @@ body.sidebar-collapsed .sidebar-bottom .sidebar-link {
   border-color: #C8102E;
   color: #FFFFFF;
 }
+
+/* The intro artwork always fills the whole area beside the sidebar, at any zoom level. */
+.stage-main.ceremony-stage-main {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+}
