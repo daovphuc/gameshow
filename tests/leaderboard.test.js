@@ -6,7 +6,9 @@ import {
   getTeamInitials,
   diffLeaderboard,
   shortenTeamName,
-  formatSeconds
+  formatSeconds,
+  buildScoreboardRows,
+  renderScoreboardTableHtml
 } from "../js/leaderboard.js";
 
 const TEAMS = [
@@ -270,3 +272,77 @@ test("round 2 leaderboard tie-break: most fastest answers, then shorter total ti
   assert.deepEqual(ranked.map((e) => e.id), ["b", "c", "a"]);
   assert.deepEqual(ranked.map((e) => e.rank), [1, 2, 3]);
 });
+
+test("shared scoreboard rows: given teams and scores (including round 2 answer times), it returns rows in rank order with r1, r2, r3, total and round 2 seconds; ties ordered as today", () => {
+  const teams = [
+    { id: "A", name: "Đội A" },
+    { id: "B", name: "Đội B" },
+    { id: "C", name: "Đội C" },
+    { id: "D", name: "Đội D" }
+  ];
+
+  // All 4 teams tie on total (80), ties broken by Điều 22:
+  // Team B: R1=40, R2=20 (15.5s), R3=20 -> total 80 (highest R1 -> #1)
+  // Team C: R1=35, R2=15 (10.2s), R3=30 -> total 80 (beats A on R3 -> #2)
+  // Team A: R1=35, R2=20 (22.0s), R3=25 -> total 80 (#3)
+  // Team D: R1=30, R2=20 (18.1s), R3=30 -> total 80 (#4)
+  const scores = {
+    A: { round1: 35, round2: 20, round3: 25 },
+    B: { round1: 40, round2: 20, round3: 20 },
+    C: { round1: 35, round2: 15, round3: 30 },
+    D: { round1: 30, round2: 20, round3: 30 }
+  };
+  const round2Stats = {
+    A: { totalCorrectTimeSeconds: 22.0 },
+    B: { totalCorrectTimeSeconds: 15.5 },
+    C: { totalCorrectTimeSeconds: 10.2 },
+    D: { totalCorrectTimeSeconds: 18.1 }
+  };
+
+  const rows = buildScoreboardRows(teams, scores, { round2Stats });
+
+  assert.equal(rows.length, 4);
+
+  // #1: Team B
+  assert.equal(rows[0].id, "B");
+  assert.equal(rows[0].rank, 1);
+  assert.equal(rows[0].r1, 40);
+  assert.equal(rows[0].r2, 20);
+  assert.equal(rows[0].r3, 20);
+  assert.equal(rows[0].total, 80);
+  assert.equal(rows[0].round2Seconds, 15.5);
+
+  // #2: Team C
+  assert.equal(rows[1].id, "C");
+  assert.equal(rows[1].rank, 2);
+  assert.equal(rows[1].r1, 35);
+  assert.equal(rows[1].r2, 15);
+  assert.equal(rows[1].r3, 30);
+  assert.equal(rows[1].total, 80);
+  assert.equal(rows[1].round2Seconds, 10.2);
+
+  // #3: Team A
+  assert.equal(rows[2].id, "A");
+  assert.equal(rows[2].rank, 3);
+  assert.equal(rows[2].r1, 35);
+  assert.equal(rows[2].r2, 20);
+  assert.equal(rows[2].r3, 25);
+  assert.equal(rows[2].total, 80);
+  assert.equal(rows[2].round2Seconds, 22.0);
+
+  // #4: Team D
+  assert.equal(rows[3].id, "D");
+  assert.equal(rows[3].rank, 4);
+  assert.equal(rows[3].r1, 30);
+  assert.equal(rows[3].r2, 20);
+  assert.equal(rows[3].r3, 30);
+  assert.equal(rows[3].total, 80);
+  assert.equal(rows[3].round2Seconds, 18.1);
+
+  // HTML renderer verification
+  const html = renderScoreboardTableHtml(rows);
+  assert.ok(html.includes("Đội B"));
+  assert.ok(html.includes("15,50 s"));
+  assert.ok(html.includes("scoreboard-table"));
+});
+

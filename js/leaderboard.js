@@ -2,8 +2,34 @@
 // animation diff helper, team name shortening, and team avatar helpers (DOM-free).
 
 import { TEAM_PALETTE } from "./config.js";
+import { resolveTeamIcon } from "./data.js";
 
 export const PODIUM_SLOT_ORDER = [4, 2, 1, 3, 5];
+
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export function renderAvatarHtml(team, sizeClass = "") {
+  const initials = escapeHtml(getTeamInitials(team?.name || "?"));
+  const color = escapeHtml(team?.color || "#D97757");
+  const resolvedUrl = resolveTeamIcon(team);
+  const isSvg = Boolean(resolvedUrl && /\.svg(?:$|[?#])/i.test(resolvedUrl));
+  const cls = ["team-avatar", sizeClass, isSvg ? "has-svg" : ""].filter(Boolean).join(" ");
+  if (resolvedUrl) {
+    const imgUrl = escapeHtml(resolvedUrl);
+    return `<div class="${cls}" style="--team-color: ${color}; border-color: ${color}; background-color: ${color}">
+      <span class="team-avatar-initials">${initials}</span>
+      <img class="${isSvg ? "team-avatar-svg" : ""}" src="${imgUrl}" alt="" onload="this.parentElement.classList.add('has-image');if(this.previousElementSibling)this.previousElementSibling.style.display='none'" onerror="this.remove()" />
+    </div>`;
+  }
+  return `<div class="${cls}" style="--team-color: ${color}; border-color: ${color}; background-color: ${color}">${initials}</div>`;
+}
 
 /**
  * Shortens Vietnamese police team names for display in narrow lists:
@@ -130,12 +156,14 @@ export function computeLeaderboard(teams = [], stateOrScores = {}, mode = "total
     const round3 = Number(raw.round3) || 0;
     const total = Math.round((round1 + round2 + round3) * 100) / 100;
 
-    const r2Stat = r2Stats[team.id] || {};
-    const round2TimeMs = Number(r2Stat.totalCorrectTimeMs) || 0;
-    const round2Fastest = Number(r2Stat.fastestCount) || 0;
-    const round2Seconds = r2Stat.totalCorrectTimeSeconds !== undefined
-      ? Number(r2Stat.totalCorrectTimeSeconds)
-      : Math.round((round2TimeMs / 1000) * 100) / 100;
+    const r2Stat = r2Stats[team.id] || raw.round2Stats || raw;
+    const round2TimeMs = Number(r2Stat.totalCorrectTimeMs ?? r2Stat.round2TimeMs) || 0;
+    const round2Fastest = Number(r2Stat.fastestCount ?? r2Stat.round2Fastest) || 0;
+    const round2Seconds = r2Stat.round2Seconds !== undefined
+      ? Number(r2Stat.round2Seconds)
+      : r2Stat.totalCorrectTimeSeconds !== undefined
+        ? Number(r2Stat.totalCorrectTimeSeconds)
+        : Math.round((round2TimeMs / 1000) * 100) / 100;
 
     const score =
       scoreKey === "round1"
@@ -353,3 +381,132 @@ export function diffLeaderboard(prevEntries = [], nextEntries = []) {
     hasChanged
   };
 }
+
+/**
+ * Computes shared scoreboard rows in rank order.
+ * Given teams and scores (including round 2 answer times), it returns rows in rank order
+ * with r1, r2, r3, total and round 2 seconds; ties ordered as today.
+ *
+ * @param {Array<{id: string, name: string, image_url?: string, color?: string}>} teams
+ * @param {Record<string, any>} [stateOrScores]
+ * @param {{
+ *   round2Stats?: Record<string, any>,
+ *   mode?: "total"|"round1"|"round2"|"round3",
+ *   tieBreak?: boolean
+ * }} [options]
+ * @returns {Array<Record<string, any>>}
+ */
+export function buildScoreboardRows(teams = [], stateOrScores = {}, options = {}) {
+  const ranked = computeLeaderboard(teams, stateOrScores, options.mode || "total", {
+    tieBreak: true,
+    ...options
+  });
+  return ranked.map((entry) => ({
+    ...entry,
+    team: {
+      id: entry.id,
+      name: entry.name,
+      image_url: entry.image_url,
+      color: entry.color,
+      initials: entry.initials
+    },
+    r1: entry.round1,
+    r2: entry.round2,
+    r3: entry.round3,
+    total: entry.total,
+    round2Seconds: entry.round2Seconds,
+    r2Seconds: entry.round2Seconds
+  }));
+}
+
+/**
+ * Shared scoreboard table renderer used across the leaderboard drawer,
+ * leaderboard page, and round 2 stats modal.
+ *
+ * Structure: rank, team (avatar + name), Vòng 1, Vòng 2, Vòng 3, Tổng,
+ * and for round 2 the total answer time in seconds (the tie-breaker).
+ *
+ * @param {Array<Record<string, any>>} rows - Scoreboard rows from buildScoreboardRows
+ * @param {{
+ *   tableClass?: string,
+ *   wrapClass?: string,
+ *   shortenName?: boolean,
+ *   highlightMode?: string
+ * }} [options]
+ * @returns {string} HTML table string
+ */
+export function renderScoreboardTableHtml(rows = [], options = {}) {
+  const {
+    tableClass = "scoreboard-table",
+    wrapClass = "scoreboard-table-wrap",
+    shortenName = false,
+    highlightMode = null
+  } = options;
+
+  const rowList = Array.isArray(rows) ? rows : [];
+
+  const trs = rowList.map((entry) => {
+    const rankStr = entry.rank != null ? `#${entry.rank}` : "–";
+    const rankClass = entry.rank === 1 ? "top-1" : entry.rank === 2 ? "top-2" : entry.rank === 3 ? "top-3" : "";
+    const teamName = shortenName ? shortenTeamName(entry.name) : (entry.name || "");
+    const avatarHtml = renderAvatarHtml(entry, "team-avatar-sm");
+
+    const r1 = entry.r1 ?? entry.round1 ?? 0;
+    const r2 = entry.r2 ?? entry.round2 ?? 0;
+    const r3 = entry.r3 ?? entry.round3 ?? 0;
+    const total = entry.total ?? (r1 + r2 + r3);
+    const r2Sec = entry.round2Seconds ?? entry.r2Seconds ?? 0;
+    const r2SecHtml = (r2Sec !== undefined && r2Sec !== null && Number(r2Sec) > 0)
+      ? ` <span class="scoreboard-r2-time">(${formatSeconds(r2Sec)})</span>`
+      : "";
+
+    return `
+      <tr class="scoreboard-row ${rankClass}" data-team-id="${escapeHtml(entry.id)}">
+        <td class="col-rank">
+          <span class="scoreboard-rank-badge ${rankClass}">${rankStr}</span>
+        </td>
+        <td class="col-team">
+          <div class="scoreboard-team-cell">
+            ${avatarHtml}
+            <span class="scoreboard-team-name" title="${escapeHtml(entry.name)}">${escapeHtml(teamName)}</span>
+          </div>
+        </td>
+        <td class="col-round col-r1 ${highlightMode === "round1" ? "active-col" : ""}">
+          <span class="scoreboard-score">${r1}</span>
+        </td>
+        <td class="col-round col-r2 ${highlightMode === "round2" ? "active-col" : ""}">
+          <div class="scoreboard-r2-cell">
+            <span class="scoreboard-score">${r2}</span>${r2SecHtml}
+          </div>
+        </td>
+        <td class="col-round col-r3 ${highlightMode === "round3" ? "active-col" : ""}">
+          <span class="scoreboard-score">${r3}</span>
+        </td>
+        <td class="col-total ${highlightMode === "total" ? "active-col" : ""}">
+          <strong class="scoreboard-total-score">${total}</strong>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  return `
+    <div class="${wrapClass}">
+      <table class="${tableClass}">
+        <thead>
+          <tr>
+            <th class="col-rank">Hạng</th>
+            <th class="col-team">Đội thi</th>
+            <th class="col-round col-r1">Vòng 1</th>
+            <th class="col-round col-r2">Vòng 2</th>
+            <th class="col-round col-r3">Vòng 3</th>
+            <th class="col-total">Tổng</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${trs || `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">Chưa có dữ liệu</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+

@@ -125,10 +125,10 @@ test("drawRound3Tile: draws from 15 tiles and excludes already opened tiles", ()
   assert.equal(allOpened, null);
 });
 
-test("draw duration constant is about 4000 ms", () => {
+test("draw duration constant is about 5000 ms", () => {
   assert.equal(typeof DRAW_DURATION_MS, "number");
   assert.ok(
-    DRAW_DURATION_MS >= 3500 && DRAW_DURATION_MS <= 4500,
-    `Expected DRAW_DURATION_MS to be about 4000 ms, got ${DRAW_DURATION_MS}`
+    DRAW_DURATION_MS >= 4500 && DRAW_DURATION_MS <= 5500,
+    `Expected DRAW_DURATION_MS to be about 5000 ms, got ${DRAW_DURATION_MS}`
   );
 });

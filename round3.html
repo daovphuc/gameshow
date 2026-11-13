@@ -30,7 +30,6 @@
     import { resolveImageUrl } from "./js/data.js";
     import { getRoundTeams } from "./js/content.js";
     import {
-      isTileOpened,
       openRound3Tile,
       updateRound3TileSession,
       closeRound3Tile
@@ -254,18 +253,19 @@
       const team = roundTeams.find((t) => t.id === selectedTeamId) || roundTeams[0];
       const teamId = team ? team.id : selectedTeamId;
 
-      set("live/draw", {
-        round: "round3",
-        status: "rolling",
-        stageTeamId: teamId
-      });
-
       showLotteryDrawModal({
         items: allTiles,
         exclude: opened,
         title: "BỐC THĂM Ô TÌNH HUỐNG VÒNG 3",
-        subtitle: `Lượt thi của: ${team ? team.name : teamId}`,
         getLabel: (tile) => `Ô số ${tile.number} (${tile.points}đ)`,
+        onRolling: (drawnTile) => {
+          set("live/draw", {
+            round: "round3",
+            status: "rolling",
+            stageTeamId: teamId,
+            result: drawnTile.number
+          });
+        },
         onComplete: (drawnTile) => {
           set("live/draw", {
             round: "round3",
@@ -293,7 +293,7 @@
       renderStage();
     }
 
-    function renderTileGridStage(container) {
+    function renderDrawStage(container) {
       stopTimerLoop();
       activeTimerKey = null;
 
@@ -302,23 +302,9 @@
         selectedTeamId = roundTeams[0].id;
       }
       const selectedTeam = roundTeams.find((t) => t.id === selectedTeamId) || roundTeams[0];
-
-      const tilesHtml = quizData.round3Questions
-        .map((tile) => {
-          const opened = isTileOpened(gameState, tile.number);
-          return `
-            <div
-              class="tile-btn ${opened ? "opened" : ""}"
-              data-tile-number="${tile.number}"
-              style="cursor: default;"
-              aria-disabled="${opened ? "true" : "false"}"
-            >
-              <span class="tile-number">${tile.number}</span>
-              <span class="tile-points">${opened ? "Đã mở" : `${tile.points}đ`}</span>
-            </div>
-          `;
-        })
-        .join("");
+      const allTiles = quizData.round3Questions || [];
+      const opened = gameState.round3.openedTiles || [];
+      const remainingTiles = allTiles.filter((t) => !opened.includes(t.number));
 
       container.innerHTML = `
         <div class="section-header">
@@ -327,50 +313,71 @@
               ${quizData.config?.show_subtitle ? `<div class="stage-cluster-subtitle" style="font-size: 1rem; color: var(--accent); font-weight: 700; margin-bottom: 0.35rem;">${escapeHtml(quizData.config.show_subtitle)}</div>` : ""}
               <h1 class="section-title">${escapeHtml(quizData.config.round3_name)}</h1>
               <p class="section-subtitle">
-                Bấm nút Quay số để bốc thăm ngẫu nhiên ô tình huống cho đội dự thi.
+                Chọn đội thi trên sân khấu và bấm nút Quay số để bốc thăm ngẫu nhiên ô tình huống.
               </p>
             </div>
-            <button type="button" id="btn-open-rules" class="btn btn-outline" style="font-weight: 600; font-size: 0.95rem;">
-              📜 Thể lệ phần thi
-            </button>
+            <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+              <button type="button" id="btn-draw-back" class="btn btn-outline" style="font-weight: 600; font-size: 0.95rem;">
+                ← Quay lại Vòng 2
+              </button>
+              <button type="button" id="btn-open-rules" class="btn btn-outline" style="font-weight: 600; font-size: 0.95rem;">
+                📜 Thể lệ phần thi
+              </button>
+              <button type="button" id="btn-draw-continue" class="btn btn-outline" style="font-weight: 600; font-size: 0.95rem;">
+                Sang Bảng điểm →
+              </button>
+            </div>
           </div>
         </div>
 
-        <div class="screen-action-bar" style="margin-bottom: 1.5rem; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
-          <div class="screen-left-group">
-            <div class="question-team-banner">
-              ${selectedTeam ? renderAvatarHtml(selectedTeam, "team-avatar-sm") : ""}
-              <div>
-                <div style="font-size: 0.78rem; color: var(--accent); font-weight: 700; text-transform: uppercase;">
-                  Đội đang dự thi
+        <div class="round3-draw-container" style="max-width: 860px; margin: 2rem auto; display: flex; flex-direction: column; align-items: center; gap: 2rem; background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius-lg, 16px); padding: clamp(1.5rem, 3vw, 2.5rem); box-shadow: var(--shadow-md, 0 4px 20px rgba(0,0,0,0.06)); text-align: center;">
+          <div style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+            <div style="font-size: 0.85rem; color: var(--accent); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">
+              Đội thi trên sân khấu
+            </div>
+            <div class="question-team-banner" style="justify-content: center; padding: 0.75rem 1.75rem; border-radius: var(--radius-lg, 16px);">
+              ${selectedTeam ? renderAvatarHtml(selectedTeam, "team-avatar-lg") : ""}
+              <div style="text-align: left;">
+                <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 700;">
+                  #${selectedTeam?.orderNumber || "?"}
                 </div>
-                <div style="font-family: var(--font-serif); font-size: 1.25rem; font-weight: 700;">
+                <div style="font-family: var(--font-serif); font-size: clamp(1.3rem, 2.5vw, 1.8rem); font-weight: 800; color: var(--text);">
                   ${selectedTeam ? escapeHtml(selectedTeam.name) : "Chưa chọn"}
                 </div>
               </div>
             </div>
-            <div class="team-select-group" style="margin-left: 1rem;">
-              <label for="r3-team-select" style="font-weight: 600; font-size: 0.92rem; color: var(--text-muted);">Đổi đội thi:</label>
-              <select id="r3-team-select" class="team-dropdown">
+
+            <div class="team-select-group" style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem;">
+              <label for="r3-team-select" style="font-weight: 700; font-size: 1rem; color: var(--text-muted);">Chọn đội khác:</label>
+              <select id="r3-team-select" class="team-dropdown" style="font-size: 1rem; padding: 0.5rem 1.25rem;">
                 ${renderTeamSelectOptionsHtml(selectedTeamId)}
               </select>
             </div>
           </div>
-          <div class="screen-right-group" style="display: flex; align-items: center; gap: 0.75rem;">
-            <button type="button" id="btn-start-lottery-r3" class="btn btn-primary" style="font-weight: 800; font-size: 1.05rem; padding: 0.6rem 1.4rem; box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 0.5rem;">
-              <span>🎲</span>
+
+          <div style="width: 100%; height: 1px; background: var(--border); margin: 0.5rem 0;"></div>
+
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+            <button
+              type="button"
+              id="btn-start-lottery-r3"
+              class="btn btn-primary btn-lg"
+              style="font-size: clamp(1.2rem, 2vw, 1.5rem); font-weight: 800; padding: 1rem 3rem; border-radius: var(--radius-full, 9999px); box-shadow: 0 4px 25px rgba(217, 119, 87, 0.4); display: flex; align-items: center; gap: 0.75rem;"
+              ${remainingTiles.length === 0 ? "disabled" : ""}
+            >
+              <span style="font-size: 1.5em;">🎲</span>
               <span>QUAY SỐ CHỌN Ô</span>
             </button>
-            <div style="font-weight: 700; color: var(--text-muted); font-size: 0.95rem;">
-              Đã mở: <strong style="color: var(--accent); font-size: 1.15rem;">${gameState.round3.openedTiles?.length || 0}</strong> / ${quizData.round3Questions.length} ô
+
+            <div style="font-weight: 700; color: var(--text-muted); font-size: 1.05rem;">
+              Đã mở: <strong style="color: var(--accent); font-size: 1.25rem;">${opened.length}</strong> / ${allTiles.length} ô tình huống
             </div>
           </div>
         </div>
-
-        <div class="tiles-grid">
-          ${tilesHtml}
-        </div>
       `;
+
+      document.getElementById("btn-draw-back")?.addEventListener("click", handleBack);
+      document.getElementById("btn-draw-continue")?.addEventListener("click", handleContinue);
 
       document.getElementById("btn-open-rules")?.addEventListener("click", () => {
         showingRules = true;
@@ -412,7 +419,7 @@
           <div class="screen-action-bar">
             <div class="screen-left-group">
               <button type="button" id="btn-screen-back" class="btn">
-                ← Quay lại bảng ô số
+                ← Quay lại
               </button>
               <div class="question-team-banner">
                 ${renderAvatarHtml(currentTeam, "team-avatar-sm")}
@@ -498,7 +505,7 @@
         if (activeTile) {
           renderActiveTileStage(container, activeTile);
         } else {
-          renderTileGridStage(container);
+          renderDrawStage(container);
         }
       }
 
@@ -506,6 +513,8 @@
         activePage: "round3",
         config: quizData.config,
         teams: quizData.teams,
+        onBack: handleBack,
+        onContinue: handleContinue,
         onReload: () => initRound3(true)
       });
     }

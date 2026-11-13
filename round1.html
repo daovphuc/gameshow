@@ -363,17 +363,18 @@
 
       const team = quizData.teams.find((t) => t.id === teamId) || { name: teamId };
 
-      set("live/draw", {
-        round: "round1",
-        status: "rolling",
-        stageTeamId: teamId
-      });
-
       showLotteryDrawModal({
         items: offered,
         title: "BỐC THĂM CHỦ ĐỀ VÒNG 1",
-        subtitle: `Lượt thi của: ${team.name}`,
         getLabel: (pkg) => getRound1TopicLabel(pkg),
+        onRolling: (drawnPkg) => {
+          set("live/draw", {
+            round: "round1",
+            status: "rolling",
+            stageTeamId: teamId,
+            result: drawnPkg.id
+          });
+        },
         onComplete: (drawnPkg) => {
           set("live/draw", {
             round: "round1",
