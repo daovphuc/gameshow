@@ -16,22 +16,34 @@
     </header>
 
     <div class="home-tiles-grid" role="group" aria-label="Các cổng truy cập">
-      <!-- Host Tile -->
+      <!-- 1. Host Tile -->
       <button type="button" class="home-tile" data-portal="host">
         <div class="home-tile-icon" aria-hidden="true">🖥</div>
         <div class="home-tile-name">Dẫn chương trình</div>
       </button>
 
-      <!-- Judge Tile -->
+      <!-- 2. Judge Tile -->
       <button type="button" class="home-tile" data-portal="judge">
         <div class="home-tile-icon" aria-hidden="true">📋</div>
         <div class="home-tile-name">Ban Giám khảo</div>
       </button>
 
-      <!-- Team Tile -->
+      <!-- 3. Team Tile -->
       <button type="button" class="home-tile" data-portal="team">
         <div class="home-tile-icon" aria-hidden="true">📱</div>
         <div class="home-tile-name">Đội thi đấu</div>
+      </button>
+
+      <!-- 4. Stage Timer Tile -->
+      <button type="button" class="home-tile" data-portal="stage_timer">
+        <div class="home-tile-icon" aria-hidden="true">⏱</div>
+        <div class="home-tile-name">Đồng hồ sân khấu</div>
+      </button>
+
+      <!-- 5. Remote Draw Tile -->
+      <button type="button" class="home-tile" data-portal="draw">
+        <div class="home-tile-icon" aria-hidden="true">🎲</div>
+        <div class="home-tile-name">Quay số từ xa</div>
       </button>
     </div>
 
@@ -87,7 +99,7 @@
   <script type="module">
     import { fetchQuizData, escapeHtml, logoutUser, listenContent } from "./js/app.js";
     import { contentToQuizData } from "./js/content.js";
-    import { listen, isFirebaseBackend, signInAndResolveRole } from "./js/backend.js";
+    import { isFirebaseBackend, signInAndResolveRole } from "./js/backend.js";
     import {
       authenticate,
       getActiveSession,
@@ -98,6 +110,46 @@
     } from "./js/auth.js";
 
     let quizData = null;
+    let currentTargetPortal = null;
+
+    const PORTAL_PAGES = {
+      host: "./host.html",
+      judge: "./judge.html",
+      team: "./team.html",
+      stage_timer: "./stage-timer.html",
+      "stage-timer": "./stage-timer.html",
+      draw: "./draw.html"
+    };
+
+    function findStoredSessionForPortal(portal, accounts = []) {
+      const clean = String(portal || "").toLowerCase().trim();
+      let session = null;
+      if (clean === "host") {
+        session = getActiveSession(undefined, "host");
+      } else if (clean === "judge") {
+        session = getActiveSession(undefined, "judge") || getActiveSession(undefined, "head_judge");
+      } else if (clean === "team") {
+        session = getActiveSession(undefined, "team");
+      } else if (clean === "stage_timer" || clean === "stage-timer") {
+        session = getActiveSession(undefined, "host") || getActiveSession(undefined, "head_judge");
+      } else if (clean === "draw") {
+        session = getActiveSession(undefined, "host") || getActiveSession(undefined, "team");
+      }
+
+      if (!session) return null;
+
+      if (isFirebaseBackend()) {
+        if (isRoleAllowedForPortal(session.role, clean)) {
+          return { session, url: PORTAL_PAGES[clean] || getPortalUrl(session.role) };
+        }
+      } else {
+        const valid = validateSession(session, accounts, clean);
+        if (valid) {
+          return { session, url: PORTAL_PAGES[clean] || getPortalUrl(session.role) };
+        }
+      }
+      return null;
+    }
 
     function renderActiveSession(accounts = []) {
       const banner = document.getElementById("home-active-session");
@@ -138,35 +190,40 @@
     }
 
     function openLoginModal(targetPortal = "") {
+      currentTargetPortal = targetPortal;
       const modal = document.getElementById("login-modal");
       const usernameInput = document.getElementById("login-username");
       const passwordInput = document.getElementById("login-password");
       const errorEl = document.getElementById("login-error");
+      const titleEl = document.getElementById("login-modal-title");
       if (!modal) return;
 
       if (errorEl) errorEl.textContent = "";
+
+      const portalTitles = {
+        host: "Đăng Nhập — Dẫn chương trình",
+        judge: "Đăng Nhập — Ban Giám khảo",
+        team: "Đăng Nhập — Đội thi đấu",
+        stage_timer: "Đăng Nhập — Đồng hồ sân khấu",
+        draw: "Đăng Nhập — Quay số từ xa"
+      };
+      if (titleEl) {
+        titleEl.textContent = portalTitles[targetPortal] || "Đăng Nhập";
+      }
+
       modal.style.display = "flex";
 
-      // Hint username if role matches
-      const currentSession = getActiveSession();
-      if (currentSession?.username && targetPortal && currentSession.role === targetPortal) {
-        if (usernameInput) usernameInput.value = currentSession.username;
-        if (passwordInput) {
-          passwordInput.value = "";
-          passwordInput.focus();
-        }
-      } else {
-        if (usernameInput) {
-          usernameInput.value = "";
-          usernameInput.focus();
-        }
-        if (passwordInput) passwordInput.value = "";
+      if (usernameInput) {
+        usernameInput.value = "";
+        usernameInput.focus();
       }
+      if (passwordInput) passwordInput.value = "";
     }
 
     function closeLoginModal() {
       const modal = document.getElementById("login-modal");
       if (modal) modal.style.display = "none";
+      currentTargetPortal = null;
     }
 
     async function handleLoginFormSubmit(e) {
@@ -178,14 +235,22 @@
 
       const u = usernameInput ? usernameInput.value : "";
       const p = passwordInput ? passwordInput.value : "";
+      const target = currentTargetPortal;
 
       if (submitBtn) submitBtn.disabled = true;
       try {
         if (isFirebaseBackend()) {
           const res = await signInAndResolveRole(u, p);
           if (res.ok) {
+            if (target && !isRoleAllowedForPortal(res.role, target)) {
+              if (errorEl) {
+                errorEl.textContent = "Tài khoản không có quyền truy cập vào cổng này.";
+              }
+              return;
+            }
             saveActiveSession(res.session);
-            window.location.href = res.portalUrl;
+            const targetUrl = target ? (PORTAL_PAGES[target] || getPortalUrl(res.role)) : res.portalUrl;
+            window.location.href = targetUrl;
           } else {
             if (errorEl) {
               errorEl.textContent = res.error || "Tên đăng nhập hoặc mật khẩu không chính xác.";
@@ -202,9 +267,15 @@
         const accounts = quizData?.accounts || [];
         const res = authenticate(u, p, accounts);
         if (res.ok) {
+          if (target && !isRoleAllowedForPortal(res.account.role, target)) {
+            if (errorEl) {
+              errorEl.textContent = "Tài khoản không có quyền truy cập vào cổng này.";
+            }
+            return;
+          }
           saveActiveSession(res.account);
-          // Redirect directly to account's role portal
-          window.location.href = res.portalUrl;
+          const targetUrl = target ? (PORTAL_PAGES[target] || getPortalUrl(res.account.role)) : res.portalUrl;
+          window.location.href = targetUrl;
         } else {
           if (errorEl) {
             errorEl.textContent = res.error || "Tên đăng nhập hoặc mật khẩu không chính xác.";
@@ -244,10 +315,15 @@
         }
       });
 
-      // Wire tile clicks
+      // Wire tile clicks: reuse stored session or open login modal
       document.querySelectorAll(".home-tile").forEach((tile) => {
         tile.addEventListener("click", () => {
           const targetPortal = tile.dataset.portal || "";
+          const stored = findStoredSessionForPortal(targetPortal, quizData?.accounts || []);
+          if (stored) {
+            window.location.href = stored.url;
+            return;
+          }
           openLoginModal(targetPortal);
         });
       });

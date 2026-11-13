@@ -274,13 +274,6 @@
             result: drawnTile.number
           });
           openTileByNumber(drawnTile.number, teamId);
-        },
-        onManualOverride: () => {
-          set("live/draw", {
-            round: "round3",
-            status: "pending",
-            stageTeamId: teamId
-          });
         }
       });
     }
@@ -314,15 +307,15 @@
         .map((tile) => {
           const opened = isTileOpened(gameState, tile.number);
           return `
-            <button
-              type="button"
+            <div
               class="tile-btn ${opened ? "opened" : ""}"
               data-tile-number="${tile.number}"
-              ${opened ? "disabled" : ""}
+              style="cursor: default;"
+              aria-disabled="${opened ? "true" : "false"}"
             >
               <span class="tile-number">${tile.number}</span>
               <span class="tile-points">${opened ? "Đã mở" : `${tile.points}đ`}</span>
-            </button>
+            </div>
           `;
         })
         .join("");
@@ -334,7 +327,7 @@
               ${quizData.config?.show_subtitle ? `<div class="stage-cluster-subtitle" style="font-size: 1rem; color: var(--accent); font-weight: 700; margin-bottom: 0.35rem;">${escapeHtml(quizData.config.show_subtitle)}</div>` : ""}
               <h1 class="section-title">${escapeHtml(quizData.config.round3_name)}</h1>
               <p class="section-subtitle">
-                Bấm quay số hoặc chọn trực tiếp ô câu hỏi tình huống trên bảng để tính giờ.
+                Bấm nút Quay số để bốc thăm ngẫu nhiên ô tình huống cho đội dự thi.
               </p>
             </div>
             <button type="button" id="btn-open-rules" class="btn btn-outline" style="font-weight: 600; font-size: 0.95rem;">
@@ -391,12 +384,6 @@
       document.getElementById("r3-team-select")?.addEventListener("change", (e) => {
         setSelectedTeam(e.target.value);
         renderStage();
-      });
-
-      container.querySelectorAll(".tile-btn:not(.opened)").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          openTileByNumber(Number(btn.dataset.tileNumber), selectedTeamId);
-        });
       });
     }
 
