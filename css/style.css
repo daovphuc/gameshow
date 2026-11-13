@@ -4494,3 +4494,71 @@ body.sidebar-collapsed .sidebar-bottom .sidebar-link {
   min-width: 0;
   text-overflow: ellipsis;
 }
+
+/* Intro ceremony on the contest artwork (sky, firefighters, fire truck, red ribbon).
+   Fixed colours: the photo looks the same in the light and dark themes. */
+.ceremony-container {
+  align-items: flex-start;
+  padding-top: clamp(1.5rem, 9vh, 6rem);
+  background: #9cc7ec url("../images/intro-bg.jpg") center bottom / cover no-repeat;
+}
+
+/* Soft light behind the text so it stays readable on the sky. */
+.ceremony-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 42% 46% at 50% 36%, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ceremony-content {
+  max-width: min(62vw, 1100px);
+}
+
+.ceremony-agency-ministry {
+  color: #0B2E6B;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.ceremony-agency-dept {
+  color: #C8102E;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.85), 0 0 18px rgba(255, 255, 255, 0.7);
+}
+
+.ceremony-star-divider {
+  color: #E5A800;
+  text-shadow: 0 1px 2px rgba(120, 60, 0, 0.35);
+}
+
+.ceremony-contest-title {
+  color: #C8102E;
+  text-shadow: 0 2px 0 #FFFFFF, 0 0 22px rgba(255, 255, 255, 0.9), 0 6px 18px rgba(120, 0, 10, 0.25);
+}
+
+.ceremony-drum-wrap {
+  top: 40%;
+  opacity: 0.16;
+}
+
+.ceremony-bronze-drum {
+  color: #C8102E;
+}
+
+@keyframes ceremonyDrumScaleIn {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.65); }
+  100% { opacity: 0.16; transform: translate(-50%, -50%) scale(1); }
+}
+
+.ceremony-pill {
+  background-color: rgba(255, 255, 255, 0.92);
+  border-color: rgba(200, 16, 46, 0.35);
+  color: #8A0F1F;
+}
+
+.ceremony-pill-cluster {
+  background-color: #C8102E;
+  border-color: #C8102E;
+  color: #FFFFFF;
+}
