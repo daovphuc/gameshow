@@ -405,7 +405,9 @@
         setStarted: true,
         questionIndex: 0
       });
-      await handleOpenQuestionPreview();
+      // Show the drawn set first; the MC presses "Bắt đầu" to open question 1.
+      liveR2.status = "idle";
+      renderStage();
     }
 
     async function handleNextQuestion() {
@@ -832,7 +834,11 @@
               </div>
 
               ${
-                (liveR2.status === "idle" || liveR2.status === "reading")
+                liveR2.status === "idle"
+                  ? `<button type="button" id="btn-show-question" class="btn btn-primary btn-lg" style="font-weight: 800;">
+                      ▶ Bắt đầu
+                    </button>`
+                : liveR2.status === "reading"
                   ? `<button type="button" id="btn-open-question" class="btn btn-primary btn-lg" style="font-weight: 800;">
                       ▶ Bắt đầu tính giờ
                     </button>`
@@ -859,10 +865,10 @@
                     Câu ${currentQuestionIdx + 1}/${totalQuestions}
                   </span>
                   <h2 style="font-family: var(--font-serif); font-size: 2.2rem; margin: 1.25rem 0 0.75rem;">
-                    Sẵn Sàng Cho Câu Hỏi Số ${currentQuestionIdx + 1}
+                    ${currentQuestionIdx === 0 ? `Bộ đề số ${escapeHtml(String(selectedSet))}` : `Sẵn Sàng Cho Câu Hỏi Số ${currentQuestionIdx + 1}`}
                   </h2>
                   <p style="color: var(--text-muted); font-size: 1.15rem; max-width: 520px; margin: 0 auto;">
-                    Bấm <strong>"▶ Bắt đầu tính giờ"</strong> để bắt đầu đếm ngược thời gian và cho phép các đội bấm trả lời.
+                    Bấm <strong>"▶ Bắt đầu"</strong> để hiện câu hỏi cho MC đọc.
                   </p>
                 </div>`
               : `<article class="question-card" style="margin-top: 1rem;">
@@ -899,6 +905,7 @@
       });
       document.getElementById("btn-toggle-r2-stats")?.addEventListener("click", openStatsModal);
       document.getElementById("btn-open-question")?.addEventListener("click", handleStartQuestion);
+      document.getElementById("btn-show-question")?.addEventListener("click", handleOpenQuestionPreview);
       document.getElementById("btn-lock-question")?.addEventListener("click", handleLockQuestion);
       document.getElementById("btn-reveal-question")?.addEventListener("click", handleRevealQuestion);
       document.getElementById("btn-next-question")?.addEventListener("click", handleNextQuestion);

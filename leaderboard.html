@@ -13,7 +13,7 @@
   <div class="app-shell">
     <aside id="app-sidebar" class="app-sidebar" aria-label="Thanh điều hướng bên trái"></aside>
 
-    <main class="stage-main">
+    <main class="stage-main leaderboard-fit">
       <div class="section-header">
         <div>
           <div id="leaderboard-subtitle" class="stage-cluster-subtitle" style="font-size: 1rem; color: var(--accent); font-weight: 700; margin-bottom: 0.35rem; display: none;"></div>
@@ -31,7 +31,7 @@
             <button type="button" class="tab-btn" data-tab="round3">Vòng 3</button>
           </div>
           <button type="button" id="btn-export-report-csv" class="btn btn-outline" title="Xuất báo cáo tổng kết dạng bảng CSV/Excel">
-            ⬇ Tải báo cáo kết quả (CSV)
+            ⬇ Tải báo cáo (CSV)
           </button>
         </div>
       </div>
@@ -466,12 +466,48 @@
         mode: currentMode
       });
 
-      listEl.innerHTML = renderScoreboardTableHtml(scoreboardRows, {
-        highlightMode: currentMode,
-        tableClass: "scoreboard-table",
-        wrapClass: "scoreboard-table-wrap"
-      });
+      // Teams on the podium are not repeated; the rest is split into up to
+      // three side-by-side tables so the whole page fits the screen.
+      const podiumIds = new Set(podiumSlots.map((slot) => slot.id));
+      const tableRows = scoreboardRows.filter((row) => !podiumIds.has(row.id));
+      const colCount = tableRows.length > 20 ? 3 : tableRows.length > 8 ? 2 : 1;
+      const perCol = Math.max(1, Math.ceil(tableRows.length / colCount));
+      const chunks = [];
+      for (let i = 0; i < tableRows.length; i += perCol) chunks.push(tableRows.slice(i, i + perCol));
+      listEl.innerHTML = chunks.length === 0 ? "" : `
+        <div class="leaderboard-columns" style="--lb-cols: ${chunks.length};">
+          ${chunks
+            .map((chunk) =>
+              renderScoreboardTableHtml(chunk, {
+                highlightMode: currentMode,
+                shortenName: true,
+                tableClass: "scoreboard-table compact-scoreboard-table",
+                wrapClass: "scoreboard-table-wrap"
+              })
+            )
+            .join("")}
+        </div>
+      `;
+      fitLeaderboardToScreen();
     }
+
+    // Shrinks the podium (CSS zoom) so header + podium + tables fit without scrolling.
+    function fitLeaderboardToScreen() {
+      const podiumEl = document.getElementById("podium-section");
+      const main = document.querySelector(".stage-main");
+      if (!podiumEl || !main) return;
+      podiumEl.style.zoom = "1";
+      const natural = podiumEl.offsetHeight;
+      if (natural <= 0) return;
+      // Give the podium whatever height the header and the tables leave free.
+      const header = main.querySelector(".section-header");
+      const tablesH = document.getElementById("leaderboard-list")?.firstElementChild?.offsetHeight || 0;
+      const cs = getComputedStyle(main);
+      const chrome = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + 2 * (parseFloat(cs.rowGap) || 0);
+      const free = window.innerHeight - (header?.offsetHeight || 0) - tablesH - chrome - 4;
+      podiumEl.style.zoom = String(Math.max(0.3, Math.min(1, free / natural)));
+    }
+    window.addEventListener("resize", () => fitLeaderboardToScreen());
 
     async function initLeaderboard(forceRefresh = false) {
       quizData = await fetchQuizData({ forceRefresh, portal: "host" });
