@@ -1,5 +1,7 @@
 // Pure logic for lottery draws across Round 1, Round 2, and Round 3 (DOM-free).
 
+export const DRAW_DURATION_MS = 4000;
+
 /**
  * Determines whether a set identifier corresponds to the rehearsal ("Chạy thử") set.
  * @param {any} setIdentifier

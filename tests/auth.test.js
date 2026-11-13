@@ -44,6 +44,11 @@ test("Role to portal URL mapping", () => {
   assert.equal(getPortalUrl("team"), "./team.html");
   assert.equal(getPortalUrl("TEAM"), "./team.html");
   assert.equal(getPortalUrl(PORTALS.TEAM), "./team.html");
+  assert.equal(getPortalUrl("stage_timer"), "./stage-timer.html");
+  assert.equal(getPortalUrl("stage-timer"), "./stage-timer.html");
+  assert.equal(getPortalUrl(PORTALS.STAGE_TIMER), "./stage-timer.html");
+  assert.equal(getPortalUrl("draw"), "./draw.html");
+  assert.equal(getPortalUrl(PORTALS.DRAW), "./draw.html");
   assert.equal(getPortalUrl("unknown"), "./index.html");
 });
 
@@ -352,6 +357,18 @@ test("Portal access check per role: host, judge, head_judge, team; unknown role 
   assert.equal(isRoleAllowedForPortal("judge", "team"), false);
   assert.equal(isRoleAllowedForPortal("head_judge", "team"), false);
 
+  // Stage Timer portal: host and head_judge allowed; judge and team rejected
+  assert.equal(isRoleAllowedForPortal("host", "stage_timer"), true);
+  assert.equal(isRoleAllowedForPortal("head_judge", "stage_timer"), true);
+  assert.equal(isRoleAllowedForPortal("judge", "stage_timer"), false);
+  assert.equal(isRoleAllowedForPortal("team", "stage_timer"), false);
+
+  // Draw portal: host and team allowed; judge and head_judge rejected
+  assert.equal(isRoleAllowedForPortal("host", "draw"), true);
+  assert.equal(isRoleAllowedForPortal("team", "draw"), true);
+  assert.equal(isRoleAllowedForPortal("judge", "draw"), false);
+  assert.equal(isRoleAllowedForPortal("head_judge", "draw"), false);
+
   // Unknown role or unknown portal rejected
   assert.equal(isRoleAllowedForPortal("unknown", "host"), false);
   assert.equal(isRoleAllowedForPortal("guest", "judge"), false);
@@ -363,6 +380,13 @@ test("Portal access check per role: host, judge, head_judge, team; unknown role 
   assert.equal(checkPortalAccess("judge", "judge").ok, true);
   assert.equal(checkPortalAccess("head_judge", "judge").ok, true);
   assert.equal(checkPortalAccess("team", "team").ok, true);
+  assert.equal(checkPortalAccess("host", "stage_timer").ok, true);
+  assert.equal(checkPortalAccess("head_judge", "stage_timer").ok, true);
+  assert.equal(checkPortalAccess("judge", "stage_timer").ok, false);
+  assert.equal(checkPortalAccess("team", "stage_timer").ok, false);
+  assert.equal(checkPortalAccess("host", "draw").ok, true);
+  assert.equal(checkPortalAccess("team", "draw").ok, true);
+  assert.equal(checkPortalAccess("judge", "draw").ok, false);
   assert.equal(checkPortalAccess("guest", "host").ok, false);
   assert.equal(checkPortalAccess("team", "host").ok, false);
 });

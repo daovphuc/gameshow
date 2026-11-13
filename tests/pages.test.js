@@ -101,3 +101,41 @@ test("new pages exist and all pages use relative paths and load Firebase SDK onl
     }
   }
 });
+
+test("brief acceptance requirements: 5 portals, sidebar links removed, ceremony headers, overview buttons removed, draw-only pages", () => {
+  // 1. index.html offers the 5 portals
+  const indexHtml = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  for (const portal of ["host", "judge", "team", "stage_timer", "draw"]) {
+    assert.ok(
+      indexHtml.includes(`data-portal="${portal}"`),
+      `index.html must offer portal ${portal}`
+    );
+  }
+
+  // 2. sidebar no longer links stage-timer.html / draw.html
+  const appJs = fs.readFileSync(path.join(root, "js", "app.js"), "utf8");
+  assert.ok(!appJs.includes("stage-timer.html"), "sidebar must not link stage-timer.html");
+  assert.ok(!appJs.includes("draw.html"), "sidebar must not link draw.html");
+
+  // 3. intro.html contains 'BỘ CÔNG AN' and 'CỤC CẢNH SÁT PCCC VÀ CNCH'
+  const introHtml = fs.readFileSync(path.join(root, "intro.html"), "utf8");
+  assert.ok(introHtml.includes("BỘ CÔNG AN"), "intro.html must contain 'BỘ CÔNG AN'");
+  assert.ok(
+    introHtml.includes("CỤC CẢNH SÁT PCCC VÀ CNCH") || introHtml.includes("CỤC CẢNH SÁT PCCC &amp; CNCH"),
+    "intro.html must contain 'CỤC CẢNH SÁT PCCC VÀ CNCH'"
+  );
+
+  // 4. host.html no longer contains 'Vào Bảng Điều Khiển' / 'Toàn màn hình'
+  const hostHtml = fs.readFileSync(path.join(root, "host.html"), "utf8");
+  assert.ok(!hostHtml.includes("Vào Bảng Điều Khiển"), "host.html must not contain 'Vào Bảng Điều Khiển'");
+  assert.ok(!hostHtml.includes("Toàn màn hình"), "host.html must not contain 'Toàn màn hình'");
+
+  // 5. round pages contain no 'Chọn thủ công'
+  for (const roundPage of ["round1.html", "round2.html", "round3.html"]) {
+    const src = fs.readFileSync(path.join(root, roundPage), "utf8");
+    assert.ok(
+      !src.includes("Chọn thủ công") && !src.includes("chọn thủ công"),
+      `${roundPage} must not contain 'Chọn thủ công'`
+    );
+  }
+});

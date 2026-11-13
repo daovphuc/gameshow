@@ -8,7 +8,9 @@ export const PORTALS = {
   HOST: "host",
   JUDGE: "judge",
   TEAM: "team",
-  HEAD_JUDGE: "head_judge"
+  HEAD_JUDGE: "head_judge",
+  STAGE_TIMER: "stage_timer",
+  DRAW: "draw"
 };
 
 export const VALID_ROLES = new Set(["host", "judge", "team", "head_judge"]);
@@ -18,6 +20,8 @@ export const PORTAL_URLS = {
   judge: "./judge.html",
   team: "./team.html",
   head_judge: "./judge.html",
+  stage_timer: "./stage-timer.html",
+  "stage-timer": "./stage-timer.html",
   draw: "./draw.html"
 };
 
@@ -85,6 +89,9 @@ export function isRoleAllowedForPortal(role, portal) {
   }
   if (cleanPortal === "draw") {
     return cleanRole === "host" || cleanRole === "team";
+  }
+  if (cleanPortal === "stage_timer" || cleanPortal === "stage-timer") {
+    return cleanRole === "host" || cleanRole === "head_judge";
   }
   return false;
 }
@@ -508,6 +515,14 @@ export function validateSession(session, accounts = [], requiredRole = null) {
     const req = String(requiredRole).toLowerCase().trim();
     if (req === "judge") {
       if (match.role !== "judge" && match.role !== "head_judge") {
+        return null;
+      }
+    } else if (req === "stage_timer" || req === "stage-timer") {
+      if (match.role !== "host" && match.role !== "head_judge") {
+        return null;
+      }
+    } else if (req === "draw") {
+      if (match.role !== "host" && match.role !== "team") {
         return null;
       }
     } else if (match.role !== req) {

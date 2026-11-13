@@ -574,27 +574,29 @@ export function wireStageLayout({
 
     sidebar.innerHTML = `
       <div class="sidebar-top">
-        <div class="sidebar-brand-row">
-          <div id="sidebar-show-title" class="sidebar-show-title" title="${showTitle}">
-            ${showTitle}
-            ${showSubtitle ? `<div class="sidebar-show-subtitle" style="font-size: 0.76rem; font-weight: normal; color: var(--accent); margin-top: 0.25rem; line-height: 1.3; font-family: var(--font-sans);" title="${showSubtitle}">${showSubtitle}</div>` : ""}
+        <div class="sidebar-header-card">
+          <div class="sidebar-brand-row">
+            <div id="sidebar-show-title" class="sidebar-show-title" title="${showTitle}">
+              <div class="sidebar-title-main">${showTitle}</div>
+              ${showSubtitle ? `<div class="sidebar-show-subtitle" title="${showSubtitle}">${showSubtitle}</div>` : ""}
+            </div>
+            <button
+              type="button"
+              id="btn-sidebar-toggle"
+              class="sidebar-toggle-btn"
+              title="Thu gọn / Mở rộng thanh bên"
+              aria-label="Thu gọn hoặc mở rộng thanh bên"
+            >
+              ${collapsed ? "»" : "«"}
+            </button>
           </div>
-          <button
-            type="button"
-            id="btn-sidebar-toggle"
-            class="sidebar-toggle-btn"
-            title="Thu gọn / Mở rộng thanh bên"
-            aria-label="Thu gọn hoặc mở rộng thanh bên"
-          >
-            ${collapsed ? "»" : "«"}
-          </button>
-        </div>
 
-        <!-- Connection Status -->
-        <div class="sidebar-conn-wrap">
-          <div id="sidebar-conn-badge" class="conn-status-badge local" title="Chế độ thử trên 1 máy">
-            <span class="conn-status-dot"></span>
-            <span id="sidebar-conn-label">Đang kết nối...</span>
+          <!-- Connection Status -->
+          <div class="sidebar-conn-wrap">
+            <div id="sidebar-conn-badge" class="conn-status-badge local" title="Chế độ thử trên 1 máy">
+              <span class="conn-status-dot"></span>
+              <span id="sidebar-conn-label">Đang kết nối...</span>
+            </div>
           </div>
         </div>
 
@@ -614,30 +616,6 @@ export function wireStageLayout({
             )
             .join("")}
         </nav>
-
-        <div class="sidebar-settings-section">
-          <div class="sidebar-section-title" style="padding: 0.5rem 0.85rem 0.25rem; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">
-            Màn hình bổ trợ
-          </div>
-          <a
-            href="./stage-timer.html"
-            target="_blank"
-            class="sidebar-link ${activePage === "stage-timer" ? "active" : ""}"
-            title="Đồng hồ sân khấu (mở tab mới)"
-          >
-            <span class="sidebar-link-icon">⏱</span>
-            <span class="sidebar-link-label">Đồng hồ sân khấu</span>
-          </a>
-          <a
-            href="./draw.html"
-            target="_blank"
-            class="sidebar-link ${activePage === "draw" ? "active" : ""}"
-            title="Nút quay số (mở tab mới)"
-          >
-            <span class="sidebar-link-icon">🎲</span>
-            <span class="sidebar-link-label">Nút quay số từ xa</span>
-          </a>
-        </div>
 
         <div class="sidebar-settings-section">
           <div class="sidebar-section-title" style="padding: 0.5rem 0.85rem 0.25rem; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">

@@ -48,7 +48,6 @@
     let gameState = null;
     let pendingTeamId = sessionStorage.getItem(PENDING_TEAM_KEY) || null;
     let showingRules = true;
-    let showManualPackages = false;
 
     let currentTimer = null;
     let timerInterval = null;
@@ -163,7 +162,6 @@
 
     function setPendingTeam(teamId) {
       pendingTeamId = teamId;
-      showManualPackages = false;
       if (teamId) {
         sessionStorage.setItem(PENDING_TEAM_KEY, teamId);
       } else {
@@ -384,15 +382,6 @@
             result: drawnPkg.id
           });
           selectPackageForTeam(teamId, drawnPkg.id);
-        },
-        onManualOverride: () => {
-          showManualPackages = true;
-          set("live/draw", {
-            round: "round1",
-            status: "pending",
-            stageTeamId: teamId
-          });
-          renderStage();
         }
       });
     }
@@ -410,24 +399,6 @@
 
       const offeredLimit = Number(quizData.config.round1_packages_offered) || 3;
       const offered = getAvailableRound1Packages(gameState, quizData.round1Packages, teamId, offeredLimit);
-
-      const renderPkgCard = (pkg, idx) => {
-        const timeSec = pkg.time_seconds || pkg.questions?.[0]?.time_seconds || quizData.config.round1_time_seconds;
-        const topicLabel = getRound1TopicLabel(pkg, idx);
-        return `
-          <button type="button" class="package-card" data-package-id="${escapeHtml(pkg.id)}">
-            <div>
-              <span class="package-card-tag">
-                Lựa chọn ${idx + 1} • ${escapeHtml(team.name)}
-              </span>
-              <h2 class="package-card-title">${escapeHtml(topicLabel)}</h2>
-              <p class="package-card-meta">
-                Thời gian: <strong>${timeSec % 60 === 0 ? `${timeSec / 60} phút` : `${timeSec} giây`}</strong>
-              </p>
-            </div>
-          </button>
-        `;
-      };
 
       container.innerHTML = `
         <div class="screen-action-bar">
@@ -469,21 +440,7 @@
                 <div style="color: var(--text-muted); font-size: 0.95rem;">
                   Đội thi cũng có thể bấm nút Quay số từ xa trên iPad
                 </div>
-
-                <div style="margin-top: 1rem;">
-                  <button type="button" id="btn-toggle-manual" class="btn btn-sm btn-ghost" style="color: var(--text-muted); text-decoration: underline;">
-                    ${showManualPackages ? "▲ Ẩn danh sách chủ đề" : "▼ Chọn chủ đề thủ công"}
-                  </button>
-                </div>
               </div>
-
-              ${
-                showManualPackages
-                  ? `<div class="packages-grid" style="margin-top: 1.5rem;">
-                      ${offered.map((pkg, idx) => renderPkgCard(pkg, idx)).join("")}
-                    </div>`
-                  : ""
-              }
             `
         }
       `;
@@ -495,16 +452,6 @@
       });
       document.getElementById("btn-start-lottery")?.addEventListener("click", () => {
         runRound1Lottery(teamId);
-      });
-      document.getElementById("btn-toggle-manual")?.addEventListener("click", () => {
-        showManualPackages = !showManualPackages;
-        renderStage();
-      });
-
-      container.querySelectorAll(".package-card").forEach((card) => {
-        card.addEventListener("click", () => {
-          selectPackageForTeam(teamId, card.dataset.packageId);
-        });
       });
     }
 

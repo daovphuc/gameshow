@@ -56,13 +56,20 @@
     import { fetchQuizData, renderAvatarHtml, escapeHtml } from "./js/app.js";
     import { formatTimer, getRemainingSeconds } from "./js/timer.js";
     import { listen, getServerTime } from "./js/backend.js";
+    import { getActiveSession, isRoleAllowedForPortal } from "./js/auth.js";
 
     let quizData = null;
     let liveState = null;
     let tickInterval = null;
 
     async function initStageTimer() {
-      quizData = await fetchQuizData({ portal: "host" });
+      const session = getActiveSession(undefined, "host") || getActiveSession(undefined, "head_judge");
+      if (!session || !isRoleAllowedForPortal(session.role, "stage_timer")) {
+        window.location.href = "./index.html";
+        return;
+      }
+      const portal = session.role === "head_judge" ? "judge" : "host";
+      quizData = await fetchQuizData({ portal });
       const cfg = quizData.config || {};
 
       listen("live", (data) => {

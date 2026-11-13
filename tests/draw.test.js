@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  DRAW_DURATION_MS,
   drawLotteryItem,
   drawLottery,
   isRehearsalSet,
@@ -122,4 +123,12 @@ test("drawRound3Tile: draws from 15 tiles and excludes already opened tiles", ()
   // When all 15 are opened
   const allOpened = drawRound3Tile(tiles, { openedTiles: [...opened, 15], randomSource: () => 0 });
   assert.equal(allOpened, null);
+});
+
+test("draw duration constant is about 4000 ms", () => {
+  assert.equal(typeof DRAW_DURATION_MS, "number");
+  assert.ok(
+    DRAW_DURATION_MS >= 3500 && DRAW_DURATION_MS <= 4500,
+    `Expected DRAW_DURATION_MS to be about 4000 ms, got ${DRAW_DURATION_MS}`
+  );
 });

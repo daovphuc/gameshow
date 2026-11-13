@@ -67,7 +67,7 @@
   <script type="module">
     import { fetchQuizData, renderAvatarHtml, escapeHtml, logoutUser, showToast } from "./js/app.js";
     import { set, listen, serverTimestamp, onStatusChange } from "./js/backend.js";
-    import { getActiveSession } from "./js/auth.js";
+    import { getActiveSession, isRoleAllowedForPortal } from "./js/auth.js";
 
     let quizData = null;
     let liveState = null;
@@ -77,11 +77,16 @@
     async function initDrawPage() {
       // Logins are stored per role (and, on Firebase, per portal app), so reuse
       // the MC login when this device has one, otherwise the team login.
-      const portal = getActiveSession(undefined, "host") ? "host" : "team";
+      const stored = getActiveSession(undefined, "host") || getActiveSession(undefined, "team");
+      if (!stored || !isRoleAllowedForPortal(stored.role, "draw")) {
+        window.location.href = "./index.html";
+        return;
+      }
+      const portal = stored.role === "team" ? "team" : "host";
       quizData = await fetchQuizData({ portal });
       session = quizData.session;
 
-      if (!session) {
+      if (!session || !isRoleAllowedForPortal(session.role, "draw")) {
         window.location.href = "./index.html";
         return;
       }
