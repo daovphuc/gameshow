@@ -65,7 +65,10 @@ export function showLotteryDrawModal({
     const tumbleClass = `tumble-${(i % 6) + 1}`;
     const rawLabel = getLabel(it);
     const shortLabel = ballNumber(rawLabel) || `${i + 1}`;
-    return `<div class="drum-ball ${tumbleClass}" style="--ball-color: ${color};">${escapeHtml(shortLabel)}</div>`;
+    // Balls that share one of the 6 paths start at a different point of it,
+    // so every ball stays visible (15 balls in round 3).
+    const phaseDelay = -(Math.floor(i / 6) * 0.35).toFixed(2);
+    return `<div class="drum-ball ${tumbleClass}" style="--ball-color: ${color}; animation-delay: ${phaseDelay}s;">${escapeHtml(shortLabel)}</div>`;
   }).join("");
 
   const finalLabel = getLabel(drawnItem);

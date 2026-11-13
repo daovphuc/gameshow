@@ -3573,6 +3573,7 @@ body.sidebar-collapsed .sidebar-bottom .sidebar-link {
 }
 
 .lottery-drum-center-hub {
+  display: none;
   position: absolute;
   width: clamp(36px, min(5vh, 5vw), 54px);
   height: clamp(36px, min(5vh, 5vw), 54px);
@@ -3606,6 +3607,8 @@ body.sidebar-collapsed .sidebar-bottom .sidebar-link {
 
 .drum-ball {
   position: absolute;
+  left: 50%;
+  top: 50%;
   width: clamp(54px, min(8vh, 8vw), 88px);
   height: clamp(54px, min(8vh, 8vw), 88px);
   border-radius: 50%;
@@ -3629,48 +3632,48 @@ body.sidebar-collapsed .sidebar-bottom .sidebar-link {
 .drum-ball.tumble-6 { animation: tumbleF 1.15s infinite cubic-bezier(0.4, 0, 0.6, 1); }
 
 @keyframes tumbleA {
-  0% { transform: translate(15%, 25%) rotate(0deg); }
-  25% { transform: translate(65%, 15%) rotate(90deg); }
-  50% { transform: translate(75%, 65%) rotate(180deg); }
-  75% { transform: translate(25%, 75%) rotate(270deg); }
-  100% { transform: translate(15%, 25%) rotate(360deg); }
+  0% { left: 22%; top: 31%; transform: translate(-50%, -50%) rotate(0deg); }
+  25% { left: 69%; top: 22%; transform: translate(-50%, -50%) rotate(90deg); }
+  50% { left: 78%; top: 69%; transform: translate(-50%, -50%) rotate(180deg); }
+  75% { left: 31%; top: 78%; transform: translate(-50%, -50%) rotate(270deg); }
+  100% { left: 22%; top: 31%; transform: translate(-50%, -50%) rotate(360deg); }
 }
 
 @keyframes tumbleB {
-  0% { transform: translate(70%, 30%) rotate(0deg); }
-  25% { transform: translate(20%, 65%) rotate(-100deg); }
-  50% { transform: translate(30%, 15%) rotate(-200deg); }
-  75% { transform: translate(75%, 70%) rotate(-290deg); }
-  100% { transform: translate(70%, 30%) rotate(-360deg); }
+  0% { left: 73%; top: 36%; transform: translate(-50%, -50%) rotate(0deg); }
+  25% { left: 27%; top: 69%; transform: translate(-50%, -50%) rotate(-100deg); }
+  50% { left: 36%; top: 22%; transform: translate(-50%, -50%) rotate(-200deg); }
+  75% { left: 78%; top: 73%; transform: translate(-50%, -50%) rotate(-290deg); }
+  100% { left: 73%; top: 36%; transform: translate(-50%, -50%) rotate(-360deg); }
 }
 
 @keyframes tumbleC {
-  0% { transform: translate(45%, 70%) rotate(0deg); }
-  30% { transform: translate(15%, 35%) rotate(120deg); }
-  60% { transform: translate(70%, 20%) rotate(240deg); }
-  85% { transform: translate(55%, 65%) rotate(310deg); }
-  100% { transform: translate(45%, 70%) rotate(360deg); }
+  0% { left: 50%; top: 73%; transform: translate(-50%, -50%) rotate(0deg); }
+  30% { left: 22%; top: 41%; transform: translate(-50%, -50%) rotate(120deg); }
+  60% { left: 73%; top: 27%; transform: translate(-50%, -50%) rotate(240deg); }
+  85% { left: 59%; top: 69%; transform: translate(-50%, -50%) rotate(310deg); }
+  100% { left: 50%; top: 73%; transform: translate(-50%, -50%) rotate(360deg); }
 }
 
 @keyframes tumbleD {
-  0% { transform: translate(30%, 20%) rotate(0deg); }
-  35% { transform: translate(75%, 55%) rotate(-130deg); }
-  70% { transform: translate(20%, 75%) rotate(-260deg); }
-  100% { transform: translate(30%, 20%) rotate(-360deg); }
+  0% { left: 36%; top: 27%; transform: translate(-50%, -50%) rotate(0deg); }
+  35% { left: 78%; top: 59%; transform: translate(-50%, -50%) rotate(-130deg); }
+  70% { left: 27%; top: 78%; transform: translate(-50%, -50%) rotate(-260deg); }
+  100% { left: 36%; top: 27%; transform: translate(-50%, -50%) rotate(-360deg); }
 }
 
 @keyframes tumbleE {
-  0% { transform: translate(55%, 35%) rotate(0deg); }
-  30% { transform: translate(75%, 70%) rotate(110deg); }
-  70% { transform: translate(15%, 55%) rotate(250deg); }
-  100% { transform: translate(55%, 35%) rotate(360deg); }
+  0% { left: 59%; top: 41%; transform: translate(-50%, -50%) rotate(0deg); }
+  30% { left: 78%; top: 73%; transform: translate(-50%, -50%) rotate(110deg); }
+  70% { left: 22%; top: 59%; transform: translate(-50%, -50%) rotate(250deg); }
+  100% { left: 59%; top: 41%; transform: translate(-50%, -50%) rotate(360deg); }
 }
 
 @keyframes tumbleF {
-  0% { transform: translate(20%, 60%) rotate(0deg); }
-  33% { transform: translate(60%, 25%) rotate(-120deg); }
-  66% { transform: translate(70%, 60%) rotate(-240deg); }
-  100% { transform: translate(20%, 60%) rotate(-360deg); }
+  0% { left: 27%; top: 64%; transform: translate(-50%, -50%) rotate(0deg); }
+  33% { left: 64%; top: 31%; transform: translate(-50%, -50%) rotate(-120deg); }
+  66% { left: 73%; top: 64%; transform: translate(-50%, -50%) rotate(-240deg); }
+  100% { left: 27%; top: 64%; transform: translate(-50%, -50%) rotate(-360deg); }
 }
 
 .lottery-pedestal {
@@ -4358,4 +4361,136 @@ body.sidebar-collapsed .sidebar-bottom .sidebar-link {
 .scoreboard-table.drawer-scoreboard-table th {
   font-size: 0.75rem;
   letter-spacing: 0.02em;
+}
+
+/* Leaderboard page: podium + all teams on one screen, no scrolling. */
+.stage-main.leaderboard-fit {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.leaderboard-fit .section-header {
+  margin-bottom: 0;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.leaderboard-fit .section-subtitle {
+  display: none;
+}
+
+.leaderboard-fit .section-title {
+  font-size: clamp(1.3rem, 3.2vh, 2.2rem);
+  margin: 0;
+}
+
+.leaderboard-fit #podium-section {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.leaderboard-fit #leaderboard-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+}
+
+.leaderboard-columns {
+  display: grid;
+  grid-template-columns: repeat(var(--lb-cols, 3), minmax(0, 1fr));
+  gap: 0.6rem;
+  align-items: start;
+}
+
+.leaderboard-columns .scoreboard-table-wrap {
+  overflow: hidden;
+}
+
+.scoreboard-table.compact-scoreboard-table th,
+.scoreboard-table.compact-scoreboard-table td {
+  padding: 0.18rem 0.35rem;
+  font-size: clamp(0.72rem, 1.65vh, 1.05rem);
+  letter-spacing: 0;
+}
+
+.scoreboard-table.compact-scoreboard-table th {
+  font-size: clamp(0.62rem, 1.35vh, 0.85rem);
+}
+
+.scoreboard-table.compact-scoreboard-table .team-avatar {
+  width: clamp(20px, 3vh, 38px);
+  height: clamp(20px, 3vh, 38px);
+  border-width: 2px;
+}
+
+.scoreboard-table.compact-scoreboard-table .scoreboard-team-cell {
+  gap: 0.35rem;
+}
+
+.scoreboard-table.compact-scoreboard-table .scoreboard-team-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.scoreboard-table.compact-scoreboard-table .scoreboard-score,
+.scoreboard-table.compact-scoreboard-table .scoreboard-total-score {
+  font-size: inherit;
+}
+
+.scoreboard-table.compact-scoreboard-table .scoreboard-r2-cell {
+  flex-wrap: nowrap;
+  gap: 0.2rem;
+}
+
+.scoreboard-table.compact-scoreboard-table .scoreboard-r2-time {
+  font-size: 0.85em;
+}
+
+.scoreboard-table.compact-scoreboard-table .scoreboard-rank-badge {
+  min-width: 0;
+  height: auto;
+  padding: 0.05rem 0.3rem;
+  font-size: inherit;
+}
+
+.leaderboard-fit .section-header {
+  flex-wrap: nowrap;
+  gap: 0.75rem;
+}
+
+.leaderboard-fit .section-header .tab-btn,
+.leaderboard-fit .section-header .btn {
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+  font-size: 0.85rem;
+}
+
+/* Three side-by-side tables (many teams): drop the seconds to keep every column visible. */
+.leaderboard-columns[style*="--lb-cols: 3"] .scoreboard-r2-time {
+  display: none;
+}
+
+/* Fixed column widths so a narrow column table never overflows sideways. */
+.scoreboard-table.compact-scoreboard-table {
+  table-layout: fixed;
+}
+
+.scoreboard-table.compact-scoreboard-table th.col-rank { width: 13%; }
+.scoreboard-table.compact-scoreboard-table th.col-round { width: 13%; }
+.scoreboard-table.compact-scoreboard-table th.col-r2 { width: 16%; }
+.scoreboard-table.compact-scoreboard-table th.col-total { width: 13%; }
+
+.scoreboard-table.compact-scoreboard-table .scoreboard-team-cell {
+  min-width: 0;
+}
+
+.scoreboard-table.compact-scoreboard-table .scoreboard-team-name {
+  min-width: 0;
+  text-overflow: ellipsis;
 }
