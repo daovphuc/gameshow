@@ -17,6 +17,7 @@ import {
 } from "./leaderboard.js";
 import { LIGHT_THEME, mergeTheme, themeToCssVars } from "./theme.js";
 import { isTestMode } from "./draw.js";
+import { isSoundMuted, setSoundMuted } from "./sound.js";
 import {
   initBackend,
   listen,
@@ -610,6 +611,16 @@ export function wireStageLayout({
       <div class="sidebar-bottom">
         <button
           type="button"
+          id="btn-sidebar-sound"
+          class="sidebar-link"
+          title="Bật/tắt âm thanh đồng hồ và nhạc trao giải"
+        >
+          <span class="sidebar-link-icon" id="sidebar-sound-icon">${isSoundMuted() ? "🔇" : "🔊"}</span>
+          <span class="sidebar-link-label" id="sidebar-sound-label">${isSoundMuted() ? "Âm thanh: Tắt" : "Âm thanh: Bật"}</span>
+        </button>
+
+        <button
+          type="button"
           id="btn-sidebar-change-pwd"
           class="sidebar-link"
           title="Đổi mật khẩu"
@@ -638,6 +649,15 @@ export function wireStageLayout({
       connBadge.className = `conn-status-badge ${status.code || "local"}`;
       connBadge.title = status.label || "Chế độ thử trên 1 máy";
       connLabel.textContent = status.label || "Chế độ thử trên 1 máy";
+    });
+
+    document.getElementById("btn-sidebar-sound")?.addEventListener("click", () => {
+      const muted = !isSoundMuted();
+      setSoundMuted(muted);
+      const icon = document.getElementById("sidebar-sound-icon");
+      const label = document.getElementById("sidebar-sound-label");
+      if (icon) icon.textContent = muted ? "🔇" : "🔊";
+      if (label) label.textContent = muted ? "Âm thanh: Tắt" : "Âm thanh: Bật";
     });
 
     document.getElementById("btn-sidebar-change-pwd")?.addEventListener("click", () => {

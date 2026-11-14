@@ -30,6 +30,9 @@
             <button type="button" class="tab-btn" data-tab="round2">Vòng 2</button>
             <button type="button" class="tab-btn" data-tab="round3">Vòng 3</button>
           </div>
+          <button type="button" id="btn-award-music" class="btn btn-outline" title="Phát/dừng nhạc nền trao giải" aria-pressed="false">
+            🎵 Nhạc trao giải
+          </button>
           <button type="button" id="btn-export-report-csv" class="btn btn-outline" title="Xuất báo cáo tổng kết dạng bảng CSV/Excel">
             ⬇ Tải báo cáo (CSV)
           </button>
@@ -61,6 +64,7 @@
     import { computeTeamScores } from "./js/state.js";
     import { listen, get } from "./js/backend.js";
     import { buildReportCsv } from "./js/report.js";
+    import { startAwardMusic, stopAwardMusic, isAwardMusicPlaying } from "./js/sound.js";
 
     const params = new URLSearchParams(window.location.search);
     let currentMode = params.get("tab") || "total";
@@ -536,6 +540,20 @@
         onReload: () => initLeaderboard(true)
       });
     }
+
+    document.getElementById("btn-award-music")?.addEventListener("click", (e) => {
+      const btn = e.currentTarget;
+      if (isAwardMusicPlaying()) {
+        stopAwardMusic();
+      } else {
+        startAwardMusic();
+      }
+      const playing = isAwardMusicPlaying();
+      btn.setAttribute("aria-pressed", String(playing));
+      btn.classList.toggle("btn-primary", playing);
+      btn.classList.toggle("btn-outline", !playing);
+      btn.textContent = playing ? "⏸ Dừng nhạc" : "🎵 Nhạc trao giải";
+    });
 
     document.getElementById("btn-export-report-csv")?.addEventListener("click", async () => {
       try {

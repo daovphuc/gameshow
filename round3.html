@@ -40,6 +40,7 @@
     import { createTimer, startTimer, tickTimer, formatTimer } from "./js/timer.js";
     import { set, update, listen, getServerTime } from "./js/backend.js";
     import { showLotteryDrawModal } from "./js/draw-ui.js";
+    import { createCountdownSound } from "./js/sound.js";
 
     const SELECTED_TEAM_KEY = "gameshow_r3_selected_team";
 
@@ -50,6 +51,8 @@
 
     let currentTimer = null;
     let timerInterval = null;
+    // Final 5-second countdown and buzzer on the projector speakers.
+    const countdownSound = createCountdownSound();
     let activeTimerKey = null;
 
     function stopTimerLoop() {
@@ -90,9 +93,11 @@
         }
       });
 
+      countdownSound.reset();
       timerInterval = setInterval(() => {
         currentTimer = tickTimer(currentTimer, getServerTime(), warnSec);
         updateTimerDom();
+        countdownSound.update(currentTimer.remainingSeconds, true);
         if (currentTimer.finished) {
           stopTimerLoop();
           update("live/round3/timer", { status: "finished" });
@@ -344,15 +349,7 @@
               </p>
             </div>
             <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-              <button type="button" id="btn-draw-back" class="btn btn-outline" style="font-weight: 600; font-size: 0.95rem;">
-                ← Quay lại Vòng 2
-              </button>
-              <button type="button" id="btn-open-rules" class="btn btn-outline" style="font-weight: 600; font-size: 0.95rem;">
-                📜 Thể lệ phần thi
-              </button>
-              <button type="button" id="btn-draw-continue" class="btn btn-outline" style="font-weight: 600; font-size: 0.95rem;">
-                Sang Bảng điểm →
-              </button>
+              <button type="button" id="btn-open-rules" class="btn btn-icon" title="Thể lệ" aria-label="Thể lệ">📜</button>
             </div>
           </div>
         </div>
@@ -403,8 +400,6 @@
         </div>
       `;
 
-      document.getElementById("btn-draw-back")?.addEventListener("click", handleBack);
-      document.getElementById("btn-draw-continue")?.addEventListener("click", handleContinue);
 
       document.getElementById("btn-open-rules")?.addEventListener("click", () => {
         showingRules = true;
@@ -449,9 +444,7 @@
         <div class="question-stage">
           <div class="screen-action-bar">
             <div class="screen-left-group">
-              <button type="button" id="btn-screen-back" class="btn">
-                ← Quay lại
-              </button>
+              <button type="button" id="btn-screen-back" class="btn btn-icon" title="Quay lại" aria-label="Quay lại">←</button>
               <div class="question-team-banner">
                 ${renderAvatarHtml(currentTeam, "team-avatar-sm")}
                 <div>
@@ -473,9 +466,7 @@
                 </select>
               </div>
 
-              <button type="button" id="btn-open-rules" class="btn btn-outline btn-sm">
-                📜 Thể lệ
-              </button>
+              <button type="button" id="btn-open-rules" class="btn btn-icon" title="Thể lệ" aria-label="Thể lệ">📜</button>
 
               <div id="r3-timer-box" class="top-timer-box">
                 <span id="r3-timer-digits" class="top-timer-digits">${formatTimer(currentTimer.remainingSeconds)}</span>

@@ -180,3 +180,29 @@ test("round 2 clears the previous question's results when it opens the next ques
   const team = fs.readFileSync(path.join(root, "team.html"), "utf8");
   assert.ok(team.includes('isRevealedNow ? r2.results'), "team tablets read results only once revealed");
 });
+
+test("MC pages: icon-only back/rules buttons, no remote-draw hints, round 3 has no round links", () => {
+  const r1 = fs.readFileSync(path.join(root, "round1.html"), "utf8");
+  assert.ok(!r1.includes("Hệ thống bốc thăm ngẫu nhiên"));
+  assert.ok(!r1.includes("Đội thi cũng có thể bấm nút Quay số"));
+  const r3 = fs.readFileSync(path.join(root, "round3.html"), "utf8");
+  assert.ok(!r3.includes("btn-draw-back") && !r3.includes("btn-draw-continue"));
+  for (const page of ["round1.html", "round2.html", "round3.html"]) {
+    const html = fs.readFileSync(path.join(root, page), "utf8");
+    assert.ok(!/📜 Thể lệ/.test(html), `${page}: rules button is icon-only`);
+    assert.ok(!/← Quay lại/.test(html.replace(/Quay lại phần thi/g, "")), `${page}: back button is icon-only`);
+    assert.ok(html.includes("createCountdownSound"), `${page}: timer plays the countdown sound`);
+  }
+});
+
+test("round 2 bar has no category pill and the stats popup has two tabs", () => {
+  const html = fs.readFileSync(path.join(root, "round2.html"), "utf8");
+  assert.ok(!html.includes("Chuyên đề:"));
+  assert.ok(html.includes('data-tab="results"') && html.includes('data-tab="table"'));
+  assert.ok(!html.includes("← Bộ đề"));
+});
+
+test("stage timer and draw screen stay minimal; leaderboard has award music", () => {
+  const lb = fs.readFileSync(path.join(root, "leaderboard.html"), "utf8");
+  assert.ok(lb.includes("startAwardMusic"));
+});

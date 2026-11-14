@@ -40,6 +40,7 @@
     } from "./js/state.js";
     import { createTimer, startTimer, tickTimer, formatTimer } from "./js/timer.js";
     import { showLotteryDrawModal } from "./js/draw-ui.js";
+    import { createCountdownSound } from "./js/sound.js";
     import { set, update, listen, getServerTime } from "./js/backend.js";
 
     const PENDING_TEAM_KEY = "gameshow_r1_pending_team";
@@ -51,6 +52,8 @@
 
     let currentTimer = null;
     let timerInterval = null;
+    // Final 5-second countdown and buzzer on the projector speakers.
+    const countdownSound = createCountdownSound();
     let activeTimerKey = null;
     let drawRequestUnsub = null;
     let lastHandledDrawRequest = 0;
@@ -93,9 +96,11 @@
         }
       });
 
+      countdownSound.reset();
       timerInterval = setInterval(() => {
         currentTimer = tickTimer(currentTimer, getServerTime(), warnSec);
         updateTimerDom();
+        countdownSound.update(currentTimer.remainingSeconds, true);
         if (currentTimer.finished) {
           stopTimerLoop();
           update("live/round1/timer", { status: "finished" });
@@ -333,9 +338,7 @@
                 Danh sách ${roundTeams.length} đội tham gia Vòng 1 theo thứ tự bốc thăm. Bấm vào đội để bắt đầu chọn chủ đề.
               </p>
             </div>
-            <button type="button" id="btn-open-rules" class="btn btn-outline" style="font-weight: 600; font-size: 0.95rem;">
-              📜 Thể lệ phần thi
-            </button>
+            <button type="button" id="btn-open-rules" class="btn btn-icon" title="Thể lệ" aria-label="Thể lệ">📜</button>
           </div>
         </div>
         <div class="teams-grid">
@@ -406,26 +409,19 @@
       container.innerHTML = `
         <div class="screen-action-bar">
           <div class="screen-left-group">
-            <button type="button" id="btn-screen-back" class="btn">
-              ← Quay lại danh sách đội
-            </button>
+            <button type="button" id="btn-screen-back" class="btn btn-icon" title="Quay lại" aria-label="Quay lại">←</button>
             <div class="question-team-banner">
               ${renderAvatarHtml(team, "team-avatar-sm")}
               <strong style="font-family: var(--font-serif); font-size: 1.35rem;">${escapeHtml(team.name)}</strong>
             </div>
           </div>
           <div class="screen-right-group">
-            <button type="button" id="btn-open-rules" class="btn btn-outline btn-sm">
-              📜 Thể lệ
-            </button>
+            <button type="button" id="btn-open-rules" class="btn btn-icon" title="Thể lệ" aria-label="Thể lệ">📜</button>
           </div>
         </div>
 
         <div class="section-header" style="text-align: center; margin-bottom: 2rem;">
           <h1 class="section-title">Bốc thăm chủ đề tuyên truyền</h1>
-          <p class="section-subtitle">
-            Hệ thống bốc thăm ngẫu nhiên 1 trong ${offered.length} chủ đề khả dụng cho ${escapeHtml(team.name)}
-          </p>
         </div>
 
         ${
@@ -440,9 +436,6 @@
                   <span>🎲</span>
                   <span>QUAY SỐ CHỌN CHỦ ĐỀ</span>
                 </button>
-                <div style="color: var(--text-muted); font-size: 0.95rem;">
-                  Đội thi cũng có thể bấm nút Quay số từ xa trên iPad
-                </div>
               </div>
             `
         }
@@ -487,9 +480,7 @@
         <div class="question-stage">
           <div class="screen-action-bar">
             <div class="screen-left-group">
-              <button type="button" id="btn-screen-back" class="btn">
-                ← Quay lại
-              </button>
+              <button type="button" id="btn-screen-back" class="btn btn-icon" title="Quay lại" aria-label="Quay lại">←</button>
               <div class="question-team-banner">
                 ${renderAvatarHtml(team, "team-avatar-sm")}
                 <div>
@@ -504,9 +495,7 @@
             </div>
 
             <div class="screen-right-group" style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-              <button type="button" id="btn-open-rules" class="btn btn-outline btn-sm">
-                📜 Thể lệ
-              </button>
+              <button type="button" id="btn-open-rules" class="btn btn-icon" title="Thể lệ" aria-label="Thể lệ">📜</button>
               <div id="r1-timer-box" class="top-timer-box">
                 <span id="r1-timer-digits" class="top-timer-digits">${formatTimer(currentTimer.remainingSeconds)}</span>
                 <span id="r1-timer-warning" class="top-timer-warning-text"></span>
