@@ -13,3 +13,5 @@ import "./scores-filter.test.js";
 import "./clusters.test.js";
 import "./pages.test.js";
 import "./backend.test.js";
+import "./draw.test.js";
+import "./rules.test.js";

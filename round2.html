@@ -61,7 +61,7 @@
     import { computeTeamScores } from "./js/state.js";
     import { get, set, update, listen, getServerTime } from "./js/backend.js";
     import { showLotteryDrawModal } from "./js/draw-ui.js";
-    import { isRehearsalSet } from "./js/draw.js";
+    import { isTestMode, getRound2DrawPool, getRound2SetLabel } from "./js/draw.js";
 
     let quizData = null;
     let setsGrouped = {};
@@ -532,15 +532,17 @@
     }
 
     function runRound2Lottery() {
-      const drawable = availableSets.filter((s) => !isRehearsalSet(s));
-      const pool = drawable.length > 0 ? drawable : availableSets;
-      if (pool.length === 0) return;
+      // Test mode draws from the rehearsal sets, live mode from the official ones.
+      const pool = getRound2DrawPool(availableSets, quizData.config);
+      if (pool.length === 0) {
+        showToast("Chế độ thử: chưa có bộ đề thử (set \"Chạy thử\") trong câu hỏi Vòng 2.", 6000);
+        return;
+      }
 
       showLotteryDrawModal({
         items: pool,
         title: "BỐC THĂM BỘ ĐỀ VÒNG 2",
-        excludeRehearsal: true,
-        getLabel: (setKey) => `Bộ đề số ${setKey}`,
+        getLabel: (setKey) => getRound2SetLabel(setKey),
         onRolling: (drawnSet) => {
           set("live/draw", {
             round: "round2",
@@ -573,8 +575,8 @@
         }
       });
 
-      const rehearsalSet = availableSets.find((s) => isRehearsalSet(s));
-      const officialSets = availableSets.filter((s) => !isRehearsalSet(s));
+      const testMode = isTestMode(quizData.config);
+      const drawPool = getRound2DrawPool(availableSets, quizData.config);
 
       container.innerHTML = `
         <div class="section-header">
@@ -600,7 +602,13 @@
             Bốc Thăm Chọn Bộ Đề Thi Đấu
           </h2>
           <p style="color: var(--text-muted); font-size: 1.05rem; margin: 0 auto 2rem; max-width: 580px;">
-            Bấm nút bên dưới (hoặc bấm nút Quay số từ xa trên iPad) để bốc thăm ngẫu nhiên 1 trong ${officialSets.length} bộ đề chính thức.
+            ${
+              testMode
+                ? drawPool.length > 0
+                  ? `<strong style="color: var(--warning);">Chế độ thử (DEMO):</strong> quay số trong ${drawPool.length} bộ đề thử, các bộ đề chính thức không được dùng.`
+                  : `<strong style="color: var(--danger);">Chế độ thử (DEMO):</strong> chưa có bộ đề thử (set "Chạy thử") trong câu hỏi Vòng 2.`
+                : `Bấm nút bên dưới (hoặc bấm nút Quay số từ xa trên iPad) để bốc thăm ngẫu nhiên 1 trong ${drawPool.length} bộ đề chính thức.`
+            }
           </p>
 
           <div style="display: flex; justify-content: center; align-items: center;">
@@ -610,20 +618,6 @@
             </button>
           </div>
 
-          ${
-            rehearsalSet
-              ? `
-                <div style="margin-top: 2.5rem; padding-top: 1.75rem; border-top: 1px dashed var(--border); display: flex; flex-direction: column; align-items: center; gap: 0.6rem;">
-                  <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;">
-                    Lượt thi tập dượt
-                  </span>
-                  <button type="button" id="btn-rehearsal-set" class="btn btn-outline" style="font-weight: 700; font-size: 1.05rem; padding: 0.65rem 1.75rem; border-color: var(--warning); color: var(--warning);">
-                    🛠 Chạy thử (Tập dượt)
-                  </button>
-                </div>
-              `
-              : ""
-          }
         </div>
       `;
 
@@ -635,12 +629,6 @@
       document.getElementById("btn-lottery-set")?.addEventListener("click", () => {
         runRound2Lottery();
       });
-
-      if (rehearsalSet) {
-        document.getElementById("btn-rehearsal-set")?.addEventListener("click", () => {
-          startSet(rehearsalSet);
-        });
-      }
     }
 
     function renderSummaryStage(container) {
@@ -808,7 +796,7 @@
               <button type="button" id="btn-screen-back" class="btn">
                 ← Bộ đề
               </button>
-              <span class="meta-pill accent">Bộ #${escapeHtml(selectedSet)} • Câu ${currentQuestionIdx + 1}/${totalQuestions}</span>
+              <span class="meta-pill accent">${escapeHtml(getRound2SetLabel(selectedSet))} • Câu ${currentQuestionIdx + 1}/${totalQuestions}</span>
               ${q.category ? `<span class="meta-pill" style="background: var(--surface-2, rgba(255,255,255,0.05)); border: 1px solid var(--border); font-size: 0.85rem; font-weight: 700;">Chuyên đề: ${escapeHtml(q.category)}</span>` : ""}
               <div class="r2-live-counter">
                 <span>⚡</span>
@@ -871,7 +859,7 @@
                     Câu ${currentQuestionIdx + 1}/${totalQuestions}
                   </span>
                   <h2 style="font-family: var(--font-serif); font-size: 2.2rem; margin: 1.25rem 0 0.75rem;">
-                    ${currentQuestionIdx === 0 ? `Bộ đề số ${escapeHtml(String(selectedSet))}` : `Sẵn Sàng Cho Câu Hỏi Số ${currentQuestionIdx + 1}`}
+                    ${currentQuestionIdx === 0 ? escapeHtml(getRound2SetLabel(selectedSet)) : `Sẵn Sàng Cho Câu Hỏi Số ${currentQuestionIdx + 1}`}
                   </h2>
                   <p style="color: var(--text-muted); font-size: 1.15rem; max-width: 520px; margin: 0 auto;">
                     Bấm <strong>"▶ Bắt đầu"</strong> để hiện câu hỏi cho MC đọc.

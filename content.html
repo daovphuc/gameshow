@@ -407,8 +407,10 @@
       renderAvatarHtml,
       escapeHtml,
       showToast,
+      applyRunModeBadge,
       wireStageLayout
     } from "./js/app.js";
+    import { isTestMode } from "./js/draw.js";
     import { TEAM_PALETTE, PRESET_TEAM_NAMES } from "./js/config.js";
     import { applyCluster } from "./js/clusters.js";
     import {
@@ -2057,7 +2059,25 @@
       if (!container) return;
       const cfg = content.config || {};
 
+      const testMode = isTestMode(cfg);
       container.innerHTML = `
+        <div class="editor-card">
+          <div class="editor-card-header">
+            <h3 class="editor-card-title">Chế độ hội thi</h3>
+          </div>
+          <div style="display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;">
+            <div class="run-mode-switch" role="radiogroup" aria-label="Chế độ hội thi">
+              <button type="button" role="radio" data-mode="live" class="${testMode ? "" : "active"}" aria-checked="${!testMode}">✓ Thi thật</button>
+              <button type="button" role="radio" data-mode="test" class="${testMode ? "active" : ""}" aria-checked="${testMode}">🛠 Thi thử (DEMO)</button>
+            </div>
+            <span id="run-mode-hint" style="font-size: 0.88rem; color: var(--text-muted); max-width: 640px;">
+              ${testMode
+                ? "Chạy đầy đủ như thi thật, nhưng Vòng 2 chỉ quay trong bộ đề thử (set \"Chạy thử\") và mọi màn hình ghi DEMO. Nhớ chuyển về Thi thật và Đặt lại trận đấu trước khi thi."
+                : "Thi chính thức: Vòng 2 quay trong các bộ đề chính thức. Bấm Lưu, rồi tải lại (Ctrl+F5) các máy để áp dụng."}
+            </span>
+          </div>
+        </div>
+
         <div class="editor-card">
           <div class="editor-card-header">
             <h3 class="editor-card-title">Tiêu đề hội thi</h3>
@@ -2221,6 +2241,17 @@
           </div>
         </div>
       `;
+
+      container.querySelectorAll(".run-mode-switch button").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const mode = btn.dataset.mode === "test" ? "test" : "live";
+          if (mode === (isTestMode(content.config) ? "test" : "live")) return;
+          content.config = { ...(content.config || {}), run_mode: mode };
+          markUnsaved();
+          applyRunModeBadge(content.config);
+          renderConfig();
+        });
+      });
 
       container.querySelectorAll("[data-cfg-field]").forEach((input) => {
         input.addEventListener("input", (e) => {

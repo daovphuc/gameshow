@@ -70,7 +70,7 @@
     import { getActiveSession, isRoleAllowedForPortal } from "./js/auth.js";
     import { showLotteryDrawModal } from "./js/draw-ui.js";
     import { getRound1TopicLabel } from "./js/data.js";
-    import { isRehearsalSet } from "./js/draw.js";
+    import { getRound2DrawPool, getRound2SetLabel } from "./js/draw.js";
 
     let quizData = null;
     let liveState = null;
@@ -115,11 +115,11 @@
         getLabel = (pkg) => getRound1TopicLabel(pkg);
       } else if (round === "round2") {
         const questions = quizData?.round2Questions || [];
-        const sets = pool || [...new Set(questions.map((q) => q.set))].filter((s) => !isRehearsalSet(s));
+        const sets = pool || getRound2DrawPool([...new Set(questions.map((q) => String(q.set)))], quizData?.config);
         items = sets.length > 0 ? sets : [draw.result];
         fixedItem = draw.result;
         title = "BỐC THĂM BỘ ĐỀ VÒNG 2";
-        getLabel = (setKey) => (typeof setKey === "object" ? (setKey.label || setKey.id || "Bộ đề") : `Bộ đề số ${setKey}`);
+        getLabel = (setKey) => (typeof setKey === "object" ? (setKey.label || setKey.id || "Bộ đề") : getRound2SetLabel(setKey));
       } else if (round === "round3") {
         items = (quizData?.round3Questions || []).filter((q) => inPool(q.number));
         fixedItem = items.find((q) => q.number === Number(draw.result)) || { number: draw.result, points: 30 };
