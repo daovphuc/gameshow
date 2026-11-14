@@ -4812,7 +4812,8 @@ html.is-demo-mode body {
 
 .r2-stats-tables {
   display: grid;
-  grid-template-columns: repeat(var(--r2-table-cols, 1), minmax(0, 1fr));
+  grid-template-columns: repeat(var(--r2-table-cols, 1), max-content);
+  justify-content: safe center;
   gap: 0.75rem;
   align-items: start;
 }
@@ -4863,4 +4864,142 @@ html.is-demo-mode body {
 .r2-bar .btn.r2-bar-main {
   padding: 0 1.1rem;
   font-size: 1.05rem;
+}
+
+/* Round 2 popup tables: round 2 ranking and the per-question answer grid. */
+.r2-rank-table,
+.r2-matrix-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 1.05rem;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.r2-rank-table th,
+.r2-matrix-table th {
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.55rem 0.5rem;
+  border-bottom: 2px solid var(--border);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.r2-rank-table td,
+.r2-matrix-table td {
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.r2-rank-table tr:last-child td,
+.r2-matrix-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.r2-rank-table .r2-col-team,
+.r2-matrix-table .r2-col-team {
+  text-align: left;
+}
+
+.r2-rank-team {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.r2-rank-num {
+  font-weight: 900;
+  font-size: 1.15rem;
+}
+
+.r2-rank-top.r2-rank-1 .r2-rank-num { color: #C99A06; }
+.r2-rank-top.r2-rank-2 .r2-rank-num { color: #7C8794; }
+.r2-rank-top.r2-rank-3 .r2-rank-num { color: #B26B2F; }
+
+.r2-rank-points {
+  font-weight: 900;
+  color: var(--accent);
+  font-size: 1.15rem;
+}
+
+.r2-matrix-table .r2-q-col.current {
+  background: rgba(217, 119, 87, 0.16);
+  color: var(--accent);
+}
+
+.r2-q-correct {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: #2E7D4F;
+  margin-top: 0.1rem;
+}
+
+.r2-matrix-table .r2-cell {
+  font-family: var(--font-mono);
+  font-weight: 900;
+  font-size: 1.1rem;
+  min-width: 2.4rem;
+}
+
+.r2-matrix-table .r2-cell.current:not(.correct):not(.wrong) {
+  background: rgba(217, 119, 87, 0.08);
+}
+
+.r2-matrix-table.compact {
+  font-size: 0.95rem;
+}
+
+.r2-matrix-table.compact .r2-cell {
+  min-width: 1.7rem;
+  font-size: 1rem;
+}
+
+.r2-cell.correct { background: rgba(46, 125, 79, 0.16); color: #2E7D4F; }
+.r2-cell.wrong { background: rgba(201, 74, 56, 0.14); color: #C94A38; }
+.r2-cell.none { color: var(--text-muted); }
+.r2-cell.answered { color: var(--accent); }
+
+.r2-matrix-table .r2-sum {
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.r2-matrix-table.compact td,
+.r2-matrix-table.compact th {
+  padding: 0.3rem 0.35rem;
+}
+
+.r2-stats-caption .r2-legend {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.8rem;
+  height: 1.6rem;
+  margin: 0 0.3rem 0 0.9rem;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-weight: 900;
+}
+
+.r2-stats-caption .r2-legend:first-child { margin-left: 0; }
+.r2-legend.correct { background: rgba(46, 125, 79, 0.16); color: #2E7D4F; }
+.r2-legend.wrong { background: rgba(201, 74, 56, 0.14); color: #C94A38; }
+.r2-legend.none { background: var(--surface-elevated); color: var(--text-muted); }
+.r2-legend.answered { background: var(--surface-elevated); color: var(--accent); }
+
+.r2-stats-tables > table {
+  width: auto;
+  min-width: 100%;
 }

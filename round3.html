@@ -240,9 +240,6 @@
             <h1 class="section-title" style="font-size: clamp(1.8rem, 3.5vw, 2.5rem); margin-bottom: 0.5rem;">
               ${escapeHtml(roundTitle)}
             </h1>
-            <p class="section-subtitle" style="font-size: 1.1rem; color: var(--text-muted); margin: 0 auto;">
-              MC đọc phổ biến thể lệ thi đấu trước khi bắt đầu phần thi
-            </p>
           </div>
 
           <div class="rules-card" style="background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius-lg, 16px); padding: clamp(1.5rem, 3vw, 2.5rem); box-shadow: var(--shadow-md, 0 4px 20px rgba(0,0,0,0.06)); margin-bottom: 2rem;">
@@ -344,9 +341,6 @@
             <div>
               ${quizData.config?.show_subtitle ? `<div class="stage-cluster-subtitle" style="font-size: 1rem; color: var(--accent); font-weight: 700; margin-bottom: 0.35rem;">${escapeHtml(quizData.config.show_subtitle)}</div>` : ""}
               <h1 class="section-title">${escapeHtml(quizData.config.round3_name)}</h1>
-              <p class="section-subtitle">
-                Chọn đội thi trên sân khấu và bấm nút Quay số để bốc thăm ngẫu nhiên ô tình huống.
-              </p>
             </div>
             <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
               <button type="button" id="btn-open-rules" class="btn btn-icon" title="Thể lệ" aria-label="Thể lệ">📜</button>

@@ -206,3 +206,12 @@ test("stage timer and draw screen stay minimal; leaderboard has award music", ()
   const lb = fs.readFileSync(path.join(root, "leaderboard.html"), "utf8");
   assert.ok(lb.includes("startAwardMusic"));
 });
+
+test("rules screens and the round 3 draw drop their helper lines", () => {
+  for (const page of ["round1.html", "round2.html", "round3.html"]) {
+    const html = fs.readFileSync(path.join(root, page), "utf8");
+    assert.ok(!html.includes("MC đọc phổ biến thể lệ"), page);
+  }
+  const r3 = fs.readFileSync(path.join(root, "round3.html"), "utf8");
+  assert.ok(!r3.includes("Chọn đội thi trên sân khấu và bấm nút Quay số"));
+});

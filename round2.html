@@ -58,13 +58,14 @@
       calculateRound2AnswerTime,
       openRound2QuestionPreview,
       shouldAutoLockRound2,
+      buildRound2StatsFromHistory,
+      buildRound2AnswerMatrix,
       canResumeRound2Question,
       resumeRound2Question,
       getAdjustedShownAt
     } from "./js/round2.js";
     import { formatTimer } from "./js/timer.js";
-    import { formatSeconds, shortenTeamName, buildScoreboardRows, renderScoreboardTableHtml } from "./js/leaderboard.js";
-    import { computeTeamScores } from "./js/state.js";
+    import { formatSeconds, shortenTeamName } from "./js/leaderboard.js";
     import { get, set, update, listen, getServerTime } from "./js/backend.js";
     import { showLotteryDrawModal } from "./js/draw-ui.js";
     import { createCountdownSound } from "./js/sound.js";
@@ -190,9 +191,6 @@
             <h1 class="section-title" style="font-size: clamp(1.8rem, 3.5vw, 2.5rem); margin-bottom: 0.5rem;">
               ${escapeHtml(roundTitle)}
             </h1>
-            <p class="section-subtitle" style="font-size: 1.1rem; color: var(--text-muted); margin: 0 auto;">
-              MC đọc phổ biến thể lệ thi đấu trước khi bắt đầu phần thi
-            </p>
           </div>
 
           <div class="rules-card" style="background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius-lg, 16px); padding: clamp(1.5rem, 3vw, 2.5rem); box-shadow: var(--shadow-md, 0 4px 20px rgba(0,0,0,0.06)); margin-bottom: 2rem;">
@@ -467,94 +465,68 @@
       await handleOpenQuestionPreview();
     }
 
-    function buildRound2RankingData() {
-      const participatingTeams = getRoundTeams(quizData.teams, quizData.round_order, "round2");
-      const teamStats = {};
-      for (const t of participatingTeams) {
-        teamStats[t.id] = { points: 0, correctCount: 0, totalCorrectTimeMs: 0 };
-      }
-
-      for (const h of liveR2.history) {
-        if (!h.results) continue;
-        for (const [tId, res] of Object.entries(h.results)) {
-          if (!teamStats[tId]) {
-            teamStats[tId] = { points: 0, correctCount: 0, totalCorrectTimeMs: 0 };
-          }
-          if (res.isCorrect) {
-            teamStats[tId].points += Number(res.points) || 0;
-            teamStats[tId].correctCount += 1;
-            teamStats[tId].totalCorrectTimeMs += Number(res.responseTimeMs) || 0;
-          }
-        }
-      }
-
-      return computeRound2Ranking(participatingTeams, teamStats);
+    /** Number of questions of the active set whose answers are revealed. */
+    function getRevealedCount() {
+      const total = getQuestionsInActiveSet().length;
+      const count = liveR2.status === "revealed" ? currentQuestionIdx + 1 : currentQuestionIdx;
+      return Math.max(0, Math.min(total, count));
     }
 
+    /** Round 2 ranking only (the full scoreboard is in the right-hand drawer). */
     function renderRound2StatsTableHtml() {
-      const derivedScores = computeTeamScores({
-        teams: quizData.teams,
-        live: latestLive || {},
-        config: quizData.config
-      });
-
       const participatingTeams = getRoundTeams(quizData.teams, quizData.round_order, "round2");
-      const teamStats = { ...(latestLive?.round2Stats || {}) };
-      for (const t of participatingTeams) {
-        if (!teamStats[t.id]) {
-          teamStats[t.id] = { points: 0, correctCount: 0, totalCorrectTimeMs: 0 };
-        }
-      }
-      if (liveR2?.history) {
-        for (const h of liveR2.history) {
-          if (!h.results) continue;
-          for (const [tId, res] of Object.entries(h.results)) {
-            if (!teamStats[tId]) {
-              teamStats[tId] = { points: 0, correctCount: 0, totalCorrectTimeMs: 0 };
-            }
-            if (res.isCorrect) {
-              teamStats[tId].points = (teamStats[tId].points || 0) + (Number(res.points) || 0);
-              teamStats[tId].correctCount = (teamStats[tId].correctCount || 0) + 1;
-              teamStats[tId].totalCorrectTimeMs = (teamStats[tId].totalCorrectTimeMs || 0) + (Number(res.responseTimeMs) || 0);
-            }
-          }
-        }
-      }
+      const teamStats = buildRound2StatsFromHistory(participatingTeams, liveR2.history, getRevealedCount());
+      const ranking = computeRound2Ranking(participatingTeams, teamStats);
+      const teamById = new Map(participatingTeams.map((t) => [t.id, t]));
 
-      for (const [tId, stat] of Object.entries(teamStats)) {
-        if (stat.points && derivedScores[tId]) {
-          if (!derivedScores[tId].round2) {
-            derivedScores[tId].round2 = stat.points;
-            derivedScores[tId].total = Math.round(((derivedScores[tId].round1 || 0) + stat.points + (derivedScores[tId].round3 || 0)) * 100) / 100;
-          }
-        }
-      }
-
-      const rows = buildScoreboardRows(quizData.teams, derivedScores, {
-        round2Stats: teamStats,
-        mode: "round2"
-      });
-
-      // Many teams: side-by-side tables so the popup never scrolls.
-      const perTable = rows.length > 14 ? Math.ceil(rows.length / Math.ceil(rows.length / 12)) : rows.length || 1;
+      const perTable = ranking.length > 14 ? Math.ceil(ranking.length / Math.ceil(ranking.length / 12)) : ranking.length || 1;
       const chunks = [];
-      for (let i = 0; i < rows.length; i += perTable) chunks.push(rows.slice(i, i + perTable));
+      for (let i = 0; i < ranking.length; i += perTable) chunks.push(ranking.slice(i, i + perTable));
       if (chunks.length === 0) chunks.push([]);
-      return `<div class="r2-stats-tables" style="--r2-table-cols: ${chunks.length};">${chunks
-        .map((chunk) => renderScoreboardTableHtml(chunk, {
-          highlightMode: "round2",
-          shortenName: chunks.length > 1,
-          tableClass: "scoreboard-table modal-scoreboard-table",
-          wrapClass: "scoreboard-table-wrap modal-scoreboard-wrap"
-        }))
-        .join("")}</div>`;
+      const multi = chunks.length > 1;
+
+      const tableHtml = (chunk) => `
+        <table class="r2-rank-table">
+          <thead>
+            <tr>
+              <th>Hạng</th>
+              <th class="r2-col-team">Đội thi</th>
+              <th>${multi ? "Đúng" : "Số câu đúng"}</th>
+              <th>${multi ? "Nhanh" : "Nhanh nhất"}</th>
+              <th>${multi ? "Giây" : "Thời gian (s)"}</th>
+              <th>${multi ? "Điểm" : "Điểm V2"}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${chunk
+              .map((entry) => {
+                const team = teamById.get(entry.id) || { id: entry.id, name: entry.name };
+                const name = multi ? shortenTeamName(team.name) || team.name : team.name;
+                return `
+                  <tr class="${entry.rank <= 3 ? `r2-rank-top r2-rank-${entry.rank}` : ""}">
+                    <td class="r2-rank-num">${entry.rank}</td>
+                    <td class="r2-col-team">
+                      <span class="r2-rank-team">${renderAvatarHtml(team, "team-avatar-sm")}<span title="${escapeHtml(team.name)}">${escapeHtml(name)}</span></span>
+                    </td>
+                    <td>${entry.correctCount}</td>
+                    <td>${entry.fastestCount}</td>
+                    <td>${formatSeconds(entry.totalCorrectTimeSeconds)}</td>
+                    <td class="r2-rank-points">${entry.points}</td>
+                  </tr>
+                `;
+              })
+              .join("")}
+          </tbody>
+        </table>
+      `;
+
+      return `<div class="r2-stats-tables" style="--r2-table-cols: ${chunks.length};">${chunks.map(tableHtml).join("")}</div>`;
     }
 
     function openStatsModal() {
       const modal = document.getElementById("r2-stats-modal");
       if (!modal) return;
-      // Open on this question's results once revealed, otherwise on the table.
-      statsTab = getPresenterView().status === "revealed" ? "results" : "table";
+      statsTab = "results";
       modal.style.display = "flex";
       renderStatsModalBody();
     }
@@ -877,33 +849,95 @@
       }
     }
 
+    /** Every team's answer to every question so far (teams down, questions across). */
     function renderQuestionResultsHtml(view) {
       const participatingTeams = getRoundTeams(quizData.teams, quizData.round_order, "round2");
-      if (view.status !== "revealed" || !view.results) {
-        return `<div class="r2-stats-empty">Câu ${view.idx + 1} chưa công bố đáp án.</div>`;
+      const questions = getQuestionsInActiveSet();
+      // The question in play is not in the history until it is revealed.
+      const history = (liveR2.history || []).filter((h) => h.questionIndex !== currentQuestionIdx);
+      const liveEntry = (liveR2.history || []).find((h) => h.questionIndex === currentQuestionIdx);
+      if (liveR2.status === "revealed" && liveEntry) {
+        history.push(liveEntry);
+      } else if (liveR2.status === "revealed") {
+        history.push({ questionIndex: currentQuestionIdx, answers: liveR2.answers || {}, results: liveR2.results || {} });
+      } else if (liveR2.status === "open" || liveR2.status === "locked") {
+        history.push({ questionIndex: currentQuestionIdx, answers: liveR2.answers || {}, results: {} });
       }
-      const cells = participatingTeams
-        .map((t) => {
-          const res = view.results[t.id];
-          const answered = Boolean(res || view.answers?.[t.id]);
-          const choice = res?.answer || view.answers?.[t.id]?.answer || "—";
-          const timeMs = res && Number.isFinite(res.responseTimeMs) ? res.responseTimeMs : null;
-          const cls = res?.isCorrect ? "correct" : answered ? "wrong" : "none";
-          return `
-            <div class="r2-result-cell ${cls}" title="${escapeHtml(t.name)}">
-              ${renderAvatarHtml(t, "team-avatar-sm")}
-              <span class="r2-result-name">${escapeHtml(shortenTeamName(t.name) || t.name)}</span>
-              <span class="r2-result-choice">${escapeHtml(choice)}</span>
-              <span class="r2-result-time">${answered && timeMs !== null ? formatSeconds(timeMs / 1000) : "—"}</span>
-              <span class="r2-result-points">+${res?.points || 0}đ</span>
-            </div>
-          `;
-        })
+      const { columns, rows } = buildRound2AnswerMatrix({
+        teams: participatingTeams,
+        questions,
+        history,
+        revealedCount: getRevealedCount()
+      });
+      // Many teams: up to three tables side by side so the popup never scrolls.
+      const parts = rows.length > 14 ? Math.min(3, Math.ceil(rows.length / 12)) : 1;
+      const compact = parts > 1;
+
+      const headHtml = columns
+        .map((col) => `
+          <th class="r2-q-col ${col.index === view.idx ? "current" : ""}">
+            <div>${compact ? "C" : "Câu "}${col.index + 1}</div>
+            <div class="r2-q-correct">${col.revealed ? escapeHtml(col.correct) : "?"}</div>
+          </th>`)
         .join("");
-      const cols = participatingTeams.length > 24 ? 4 : participatingTeams.length > 8 ? 3 : 2;
+
+      const bodyRows = rows
+        .map((row) => {
+          const cells = row.cells
+            .map((cell, idx) => {
+              const label = cell.status === "correct" || cell.status === "wrong"
+                ? escapeHtml(cell.answer)
+                : cell.status === "answered"
+                  ? "•"
+                  : cell.status === "none"
+                    ? "—"
+                    : "";
+              const title = cell.status === "correct" || cell.status === "wrong"
+                ? `${cell.answer} — ${formatSeconds(cell.responseTimeMs / 1000)} — +${cell.points}đ`
+                : "";
+              return `<td class="r2-cell ${cell.status} ${idx === view.idx ? "current" : ""}" title="${escapeHtml(title)}">${label}</td>`;
+            })
+            .join("");
+          const name = compact ? shortenTeamName(row.team.name) || row.team.name : row.team.name;
+          return `
+            <tr>
+              <td class="r2-col-team"><span class="r2-rank-team">${renderAvatarHtml(row.team, "team-avatar-sm")}<span title="${escapeHtml(row.team.name)}">${escapeHtml(name)}</span></span></td>
+              ${cells}
+              <td class="r2-sum">${row.correctCount}/${columns.filter((c) => c.revealed).length}</td>
+              <td class="r2-sum">${formatSeconds(row.totalCorrectTimeMs / 1000)}</td>
+              <td class="r2-sum r2-rank-points">${row.points}</td>
+            </tr>
+          `;
+        });
+
       return `
-        <div class="r2-stats-caption">Câu ${view.idx + 1} — đáp án đúng: <strong>${escapeHtml(String(view.q?.correct || "").toUpperCase())}</strong></div>
-        <div class="r2-result-grid" style="--r2-cols: ${cols};">${cells}</div>
+        <div class="r2-stats-caption">
+          <span class="r2-legend correct">A</span> đúng
+          <span class="r2-legend wrong">B</span> sai
+          <span class="r2-legend none">—</span> không trả lời
+          <span class="r2-legend answered">•</span> đã gửi, chưa công bố
+        </div>
+        <div class="r2-stats-tables" style="--r2-table-cols: ${parts};">
+          ${Array.from({ length: parts }, (_, i) => {
+            const size = Math.ceil(bodyRows.length / parts);
+            return bodyRows.slice(i * size, (i + 1) * size);
+          })
+            .map((part) => `
+              <table class="r2-matrix-table ${compact ? "compact" : ""}">
+                <thead>
+                  <tr>
+                    <th class="r2-col-team">Đội thi</th>
+                    ${headHtml}
+                    <th>Đúng</th>
+                    <th>${compact ? "Giây" : "Thời gian (s)"}</th>
+                    <th>${compact ? "Điểm" : "Điểm V2"}</th>
+                  </tr>
+                </thead>
+                <tbody>${part.join("")}</tbody>
+              </table>
+            `)
+            .join("")}
+        </div>
       `;
     }
 
@@ -916,19 +950,25 @@
       const head = card.querySelector(".r2-stats-head");
       const cardStyle = getComputedStyle(card);
       const padding = parseFloat(cardStyle.paddingTop) + parseFloat(cardStyle.paddingBottom);
-      const available = window.innerHeight * 0.92 - padding - (head?.offsetHeight || 0) - 16;
+      const available = window.innerHeight * 0.92 - padding - (head?.offsetHeight || 0) - 32;
       const needed = body.scrollHeight;
-      if (needed > available && needed > 0) {
-        body.style.zoom = String(Math.max(0.45, available / needed));
-      }
+      const neededWidth = body.scrollWidth;
+      const availableWidth = body.clientWidth;
+      let zoom = 1;
+      if (needed > available && needed > 0) zoom = Math.min(zoom, available / needed);
+      if (neededWidth > availableWidth && neededWidth > 0) zoom = Math.min(zoom, availableWidth / neededWidth);
+      if (zoom < 1) body.style.zoom = String(Math.max(0.4, zoom));
     }
 
     function renderStatsModalBody() {
       const body = document.getElementById("r2-stats-modal-body");
       if (!body) return;
       const view = getPresenterView();
-      document.getElementById("r2-tab-results").textContent = `Kết quả trả lời (Câu ${view.idx + 1})`;
-      document.getElementById("r2-tab-table").textContent = `Bảng thống kê Vòng 2 (tạm tính đến câu ${view.idx + 1})`;
+      const revealed = getRevealedCount();
+      document.getElementById("r2-tab-results").textContent = "Kết quả trả lời theo câu";
+      document.getElementById("r2-tab-table").textContent = revealed > 0
+        ? `Bảng thống kê Vòng 2 (tạm tính đến câu ${revealed})`
+        : "Bảng thống kê Vòng 2";
       document.querySelectorAll(".r2-stats-tab").forEach((tab) => {
         const active = tab.dataset.tab === statsTab;
         tab.classList.toggle("active", active);

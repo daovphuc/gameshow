@@ -144,6 +144,89 @@ export function calculateRound2Score(totalPoints) {
 }
 
 /**
+ * Round 2 statistics from the recomputed history, counting only the first
+ * `revealedCount` questions (a question whose answer is not revealed yet must
+ * not show up in the numbers on the projector).
+ * @returns {Record<string, {points: number, correctCount: number, fastestCount: number, totalCorrectTimeMs: number}>}
+ */
+export function buildRound2StatsFromHistory(teams = [], history = [], revealedCount = Infinity) {
+  const stats = {};
+  const ensure = (id) => {
+    if (!stats[id]) stats[id] = { points: 0, correctCount: 0, fastestCount: 0, totalCorrectTimeMs: 0 };
+    return stats[id];
+  };
+  for (const t of teams) if (t?.id) ensure(t.id);
+
+  for (const h of history || []) {
+    if (!h || !(Number(h.questionIndex) < revealedCount) || !h.results) continue;
+    let fastest = Infinity;
+    for (const [teamId, res] of Object.entries(h.results)) {
+      if (!res?.isCorrect) continue;
+      const st = ensure(teamId);
+      const time = Number(res.responseTimeMs) || 0;
+      st.points += Number(res.points) || 0;
+      st.correctCount += 1;
+      st.totalCorrectTimeMs += time;
+      fastest = Math.min(fastest, time);
+    }
+    if (Number.isFinite(fastest)) {
+      for (const [teamId, res] of Object.entries(h.results)) {
+        if (res?.isCorrect && (Number(res.responseTimeMs) || 0) === fastest) ensure(teamId).fastestCount += 1;
+      }
+    }
+  }
+  return stats;
+}
+
+/**
+ * Per-team, per-question answer grid for Round 2 (teams down, questions across).
+ * Questions before `revealedCount` show right/wrong; later ones only show
+ * whether a team has answered, so nothing leaks before the reveal.
+ * Cell status: "correct" | "wrong" | "none" (no answer) | "answered" | "pending".
+ */
+export function buildRound2AnswerMatrix({ teams = [], questions = [], history = [], revealedCount = 0 } = {}) {
+  const byIndex = new Map((history || []).map((h) => [Number(h.questionIndex), h]));
+  const columns = questions.map((q, index) => {
+    const revealed = index < revealedCount;
+    return {
+      index,
+      revealed,
+      correct: revealed ? String(q?.correct || "").trim().toUpperCase() : ""
+    };
+  });
+
+  const rows = teams.map((team) => {
+    let correctCount = 0;
+    let points = 0;
+    let totalCorrectTimeMs = 0;
+    const cells = columns.map((col) => {
+      const h = byIndex.get(col.index);
+      const res = h?.results?.[team.id];
+      const ans = h?.answers?.[team.id];
+      if (!col.revealed) {
+        return { status: res || ans ? "answered" : "pending", answer: "" };
+      }
+      if (!h) return { status: "pending", answer: "" };
+      if (!res) return { status: "none", answer: "" };
+      if (res.isCorrect) {
+        correctCount += 1;
+        points += Number(res.points) || 0;
+        totalCorrectTimeMs += Number(res.responseTimeMs) || 0;
+      }
+      return {
+        status: res.isCorrect ? "correct" : "wrong",
+        answer: String(res.answer || ""),
+        responseTimeMs: Number(res.responseTimeMs) || 0,
+        points: Number(res.points) || 0
+      };
+    });
+    return { team, cells, correctCount, points, totalCorrectTimeMs };
+  });
+
+  return { columns, rows };
+}
+
+/**
  * Computes Round 2 ranking:
  * 1. Higher total points
  * 2. Shorter total correct time (faster wins)

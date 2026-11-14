@@ -723,3 +723,48 @@ test("a lock made when time ran out cannot be resumed", () => {
   assert.equal(round2.canResumeRound2Question(state), false);
   assert.equal(round2.resumeRound2Question(state, 41000).status, "locked");
 });
+
+test("round 2 popup data: the answer grid and ranking count only revealed questions", () => {
+  const teams = [{ id: "t1", name: "Đội 1" }, { id: "t2", name: "Đội 2" }, { id: "t3", name: "Đội 3" }];
+  const questions = [
+    { set: "1", correct: "A" },
+    { set: "1", correct: "B" },
+    { set: "1", correct: "C" }
+  ];
+  const history = [
+    {
+      questionIndex: 0,
+      answers: { t1: { answer: "A" }, t2: { answer: "C" } },
+      results: {
+        t1: { answer: "A", isCorrect: true, responseTimeMs: 4000, points: 2 },
+        t2: { answer: "C", isCorrect: false, responseTimeMs: 3000, points: 0 }
+      }
+    },
+    {
+      questionIndex: 1,
+      answers: { t1: { answer: "B" }, t2: { answer: "B" } },
+      results: {
+        t1: { answer: "B", isCorrect: true, responseTimeMs: 6000, points: 2 },
+        t2: { answer: "B", isCorrect: true, responseTimeMs: 5000, points: 2 }
+      }
+    },
+    // Question 3 is open: answers exist but must not be judged yet.
+    { questionIndex: 2, answers: { t1: { answer: "C" } }, results: { t1: { answer: "C", isCorrect: true, responseTimeMs: 1000, points: 2 } } }
+  ];
+
+  const { columns, rows } = round2.buildRound2AnswerMatrix({ teams, questions, history, revealedCount: 2 });
+  assert.deepEqual(columns.map((c) => c.correct), ["A", "B", ""]);
+  assert.deepEqual(rows[0].cells.map((c) => c.status), ["correct", "correct", "answered"]);
+  assert.deepEqual(rows[1].cells.map((c) => c.status), ["wrong", "correct", "pending"]);
+  assert.deepEqual(rows[2].cells.map((c) => c.status), ["none", "none", "pending"]);
+  assert.equal(rows[0].correctCount, 2);
+  assert.equal(rows[0].points, 4);
+  assert.equal(rows[0].totalCorrectTimeMs, 10000);
+
+  const stats = round2.buildRound2StatsFromHistory(teams, history, 2);
+  assert.deepEqual(stats.t1, { points: 4, correctCount: 2, fastestCount: 1, totalCorrectTimeMs: 10000 });
+  assert.deepEqual(stats.t2, { points: 2, correctCount: 1, fastestCount: 1, totalCorrectTimeMs: 5000 });
+  assert.deepEqual(stats.t3, { points: 0, correctCount: 0, fastestCount: 0, totalCorrectTimeMs: 0 });
+  const ranking = round2.computeRound2Ranking(teams, stats);
+  assert.deepEqual(ranking.map((r) => r.id), ["t1", "t2", "t3"]);
+});
