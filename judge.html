@@ -307,7 +307,15 @@
                           }">
                             ${(liveState.round1?.activeSession?.phase || liveState.round1?.phase || "prep") === "prep" ? "⏳ Đang chuẩn bị (3 phút)" : "🎤 Đang thuyết trình (15 phút)"}
                           </span>`
-                        : ""
+                        : !isR1 && liveState.round3?.activeTile && activeTeam.id === stageTeamId
+                          ? `<span class="meta-pill" style="font-size: 0.78rem; font-weight: 800; padding: 0.2rem 0.65rem; border-radius: var(--radius-full); ${
+                              liveState.round3.activeTile.phase === "answer"
+                                ? "background: #dcfce7; color: #15803d; border: 1px solid #86efac;"
+                                : "background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc;"
+                            }">
+                              ${liveState.round3.activeTile.phase === "answer" ? "🎤 Đang trả lời" : "⏳ Đang chuẩn bị"}
+                            </span>`
+                          : ""
                     }
                     ${isLocked ? `<span class="badge badge-locked" style="font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; background: rgba(0,0,0,0.06); font-weight: 700;">Đã khóa</span>` : ""}
                   </div>

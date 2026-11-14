@@ -9,6 +9,8 @@ import {
   finishRound1Package,
   isTeamLocked,
   openRound3Tile,
+  startRound3Answer,
+  getRound3PhaseSeconds,
   isTileOpened,
   recordAnswer,
   setRound2Score,
@@ -66,6 +68,29 @@ test("opening a round-3 tile marks it opened", () => {
   assert.equal(isTileOpened(state, 12), true);
   assert.equal(state.round3.activeTile.number, 12);
   assert.equal(state.round3.activeTile.selectedTeamId, "t2");
+});
+
+test("a round-3 tile opens in the preparation phase, then moves to the answer phase", () => {
+  let state = createInitialState(SAMPLE_TEAMS);
+  state = openRound3Tile(state, 4, "t1");
+  assert.equal(state.round3.activeTile.phase, "prep");
+
+  state = startRound3Answer(state);
+  assert.equal(state.round3.activeTile.phase, "answer");
+  assert.equal(state.round3.activeTile.number, 4);
+  assert.equal(state.round3.activeTile.selectedTeamId, "t1");
+
+  // No open tile: nothing changes.
+  const closed = startRound3Answer(createInitialState(SAMPLE_TEAMS));
+  assert.equal(closed.round3.activeTile, null);
+});
+
+test("round-3 phase times default to 2 minutes preparation and 5 minutes answer", () => {
+  assert.deepEqual(getRound3PhaseSeconds({}), { prep: 120, answer: 300 });
+  assert.deepEqual(
+    getRound3PhaseSeconds({ round3_prep_time_seconds: 60, round3_answer_time_seconds: "240" }),
+    { prep: 60, answer: 240 }
+  );
 });
 
 test("correct answer adds points to the right team and round, wrong adds none, and manual round-2 score works", () => {

@@ -371,7 +371,10 @@
         return;
       }
 
-      const mySavedAnswer = (r2.questionKey && myAnswers[r2.questionKey]) || r2.results?.[selectedTeamId];
+      // Results belong to the revealed question only; before that, only this
+      // question's own answer counts (never one left from the previous question).
+      const isRevealedNow = r2.status === "revealed";
+      const mySavedAnswer = (r2.questionKey && myAnswers[r2.questionKey]) || (isRevealedNow ? r2.results?.[selectedTeamId] : null);
       const hasAnswered = Boolean(mySavedAnswer);
       const chosenLetter = typeof mySavedAnswer === "object" ? mySavedAnswer?.answer : mySavedAnswer;
       const ansTime = typeof mySavedAnswer === "object" ? mySavedAnswer?.answeredAt : null;
@@ -384,7 +387,7 @@
       const isRevealed = r2.status === "revealed";
       const isLocked = r2.status === "locked" || isRevealed;
 
-      const result = r2.results?.[selectedTeamId];
+      const result = isRevealed ? r2.results?.[selectedTeamId] : null;
       const correctLetter = isRevealed ? String(r2.correct || "").toUpperCase() : "";
 
       const allOptions = [
@@ -584,12 +587,21 @@
           lastSubscribedQKey = qKey;
           if (currentTeamAnswerUnsub) currentTeamAnswerUnsub();
           currentTeamAnswerUnsub = listen(`answers/${qKey}/${selectedTeamId}`, (ans) => {
+            if (!ans) {
+              // Answers cleared (match reset): forget this question's answer.
+              if (myAnswers[qKey]?.fromServer) {
+                delete myAnswers[qKey];
+                renderTeamPortal();
+              }
+              return;
+            }
             if (ans?.answer) {
               const prev = myAnswers[qKey];
               const ansAt = ans.answeredAt || (typeof prev === "object" ? prev?.answeredAt : null);
               myAnswers[qKey] = {
                 answer: ans.answer,
-                answeredAt: ansAt
+                answeredAt: ansAt,
+                fromServer: true
               };
               renderTeamPortal();
             }

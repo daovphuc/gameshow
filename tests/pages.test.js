@@ -162,3 +162,21 @@ test("brief acceptance requirements: round 3 has no tile grid markup, draw.html 
   }
 });
 
+
+test("the MC pages publish the drawn ball pool and draw.html renders the same pool", () => {
+  for (const page of ["round1.html", "round2.html", "round3.html"]) {
+    const html = fs.readFileSync(path.join(root, page), "utf8");
+    assert.match(html, /set\("live\/draw", \{[\s\S]*?pool/, `${page} must write the ball pool to live/draw`);
+  }
+  const drawHtml = fs.readFileSync(path.join(root, "draw.html"), "utf8");
+  assert.ok(drawHtml.includes("draw.pool"), "draw.html must build its drum from live/draw.pool");
+});
+
+test("round 2 clears the previous question's results when it opens the next question", () => {
+  const html = fs.readFileSync(path.join(root, "round2.html"), "utf8");
+  const preview = html.slice(html.indexOf("async function handleOpenQuestionPreview"));
+  const previewUpdate = preview.slice(0, preview.indexOf("subscribeToQuestionAnswers"));
+  assert.match(previewUpdate, /results: null/, "the reading-phase update must clear results");
+  const team = fs.readFileSync(path.join(root, "team.html"), "utf8");
+  assert.ok(team.includes('isRevealedNow ? r2.results'), "team tablets read results only once revealed");
+});

@@ -39,6 +39,8 @@ export const DEFAULT_CONFIG = {
   round2_time_seconds: 30,
   round2_points_per_correct: 2,
   round3_time_seconds: 420,
+  round3_prep_time_seconds: 120,
+  round3_answer_time_seconds: 300,
   round3_default_points: 30,
   round3_max_content: 25,
   round3_max_manner: 5,

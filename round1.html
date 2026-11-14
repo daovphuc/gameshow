@@ -372,6 +372,7 @@
             round: "round1",
             status: "rolling",
             stageTeamId: teamId,
+            pool: offered.map((pkg) => pkg.id),
             result: drawnPkg.id
           });
         },
@@ -380,6 +381,7 @@
             round: "round1",
             status: "done",
             stageTeamId: teamId,
+            pool: offered.map((pkg) => pkg.id),
             result: drawnPkg.id
           });
           selectPackageForTeam(teamId, drawnPkg.id);

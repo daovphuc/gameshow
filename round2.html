@@ -287,6 +287,7 @@
         activeQuestion: tabletQuestion,
         correct: null,
         explanation: null,
+        results: null,
         shownAt: liveR2.shownAt,
         deadline: liveR2.deadline,
         [`questionsMeta/${questionKey}`]: liveR2.questionsMeta[questionKey]
@@ -382,6 +383,9 @@
         activeQuestion: tabletQuestion,
         correct: null,
         explanation: null,
+        // The previous question's results must not reach the tablets, or
+        // they show that answer as already chosen and lock the buttons.
+        results: null,
         shownAt: null,
         deadline: null
       });
@@ -542,6 +546,7 @@
             round: "round2",
             status: "rolling",
             stageTeamId: null,
+            pool,
             result: drawnSet
           });
         },
@@ -550,6 +555,7 @@
             round: "round2",
             status: "done",
             stageTeamId: null,
+            pool,
             result: drawnSet
           });
           startSet(drawnSet);

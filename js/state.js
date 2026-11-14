@@ -302,9 +302,36 @@ export function openRound3Tile(state, tileNumber, selectedTeamId = null) {
   next.round3.activeTile = {
     number: num,
     selectedTeamId: selectedTeamId || null,
+    phase: "prep",
     revealed: false
   };
 
+  return next;
+}
+
+/** Round 3 timing: preparation then answer (defaults 2 and 5 minutes). */
+export function getRound3PhaseSeconds(config = {}) {
+  return {
+    prep: Number(config?.round3_prep_time_seconds) || 120,
+    answer: Number(config?.round3_answer_time_seconds) || 300
+  };
+}
+
+/**
+ * Ends the Round 3 preparation (on time or early) and moves the open tile to
+ * the answer phase.
+ * @param {object} state
+ */
+export function startRound3Answer(state) {
+  const next = cloneState(state);
+  if (!next.round3?.activeTile) {
+    return next;
+  }
+  next.round3.activeTile = {
+    ...next.round3.activeTile,
+    phase: "answer",
+    prepFinishedEarly: next.round3.activeTile.phase !== "answer"
+  };
   return next;
 }
 

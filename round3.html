@@ -25,6 +25,7 @@
       saveAppState,
       renderAvatarHtml,
       escapeHtml,
+      showToast,
       wireStageLayout
     } from "./js/app.js";
     import { resolveImageUrl } from "./js/data.js";
@@ -32,7 +33,9 @@
     import {
       openRound3Tile,
       updateRound3TileSession,
-      closeRound3Tile
+      closeRound3Tile,
+      startRound3Answer,
+      getRound3PhaseSeconds
     } from "./js/state.js";
     import { createTimer, startTimer, tickTimer, formatTimer } from "./js/timer.js";
     import { set, update, listen, getServerTime } from "./js/backend.js";
@@ -56,9 +59,9 @@
       }
     }
 
-    function ensureTileTimer(tileNumber, durationSeconds) {
+    function ensureTileTimer(tileNumber, phase, durationSeconds) {
       const warnSec = Number(quizData?.config?.warning_seconds) || 5;
-      const key = `r3_tile_${tileNumber}`;
+      const key = `r3_tile_${tileNumber}__${phase}`;
       if (activeTimerKey !== key || !currentTimer) {
         stopTimerLoop();
         activeTimerKey = key;
@@ -76,12 +79,14 @@
       updateTimerDom();
       stopTimerLoop();
 
+      const phase = gameState.round3.activeTile?.phase || "prep";
       // Publish live timer for judges and secondary screens
       update("live/round3", {
         timer: {
           startedAt: now,
           durationSeconds: currentTimer.totalSeconds,
-          status: "running"
+          status: "running",
+          phase
         }
       });
 
@@ -91,9 +96,29 @@
         if (currentTimer.finished) {
           stopTimerLoop();
           update("live/round3/timer", { status: "finished" });
+          if (gameState.round3.activeTile?.phase === "prep") {
+            handleFinishPrep();
+          }
         }
       }, 100);
       return true;
+    }
+
+    /** Ends the preparation (on time or early) and starts the answer countdown. */
+    function handleFinishPrep() {
+      const tile = gameState.round3.activeTile;
+      if (!tile || tile.phase === "answer") return;
+      stopTimerLoop();
+
+      gameState = startRound3Answer(gameState);
+      saveAppState(gameState);
+      syncLiveState();
+
+      const { answer } = getRound3PhaseSeconds(quizData.config);
+      ensureTileTimer(tile.number, "answer", answer);
+      triggerStartTimer();
+      renderStage();
+      showToast(`Kết thúc chuẩn bị! Bắt đầu tính giờ trả lời (${Math.round(answer / 60)} phút).`);
     }
 
     function updateTimerDom() {
@@ -140,7 +165,7 @@
       }
 
       if (gameState.round3.activeTile) {
-        gameState = updateRound3TileSession(gameState, teamId);
+        gameState = updateRound3TileSession(gameState, { selectedTeamId: teamId || null });
         saveAppState(gameState);
       }
       syncLiveState();
@@ -263,6 +288,7 @@
             round: "round3",
             status: "rolling",
             stageTeamId: teamId,
+            pool: allTiles.map((t) => t.number),
             result: drawnTile.number
           });
         },
@@ -271,6 +297,7 @@
             round: "round3",
             status: "done",
             stageTeamId: teamId,
+            pool: allTiles.map((t) => t.number),
             result: drawnTile.number
           });
           openTileByNumber(drawnTile.number, teamId);
@@ -412,7 +439,11 @@
         color: "#D97757"
       };
 
-      ensureTileTimer(tile.number, tile.time_seconds);
+      const phase = activeTile.phase === "answer" ? "answer" : "prep";
+      const phaseSeconds = getRound3PhaseSeconds(quizData.config);
+      const prepMin = Math.round(phaseSeconds.prep / 60);
+      const answerMin = Math.round(phaseSeconds.answer / 60);
+      ensureTileTimer(tile.number, phase, phase === "prep" ? phaseSeconds.prep : phaseSeconds.answer);
 
       container.innerHTML = `
         <div class="question-stage">
@@ -454,17 +485,36 @@
                 </button>
               </div>
 
+              ${
+                phase === "prep"
+                  ? `<button type="button" id="btn-finish-prep" class="btn btn-primary btn-sm" style="font-weight: 700; background: #0284c7; border-color: #0284c7;">
+                      Hoàn thành chuẩn bị → Trả lời
+                    </button>`
+                  : ""
+              }
+
               <button type="button" id="btn-screen-continue" class="btn btn-primary btn-lg">
                 Đóng ô câu hỏi →
               </button>
             </div>
           </div>
 
+          <div style="margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+            <div class="meta-pill" style="font-weight: 800; font-size: 0.95rem; padding: 0.4rem 1rem; border-radius: var(--radius-full); ${
+              phase === "prep"
+                ? "background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc;"
+                : "background: #dcfce7; color: #15803d; border: 1px solid #86efac;"
+            }">
+              ${phase === "prep" ? `⏳ GIAI ĐOẠN CHUẨN BỊ (${prepMin} PHÚT)` : `🎤 GIAI ĐOẠN TRẢ LỜI (${answerMin} PHÚT)`}
+            </div>
+            ${phase === "prep" ? `<div style="font-size: 0.9rem; color: var(--text-muted);">Đội có ${prepMin} phút chuẩn bị. Bấm "Hoàn thành chuẩn bị" để trả lời ngay.</div>` : ""}
+          </div>
+
           <article class="question-card">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
               <span class="meta-pill accent" style="font-size: 1rem; padding: 0.4rem 1.1rem;">Tình huống #${tile.number} (${tile.points} điểm)</span>
               <span style="font-size: 0.95rem; color: var(--text-muted); font-weight: 600;">
-                Thời gian: <strong>${Math.round(tile.time_seconds / 60)} phút</strong>
+                Thời gian: <strong>${prepMin} phút chuẩn bị + ${answerMin} phút trả lời</strong>
               </span>
             </div>
             <p class="question-text">${escapeHtml(tile.question)}</p>
@@ -493,6 +543,9 @@
       });
       document.getElementById("btn-start-timer")?.addEventListener("click", () => {
         triggerStartTimer();
+      });
+      document.getElementById("btn-finish-prep")?.addEventListener("click", () => {
+        handleFinishPrep();
       });
     }
 
@@ -556,6 +609,7 @@
         gameState.round3.openedTiles = opened;
         let changed = before !== JSON.stringify(opened);
         if (r3.activeTile) {
+          if (gameState.round3.activeTile?.phase !== r3.activeTile.phase) changed = true;
           gameState.round3.activeTile = r3.activeTile;
         } else if (gameState.round3.activeTile) {
           gameState.round3.activeTile = null;
