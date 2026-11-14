@@ -5,6 +5,9 @@ import {
   drawLotteryItem,
   drawLottery,
   isRehearsalSet,
+  isTestMode,
+  getRound2DrawPool,
+  getRound2SetLabel,
   drawRound1Package,
   drawRound2Set,
   drawRound3Tile
@@ -131,4 +134,30 @@ test("draw duration constant is about 5000 ms", () => {
     DRAW_DURATION_MS >= 4500 && DRAW_DURATION_MS <= 5500,
     `Expected DRAW_DURATION_MS to be about 5000 ms, got ${DRAW_DURATION_MS}`
   );
+});
+
+test("run mode: only config run_mode = test is test mode; live is the default", () => {
+  assert.equal(isTestMode({ run_mode: "test" }), true);
+  assert.equal(isTestMode({ run_mode: " TEST " }), true);
+  assert.equal(isTestMode({ run_mode: "live" }), false);
+  assert.equal(isTestMode({}), false);
+  assert.equal(isTestMode(undefined), false);
+});
+
+test("getRound2DrawPool: test mode draws rehearsal sets, live mode the official ones", () => {
+  const sets = ["1", "2", "3", "4", "5", "Chạy thử", "Chạy thử 2"];
+  assert.deepEqual(getRound2DrawPool(sets, { run_mode: "test" }), ["Chạy thử", "Chạy thử 2"]);
+  assert.deepEqual(getRound2DrawPool(sets, { run_mode: "live" }), ["1", "2", "3", "4", "5"]);
+  assert.deepEqual(getRound2DrawPool(sets, {}), ["1", "2", "3", "4", "5"]);
+  // Test mode without a rehearsal set: nothing to draw (never the official sets).
+  assert.deepEqual(getRound2DrawPool(["1", "2"], { run_mode: "test" }), []);
+  // Live mode with only a rehearsal set keeps it, as before.
+  assert.deepEqual(getRound2DrawPool(["Chạy thử"], {}), ["Chạy thử"]);
+});
+
+test("getRound2SetLabel names official and rehearsal sets", () => {
+  assert.equal(getRound2SetLabel("3"), "Bộ đề số 3");
+  assert.equal(getRound2SetLabel("Chạy thử"), "Bộ đề thử");
+  assert.equal(getRound2SetLabel("Chạy thử 2"), "Bộ đề thử 2");
+  assert.equal(isRehearsalSet("Chạy thử 2"), true);
 });

@@ -12,7 +12,43 @@ export function isRehearsalSet(setIdentifier) {
   const str = typeof setIdentifier === "object"
     ? String(setIdentifier.name || setIdentifier.id || setIdentifier.set || "")
     : String(setIdentifier);
-  return /^ch[aạ]y\s*th[uử]$/i.test(str.trim());
+  return /^ch[aạ]y\s*th[uử](\s*\d+)?$/i.test(str.trim());
+}
+
+/**
+ * Contest run mode from the config: "test" (rehearsal, shown as DEMO) or
+ * "live" (the real contest, the default). Both modes run the same flow; the
+ * mode only changes which Round 2 sets go into the drum.
+ * @param {Record<string, any>} [config]
+ */
+export function isTestMode(config) {
+  return String(config?.run_mode ?? "").trim().toLowerCase() === "test";
+}
+
+/**
+ * The Round 2 sets that go into the drum: the rehearsal ("Chạy thử") sets in
+ * test mode, the official sets otherwise (all sets when there is no official one).
+ * @param {Array<any>} sets
+ * @param {Record<string, any>} [config]
+ */
+export function getRound2DrawPool(sets = [], config = {}) {
+  const list = (Array.isArray(sets) ? sets : []).filter(
+    (s) => s !== undefined && s !== null && String(s).trim() !== ""
+  );
+  if (isTestMode(config)) {
+    return list.filter((s) => isRehearsalSet(s));
+  }
+  const official = list.filter((s) => !isRehearsalSet(s));
+  return official.length > 0 ? official : list;
+}
+
+/** Display name of a Round 2 set: "Bộ đề số 3", or "Bộ đề thử" for a rehearsal set. */
+export function getRound2SetLabel(setKey) {
+  if (isRehearsalSet(setKey)) {
+    const num = String(setKey).match(/\d+/);
+    return num ? `Bộ đề thử ${num[0]}` : "Bộ đề thử";
+  }
+  return `Bộ đề số ${setKey}`;
 }
 
 /**

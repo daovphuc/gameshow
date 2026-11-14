@@ -16,6 +16,7 @@ import {
   renderScoreboardTableHtml
 } from "./leaderboard.js";
 import { LIGHT_THEME, mergeTheme, themeToCssVars } from "./theme.js";
+import { isTestMode } from "./draw.js";
 import {
   initBackend,
   listen,
@@ -236,6 +237,29 @@ export function setSidebarCollapsed(collapsed) {
   document.body.classList.toggle("sidebar-collapsed", Boolean(collapsed));
 }
 
+/**
+ * Marks every screen as DEMO while the contest runs in test mode (config
+ * `run_mode` = "test"), and removes the mark in live mode.
+ */
+export function applyRunModeBadge(config = {}) {
+  if (typeof document === "undefined") return;
+  const isTest = isTestMode(config);
+  document.documentElement.classList.toggle("is-demo-mode", isTest);
+  let badge = document.getElementById("demo-mode-badge");
+  if (!isTest) {
+    badge?.remove();
+    return;
+  }
+  if (!badge) {
+    badge = document.createElement("div");
+    badge.id = "demo-mode-badge";
+    badge.className = "demo-mode-badge";
+    badge.setAttribute("role", "status");
+    badge.textContent = "DEMO · CHẾ ĐỘ THỬ";
+    (document.body || document.documentElement).appendChild(badge);
+  }
+}
+
 export function applyResolvedTheme(config = {}) {
   const resolved = mergeTheme({
     defaults: LIGHT_THEME,
@@ -347,6 +371,7 @@ export async function fetchQuizData({ forceRefresh = false, portal = "host" } = 
   }
 
   applyResolvedTheme(data.config);
+  applyRunModeBadge(data.config);
   const session = portal ? await ensurePortalSession(portal, data.accounts) : getActiveSession();
   return { ...data, isSample, session };
 }

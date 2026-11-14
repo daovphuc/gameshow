@@ -38,6 +38,7 @@ export const DEFAULT_CONFIG = {
   round1_packages_offered: 3,
   round2_time_seconds: 30,
   round2_points_per_correct: 2,
+  run_mode: "live",
   round3_time_seconds: 420,
   round3_prep_time_seconds: 120,
   round3_answer_time_seconds: 300,
