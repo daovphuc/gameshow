@@ -27,6 +27,7 @@ import {
   buildQuestionKey,
   recomputeRound2FromAnswers
 } from "../js/round2.js";
+import * as round2 from "../js/round2.js";
 
 test("Round-2 scoring: flat points per correct answer (default 2); wrong/missing/late = 0; total score is sum of points", () => {
   const shownAt = 10000;
@@ -667,3 +668,58 @@ test("openRound2QuestionPreview sets status to reading with tablet filtered ques
   assert.equal("correct" in previewState.activeQuestion, false);
 });
 
+
+test("an early lock can be undone: the question reopens with the time that was left", () => {
+  const q = { set: "1", number: 1, question: "Q", option_a: "A", option_b: "B", correct: "A", time_seconds: 30 };
+  let state = round2.startRound2Question({}, q, 1000);
+  assert.equal(state.deadline, 31000);
+
+  state = round2.lockRound2Question(state, 11000); // 20 s left
+  assert.equal(state.status, "locked");
+  assert.equal(state.lockedRemainingMs, 20000);
+  assert.equal(round2.canResumeRound2Question(state), true);
+
+  state = round2.resumeRound2Question(state, 50000); // paused 39 s
+  assert.equal(state.status, "open");
+  assert.equal(state.deadline, 70000);
+  assert.deepEqual(state.pauses, [{ from: 11000, to: 50000 }]);
+  assert.equal(state.lockedRemainingMs, null);
+  assert.equal(round2.canResumeRound2Question(state), false);
+});
+
+test("answer times and the time limit leave out the paused span", () => {
+  const pauses = [{ from: 11000, to: 50000 }];
+  assert.equal(round2.getPausedMsBefore(pauses, 5000), 0);
+  assert.equal(round2.getPausedMsBefore(pauses, 60000), 39000);
+  assert.equal(round2.getAdjustedShownAt(1000, 60000, pauses), 40000);
+
+  const q = { set: "1", number: 1, question: "Q", option_a: "A", option_b: "B", correct: "A", time_seconds: 30 };
+  // Answered 59 s after the question was shown, 20 s of it real answering time: still in time.
+  const revealed = round2.revealRound2Question(
+    { status: "locked", shownAt: 1000, pauses, answers: { t1: { answer: "A", answeredAt: 60000 }, t2: { answer: "A", answeredAt: 6000 } } },
+    q,
+    { pointsPerCorrect: 2 }
+  );
+  assert.equal(revealed.results.t1.responseTimeMs, 20000);
+  assert.equal(revealed.results.t1.points, 2);
+  assert.equal(revealed.results.t2.responseTimeMs, 5000);
+
+  const recomputed = round2.recomputeRound2FromAnswers({
+    questions: [q],
+    allAnswers: { set_1__q_0: { t1: { answer: "A", answeredAt: 60000 } } },
+    questionsMeta: { set_1__q_0: { shownAt: 1000, pauses } },
+    teams: [{ id: "t1" }],
+    pointsPerCorrect: 2
+  });
+  assert.equal(recomputed.history[0].results.t1.responseTimeMs, 20000);
+  assert.equal(recomputed.history[0].results.t1.points, 2);
+});
+
+test("a lock made when time ran out cannot be resumed", () => {
+  const q = { set: "1", number: 1, question: "Q", option_a: "A", option_b: "B", correct: "A", time_seconds: 30 };
+  let state = round2.startRound2Question({}, q, 1000);
+  state = round2.lockRound2Question(state, 40000);
+  assert.equal(state.lockedRemainingMs, 0);
+  assert.equal(round2.canResumeRound2Question(state), false);
+  assert.equal(round2.resumeRound2Question(state, 41000).status, "locked");
+});

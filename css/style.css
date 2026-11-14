@@ -4620,3 +4620,247 @@ html.is-demo-mode body {
   background: #D99500;
   color: #fff;
 }
+
+/* Icon-only buttons (back, rules, stats, close). */
+.btn.btn-icon {
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+  font-size: 1.35rem;
+  line-height: 1;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.btn.btn-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Round 2 MC bar: one row, every control the same height and shape. */
+.screen-action-bar.r2-bar {
+  flex-wrap: nowrap;
+  gap: 0.75rem;
+}
+
+.r2-bar .screen-left-group,
+.r2-bar .screen-right-group {
+  flex-wrap: nowrap;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.r2-bar-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 3rem;
+  padding: 0 1.1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background-color: var(--surface-elevated);
+  font-weight: 800;
+  font-size: 1.05rem;
+  white-space: nowrap;
+}
+
+.r2-bar-chip.accent {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: #FFFFFF;
+}
+
+.r2-bar .top-timer-box.r2-bar-timer {
+  height: 3rem;
+  padding: 0 1rem;
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+.r2-bar .r2-bar-timer .top-timer-digits {
+  font-size: 2rem;
+}
+
+.r2-bar .btn.r2-bar-main {
+  height: 3rem;
+  padding: 0 1.4rem;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+/* Round 2 results & statistics popup: two tabs, fits the screen without scrolling. */
+.r2-stats-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  width: min(1500px, 96vw);
+  max-height: 92vh;
+  overflow: hidden;
+  padding: clamp(0.9rem, 1.8vw, 1.5rem);
+  box-shadow: var(--shadow-xl);
+  display: flex;
+  flex-direction: column;
+}
+
+.r2-stats-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.r2-stats-tabs {
+  display: inline-flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.r2-stats-tab {
+  border: 2px solid var(--border);
+  background: var(--surface-elevated);
+  color: var(--text-muted);
+  border-radius: 12px;
+  padding: 0.55rem 1.2rem;
+  font-weight: 800;
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+
+.r2-stats-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #FFFFFF;
+}
+
+.r2-stats-body {
+  overflow: hidden;
+}
+
+.r2-stats-caption {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.r2-stats-empty {
+  padding: 3rem 1rem;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.r2-result-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--r2-cols, 3), minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.r2-result-cell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  background: var(--surface-elevated);
+  font-size: 1.02rem;
+}
+
+.r2-result-cell.correct {
+  border-color: #2E7D4F;
+  background: rgba(46, 125, 79, 0.1);
+}
+
+.r2-result-cell.wrong {
+  border-color: #C94A38;
+  background: rgba(201, 74, 56, 0.08);
+}
+
+.r2-result-name {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.r2-result-choice {
+  font-family: var(--font-mono);
+  font-weight: 900;
+  font-size: 1.25rem;
+}
+
+.r2-result-cell.correct .r2-result-choice { color: #2E7D4F; }
+.r2-result-cell.wrong .r2-result-choice { color: #C94A38; }
+.r2-result-cell.none .r2-result-choice { color: var(--text-muted); }
+
+.r2-result-time {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.r2-result-points {
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.r2-stats-tables {
+  display: grid;
+  grid-template-columns: repeat(var(--r2-table-cols, 1), minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.r2-stats-tables .scoreboard-table-wrap {
+  overflow: visible;
+}
+
+/* Round 2 bar fits 1366 px wide projectors in one row. */
+.r2-bar .screen-left-group,
+.r2-bar .screen-right-group {
+  gap: 0.5rem;
+}
+
+.r2-bar .screen-right-group {
+  flex-shrink: 0;
+}
+
+.r2-bar .btn.btn-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  font-size: 1.2rem;
+}
+
+.r2-bar .r2-bar-chip,
+.r2-bar .top-timer-box.r2-bar-timer,
+.r2-bar .btn.r2-bar-main {
+  height: 2.75rem;
+}
+
+.r2-bar .r2-bar-chip {
+  padding: 0 0.85rem;
+  font-size: 1rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.r2-bar .top-timer-box.r2-bar-timer {
+  padding: 0 0.75rem;
+  gap: 0.5rem;
+}
+
+.r2-bar .r2-bar-timer .top-timer-digits {
+  font-size: 1.8rem;
+}
+
+.r2-bar .btn.r2-bar-main {
+  padding: 0 1.1rem;
+  font-size: 1.05rem;
+}

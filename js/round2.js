@@ -16,6 +16,33 @@ export { formatSeconds };
  * @param {number|null} answeredAt - Server timestamp when answer was submitted
  * @returns {number} Response time in milliseconds (>= 0)
  */
+/**
+ * Total pause time (MC locked early, then resumed) that ended before an answer.
+ * Answers cannot arrive during a pause, so whole pauses count.
+ * @param {Array<{from: number, to: number}>|Record<string, {from: number, to: number}>} pauses
+ * @param {number} answeredAt
+ */
+export function getPausedMsBefore(pauses, answeredAt) {
+  const list = Array.isArray(pauses) ? pauses : pauses && typeof pauses === "object" ? Object.values(pauses) : [];
+  const at = Number(answeredAt);
+  if (!Number.isFinite(at)) return 0;
+  let total = 0;
+  for (const p of list) {
+    const from = Number(p?.from);
+    const to = Number(p?.to);
+    if (Number.isFinite(from) && Number.isFinite(to) && to > from && to <= at) {
+      total += to - from;
+    }
+  }
+  return total;
+}
+
+/** The shown time for one answer, moved forward by the pauses before it. */
+export function getAdjustedShownAt(shownAt, answeredAt, pauses) {
+  if (shownAt === undefined || shownAt === null || !Number.isFinite(Number(shownAt))) return shownAt;
+  return Number(shownAt) + getPausedMsBefore(pauses, answeredAt);
+}
+
 export function calculateRound2AnswerTime(shownAt, answeredAt) {
   if (
     shownAt === undefined ||
@@ -492,7 +519,10 @@ export function openRound2QuestionPreview(state, fullQuestion) {
     shownAt: null,
     deadline: null,
     answers: {},
-    results: null
+    results: null,
+    pauses: [],
+    lockedAt: null,
+    lockedRemainingMs: null
   };
 }
 
@@ -509,7 +539,10 @@ export function startRound2Question(state, fullQuestion, serverTime = Date.now()
     shownAt: serverTime,
     deadline: serverTime + durationSec * 1000,
     answers: {},
-    results: null
+    results: null,
+    pauses: [],
+    lockedAt: null,
+    lockedRemainingMs: null
   };
 }
 
@@ -552,13 +585,43 @@ export function submitRound2Answer(state, { teamId, answer, serverTime = Date.no
 /**
  * Locks the question once time is up or host manually locks.
  */
-export function lockRound2Question(state) {
+export function lockRound2Question(state, serverTime) {
   if (state.status !== "open") {
     return state;
   }
+  const locked = { ...state, status: "locked" };
+  // Remember the time left so a mistaken early lock can be undone.
+  if (Number.isFinite(serverTime) && Number.isFinite(state.deadline)) {
+    locked.lockedAt = serverTime;
+    locked.lockedRemainingMs = Math.max(0, state.deadline - serverTime);
+  }
+  return locked;
+}
+
+/** True when an early lock can be undone: the question still had time left. */
+export function canResumeRound2Question(state) {
+  return state?.status === "locked" && Number(state?.lockedRemainingMs) > 0 && Number.isFinite(Number(state?.lockedAt));
+}
+
+/**
+ * Undoes an early lock: reopens the question with the time that was left.
+ * The paused span is recorded so answer times and the time limit leave it out.
+ */
+export function resumeRound2Question(state, serverTime = Date.now()) {
+  if (!canResumeRound2Question(state)) {
+    return state;
+  }
+  const pauses = [
+    ...(Array.isArray(state.pauses) ? state.pauses : state.pauses ? Object.values(state.pauses) : []),
+    { from: Number(state.lockedAt), to: serverTime }
+  ];
   return {
     ...state,
-    status: "locked"
+    status: "open",
+    deadline: serverTime + Number(state.lockedRemainingMs),
+    pauses,
+    lockedAt: null,
+    lockedRemainingMs: null
   };
 }
 
@@ -613,10 +676,11 @@ export function revealRound2Question(
   const answers = state?.answers || {};
   for (const [teamId, record] of Object.entries(answers)) {
     const isCorrect = record.answer === correctLetter;
+    const shownAt = getAdjustedShownAt(state?.shownAt, record.answeredAt, state?.pauses);
     const points = calculateRound2QuestionScore({
       isCorrect,
       answeredAt: record.answeredAt,
-      shownAt: state?.shownAt,
+      shownAt,
       durationSeconds: durationSec,
       pointsPerCorrect
     });
@@ -625,7 +689,7 @@ export function revealRound2Question(
       answer: record.answer,
       isCorrect,
       // Tablets store only the server-side answeredAt, so derive the time here.
-      responseTimeMs: calculateRound2AnswerTime(state?.shownAt, record.answeredAt),
+      responseTimeMs: calculateRound2AnswerTime(shownAt, record.answeredAt),
       points
     };
   }
@@ -755,15 +819,16 @@ export function recomputeRound2FromAnswers({
       const rawAns = String(ansRecord?.answer || "").trim().toUpperCase();
       const isCorrect = rawAns === String(q.correct || "").trim().toUpperCase();
       const answeredAt = Number(ansRecord?.answeredAt) || 0;
+      const answerShownAt = getAdjustedShownAt(shownAt, answeredAt, meta.pauses);
       const points = calculateRound2QuestionScore({
         isCorrect,
         answeredAt,
-        shownAt,
+        shownAt: answerShownAt,
         durationSeconds,
         pointsPerCorrect: ptsPerCorrect
       });
 
-      const responseTimeMs = calculateRound2AnswerTime(shownAt, answeredAt);
+      const responseTimeMs = calculateRound2AnswerTime(answerShownAt, answeredAt);
 
       results[teamId] = {
         answer: rawAns,

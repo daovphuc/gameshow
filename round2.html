@@ -20,12 +20,15 @@
 
   <!-- Modal Thống Kê Vòng 2 -->
   <div id="r2-stats-modal" class="scoreboard-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 9999; align-items: center; justify-content: center; padding: clamp(1rem, 2vw, 2.5rem);">
-    <div class="scoreboard-modal-card" style="background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius-lg); max-width: min(1200px, 94vw); width: 100%; max-height: 90vh; overflow-y: auto; padding: clamp(1.2rem, 2.5vw, 2rem); box-shadow: var(--shadow-xl);">
-      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--border); padding-bottom: 1rem; margin-bottom: 1.25rem;">
-        <h2 style="font-family: var(--font-serif); font-size: clamp(1.3rem, 2.2vw, 1.8rem); margin: 0; color: var(--text);">📊 Bảng Thống Kê Điểm Số &amp; Thứ Hạng Vòng 2</h2>
-        <button type="button" id="btn-close-r2-stats-modal" class="btn btn-outline" style="font-weight: 700;">✕ Đóng</button>
+    <div class="scoreboard-modal-card r2-stats-card">
+      <div class="r2-stats-head">
+        <div class="r2-stats-tabs" role="tablist">
+          <button type="button" role="tab" class="r2-stats-tab" data-tab="results" id="r2-tab-results">Kết quả trả lời</button>
+          <button type="button" role="tab" class="r2-stats-tab" data-tab="table" id="r2-tab-table">Bảng thống kê Vòng 2</button>
+        </div>
+        <button type="button" id="btn-close-r2-stats-modal" class="btn btn-icon" title="Đóng" aria-label="Đóng">✕</button>
       </div>
-      <div id="r2-stats-modal-body"></div>
+      <div id="r2-stats-modal-body" class="r2-stats-body"></div>
     </div>
   </div>
 
@@ -54,13 +57,17 @@
       recomputeRound2FromAnswers,
       calculateRound2AnswerTime,
       openRound2QuestionPreview,
-      shouldAutoLockRound2
+      shouldAutoLockRound2,
+      canResumeRound2Question,
+      resumeRound2Question,
+      getAdjustedShownAt
     } from "./js/round2.js";
     import { formatTimer } from "./js/timer.js";
     import { formatSeconds, shortenTeamName, buildScoreboardRows, renderScoreboardTableHtml } from "./js/leaderboard.js";
     import { computeTeamScores } from "./js/state.js";
     import { get, set, update, listen, getServerTime } from "./js/backend.js";
     import { showLotteryDrawModal } from "./js/draw-ui.js";
+    import { createCountdownSound } from "./js/sound.js";
     import { isTestMode, getRound2DrawPool, getRound2SetLabel } from "./js/draw.js";
 
     let quizData = null;
@@ -84,11 +91,16 @@
     };
 
     let timerInterval = null;
+    // Final 5-second countdown and buzzer on the projector speakers.
+    const countdownSound = createCountdownSound();
     let currentAnswersUnsub = null;
     let autoLockRevealing = false;
     // Latest snapshot of live/ (scores and round 2 stats) for the stats modal.
     let latestLive = null;
     let lastHandledDrawRequest = 0;
+    // Index of an earlier question the MC is looking at again (null = live question).
+    let reviewIdx = null;
+    let statsTab = "results";
 
     function subscribeToQuestionAnswers(questionKey) {
       if (currentAnswersUnsub) {
@@ -99,7 +111,7 @@
       currentAnswersUnsub = listen(`answers/${questionKey}`, async (incomingAnswers) => {
         liveR2.answers = incomingAnswers || {};
         const counterEl = document.getElementById("r2-answered-counter");
-        if (counterEl && quizData) {
+        if (counterEl && quizData && reviewIdx === null) {
           const participatingTeams = getRoundTeams(quizData.teams, quizData.round_order, "round2");
           const count = participatingTeams.filter((t) => liveR2.answers && liveR2.answers[t.id]).length;
           counterEl.textContent = `${count}/${participatingTeams.length} đội đã trả lời`;
@@ -133,7 +145,7 @@
           const ansRecord = liveR2.answers && liveR2.answers[t.id];
           const hasAnswered = Boolean(ansRecord);
           const timeMs = hasAnswered && Number.isFinite(ansRecord.answeredAt) && Number.isFinite(liveR2.shownAt)
-            ? calculateRound2AnswerTime(liveR2.shownAt, ansRecord.answeredAt)
+            ? calculateRound2AnswerTime(getAdjustedShownAt(liveR2.shownAt, ansRecord.answeredAt, liveR2.pauses), ansRecord.answeredAt)
             : (hasAnswered && Number.isFinite(ansRecord.responseTimeMs) ? ansRecord.responseTimeMs : null);
           const timeStr = timeMs !== null ? formatSeconds(timeMs / 1000) : "";
           const shortName = shortenTeamName(t.name) || t.name;
@@ -219,6 +231,7 @@
 
     function startTimerTick() {
       stopTimerTick();
+      countdownSound.reset();
       timerInterval = setInterval(() => {
         if (!liveR2.deadline) return;
         const now = getServerTime();
@@ -226,6 +239,7 @@
         const remainingSec = Math.ceil(remainingMs / 1000);
 
         updateTimerDisplay(remainingSec);
+        countdownSound.update(remainingSec, liveR2.status === "open");
 
         // Auto-lock and auto-reveal when time is up
         if (remainingMs <= 0 && liveR2.status === "open" && !autoLockRevealing) {
@@ -288,6 +302,9 @@
         correct: null,
         explanation: null,
         results: null,
+        pauses: null,
+        lockedAt: null,
+        lockedRemainingMs: null,
         shownAt: liveR2.shownAt,
         deadline: liveR2.deadline,
         [`questionsMeta/${questionKey}`]: liveR2.questionsMeta[questionKey]
@@ -300,11 +317,13 @@
 
     async function handleLockQuestion() {
       stopTimerTick();
-      liveR2 = lockRound2Question(liveR2);
+      liveR2 = lockRound2Question(liveR2, getServerTime());
 
       try {
         await update("live/round2", {
-          status: "locked"
+          status: "locked",
+          lockedAt: liveR2.lockedAt ?? null,
+          lockedRemainingMs: liveR2.lockedRemainingMs ?? null
         });
       } catch (err) {
         showToast(`Không khóa được câu hỏi: ${err?.message || err}`, 6000);
@@ -387,9 +406,13 @@
         // they show that answer as already chosen and lock the buttons.
         results: null,
         shownAt: null,
-        deadline: null
+        deadline: null,
+        pauses: null,
+        lockedAt: null,
+        lockedRemainingMs: null
       });
 
+      reviewIdx = null;
       subscribeToQuestionAnswers(questionKey);
       renderStage();
     }
@@ -415,6 +438,7 @@
     }
 
     async function handleNextQuestion() {
+      reviewIdx = null;
       currentQuestionIdx += 1;
       const questions = getQuestionsInActiveSet();
       if (currentQuestionIdx >= questions.length) {
@@ -511,19 +535,28 @@
         mode: "round2"
       });
 
-      return renderScoreboardTableHtml(rows, {
-        highlightMode: "round2",
-        tableClass: "scoreboard-table modal-scoreboard-table",
-        wrapClass: "scoreboard-table-wrap modal-scoreboard-wrap"
-      });
+      // Many teams: side-by-side tables so the popup never scrolls.
+      const perTable = rows.length > 14 ? Math.ceil(rows.length / Math.ceil(rows.length / 12)) : rows.length || 1;
+      const chunks = [];
+      for (let i = 0; i < rows.length; i += perTable) chunks.push(rows.slice(i, i + perTable));
+      if (chunks.length === 0) chunks.push([]);
+      return `<div class="r2-stats-tables" style="--r2-table-cols: ${chunks.length};">${chunks
+        .map((chunk) => renderScoreboardTableHtml(chunk, {
+          highlightMode: "round2",
+          shortenName: chunks.length > 1,
+          tableClass: "scoreboard-table modal-scoreboard-table",
+          wrapClass: "scoreboard-table-wrap modal-scoreboard-wrap"
+        }))
+        .join("")}</div>`;
     }
 
     function openStatsModal() {
       const modal = document.getElementById("r2-stats-modal");
-      const body = document.getElementById("r2-stats-modal-body");
-      if (!modal || !body) return;
-      body.innerHTML = renderRound2StatsTableHtml();
+      if (!modal) return;
+      // Open on this question's results once revealed, otherwise on the table.
+      statsTab = getPresenterView().status === "revealed" ? "results" : "table";
       modal.style.display = "flex";
+      renderStatsModalBody();
     }
 
     function closeStatsModal() {
@@ -590,9 +623,7 @@
             </div>
 
             <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
-              <button type="button" id="btn-open-rules" class="btn btn-outline" style="font-weight: 600; font-size: 0.95rem;">
-                📜 Thể lệ phần thi
-              </button>
+              <button type="button" id="btn-open-rules" class="btn btn-icon" title="Thể lệ" aria-label="Thể lệ">📜</button>
             </div>
           </div>
         </div>
@@ -607,7 +638,7 @@
                 ? drawPool.length > 0
                   ? `<strong style="color: var(--warning);">Chế độ thử (DEMO):</strong> quay số trong ${drawPool.length} bộ đề thử, các bộ đề chính thức không được dùng.`
                   : `<strong style="color: var(--danger);">Chế độ thử (DEMO):</strong> chưa có bộ đề thử (set "Chạy thử") trong câu hỏi Vòng 2.`
-                : `Bấm nút bên dưới (hoặc bấm nút Quay số từ xa trên iPad) để bốc thăm ngẫu nhiên 1 trong ${drawPool.length} bộ đề chính thức.`
+                : `Bốc thăm ngẫu nhiên 1 trong ${drawPool.length} bộ đề chính thức.`
             }
           </p>
 
@@ -645,9 +676,7 @@
             </div>
 
             <div style="display: flex; gap: 0.75rem; align-items: center;">
-              <button type="button" id="btn-open-rules" class="btn btn-outline" style="font-weight: 600;">
-                📜 Thể lệ
-              </button>
+              <button type="button" id="btn-open-rules" class="btn btn-icon" title="Thể lệ" aria-label="Thể lệ">📜</button>
               <a href="./round3.html" class="btn btn-primary btn-lg">Sang Vòng 3 →</a>
             </div>
           </div>
@@ -664,8 +693,254 @@
       });
     }
 
+    function getHistoryEntry(idx) {
+      return (liveR2.history || []).find((h) => h.questionIndex === idx) || null;
+    }
+
+    // What the MC screen shows: the live question, or an earlier one under review.
+    function getPresenterView() {
+      const questions = getQuestionsInActiveSet();
+      if (reviewIdx !== null && reviewIdx >= 0 && reviewIdx < currentQuestionIdx) {
+        const h = getHistoryEntry(reviewIdx);
+        return {
+          isReview: true,
+          idx: reviewIdx,
+          q: questions[reviewIdx] || null,
+          status: "revealed",
+          answers: h?.answers || {},
+          results: h?.results || {},
+          shownAt: h?.shownAt ?? null
+        };
+      }
+      reviewIdx = null;
+      return {
+        isReview: false,
+        idx: currentQuestionIdx,
+        q: questions[currentQuestionIdx] || null,
+        status: liveR2.status,
+        answers: liveR2.answers || {},
+        results: liveR2.results || null,
+        shownAt: liveR2.shownAt
+      };
+    }
+
+    function getBackAction() {
+      if (reviewIdx !== null) {
+        return { enabled: reviewIdx > 0, title: "Xem lại câu trước" };
+      }
+      switch (liveR2.status) {
+        case "reading":
+          return { enabled: true, title: currentQuestionIdx > 0 ? "Ẩn câu này, quay lại câu trước" : "Ẩn câu hỏi" };
+        case "open":
+          return { enabled: true, title: "Hủy tính giờ, quay lại đọc đề" };
+        case "locked":
+          return { enabled: canResumeRound2Question(liveR2), title: "Mở khóa, tiếp tục tính giờ" };
+        case "revealed":
+          return { enabled: currentQuestionIdx > 0, title: "Xem lại câu trước" };
+        default:
+          return { enabled: false, title: "Quay lại" };
+      }
+    }
+
+    /** Puts an earlier, already revealed question back on all screens (undo "next"). */
+    async function restoreRevealedQuestion(idx) {
+      const q = getQuestionsInActiveSet()[idx];
+      if (!q) return;
+      const qKey = buildQuestionKey(selectedSet, idx);
+      const h = getHistoryEntry(idx);
+      const meta = liveR2.questionsMeta?.[qKey] || {};
+      const pointsPerCorrect = Number(quizData.config?.round2_points_per_correct) || 2;
+
+      currentQuestionIdx = idx;
+      reviewIdx = null;
+      liveR2 = revealRound2Question(
+        {
+          ...liveR2,
+          status: "locked",
+          questionKey: qKey,
+          activeQuestion: filterQuestionForTablet(q),
+          answers: h?.answers || {},
+          shownAt: meta.shownAt ?? h?.shownAt ?? null,
+          deadline: meta.deadline ?? h?.deadline ?? null,
+          pauses: meta.pauses || [],
+          lockedAt: null,
+          lockedRemainingMs: null
+        },
+        q,
+        { pointsPerCorrect }
+      );
+
+      await update("live/round2", {
+        status: "revealed",
+        questionIndex: idx,
+        questionKey: qKey,
+        activeQuestion: filterQuestionForTablet(q),
+        results: liveR2.results,
+        correct: liveR2.correct,
+        explanation: liveR2.explanation || null,
+        shownAt: liveR2.shownAt,
+        deadline: liveR2.deadline,
+        pauses: liveR2.pauses && liveR2.pauses.length ? liveR2.pauses : null,
+        lockedAt: null,
+        lockedRemainingMs: null
+      });
+      subscribeToQuestionAnswers(qKey);
+      renderStage();
+    }
+
+    async function handleResumeQuestion() {
+      const qKey = liveR2.questionKey;
+      liveR2 = resumeRound2Question(liveR2, getServerTime());
+      if (liveR2.status !== "open") return;
+      if (!liveR2.questionsMeta) liveR2.questionsMeta = {};
+      liveR2.questionsMeta[qKey] = {
+        ...(liveR2.questionsMeta[qKey] || {}),
+        shownAt: liveR2.shownAt,
+        deadline: liveR2.deadline,
+        pauses: liveR2.pauses
+      };
+      await update("live/round2", {
+        status: "open",
+        deadline: liveR2.deadline,
+        pauses: liveR2.pauses,
+        lockedAt: null,
+        lockedRemainingMs: null,
+        [`questionsMeta/${qKey}`]: liveR2.questionsMeta[qKey]
+      });
+      autoLockRevealing = false;
+      startTimerTick();
+      renderStage();
+      showToast("Đã mở khóa, tiếp tục tính giờ.");
+    }
+
+    /**
+     * One step back: review the previous question, or undo a mistaken action on
+     * the live one (shown too early, timer started too early, locked too early).
+     * Results of earlier questions are never changed.
+     */
+    async function handleBack() {
+      if (reviewIdx !== null) {
+        if (reviewIdx > 0) reviewIdx -= 1;
+        renderStage();
+        return;
+      }
+      const status = liveR2.status;
+      if (status === "revealed") {
+        if (currentQuestionIdx > 0) {
+          reviewIdx = currentQuestionIdx - 1;
+          renderStage();
+        }
+        return;
+      }
+      if (status === "locked") {
+        await handleResumeQuestion();
+        return;
+      }
+      if (status === "open") {
+        if (Object.keys(liveR2.answers || {}).length > 0) {
+          showToast("Đã có đội gửi đáp án, không thể hủy tính giờ câu này.", 5000);
+          return;
+        }
+        stopTimerTick();
+        const qKey = liveR2.questionKey;
+        liveR2 = { ...liveR2, status: "reading", shownAt: null, deadline: null, pauses: [], lockedAt: null, lockedRemainingMs: null };
+        if (liveR2.questionsMeta) delete liveR2.questionsMeta[qKey];
+        await update("live/round2", {
+          status: "reading",
+          shownAt: null,
+          deadline: null,
+          pauses: null,
+          [`questionsMeta/${qKey}`]: null
+        });
+        renderStage();
+        return;
+      }
+      if (status === "reading") {
+        stopTimerTick();
+        if (currentQuestionIdx === 0) {
+          liveR2 = { ...liveR2, status: "idle", activeQuestion: null, answers: {}, results: null };
+          await update("live/round2", {
+            status: "idle",
+            questionKey: null,
+            activeQuestion: null,
+            correct: null,
+            explanation: null,
+            results: null,
+            shownAt: null,
+            deadline: null
+          });
+          subscribeToQuestionAnswers(null);
+          renderStage();
+          return;
+        }
+        await restoreRevealedQuestion(currentQuestionIdx - 1);
+      }
+    }
+
+    function renderQuestionResultsHtml(view) {
+      const participatingTeams = getRoundTeams(quizData.teams, quizData.round_order, "round2");
+      if (view.status !== "revealed" || !view.results) {
+        return `<div class="r2-stats-empty">Câu ${view.idx + 1} chưa công bố đáp án.</div>`;
+      }
+      const cells = participatingTeams
+        .map((t) => {
+          const res = view.results[t.id];
+          const answered = Boolean(res || view.answers?.[t.id]);
+          const choice = res?.answer || view.answers?.[t.id]?.answer || "—";
+          const timeMs = res && Number.isFinite(res.responseTimeMs) ? res.responseTimeMs : null;
+          const cls = res?.isCorrect ? "correct" : answered ? "wrong" : "none";
+          return `
+            <div class="r2-result-cell ${cls}" title="${escapeHtml(t.name)}">
+              ${renderAvatarHtml(t, "team-avatar-sm")}
+              <span class="r2-result-name">${escapeHtml(shortenTeamName(t.name) || t.name)}</span>
+              <span class="r2-result-choice">${escapeHtml(choice)}</span>
+              <span class="r2-result-time">${answered && timeMs !== null ? formatSeconds(timeMs / 1000) : "—"}</span>
+              <span class="r2-result-points">+${res?.points || 0}đ</span>
+            </div>
+          `;
+        })
+        .join("");
+      const cols = participatingTeams.length > 24 ? 4 : participatingTeams.length > 8 ? 3 : 2;
+      return `
+        <div class="r2-stats-caption">Câu ${view.idx + 1} — đáp án đúng: <strong>${escapeHtml(String(view.q?.correct || "").toUpperCase())}</strong></div>
+        <div class="r2-result-grid" style="--r2-cols: ${cols};">${cells}</div>
+      `;
+    }
+
+    /** Shrinks the open popup so everything fits on screen without scrolling. */
+    function fitStatsModal() {
+      const card = document.querySelector("#r2-stats-modal .r2-stats-card");
+      const body = document.getElementById("r2-stats-modal-body");
+      if (!card || !body) return;
+      body.style.zoom = "1";
+      const head = card.querySelector(".r2-stats-head");
+      const cardStyle = getComputedStyle(card);
+      const padding = parseFloat(cardStyle.paddingTop) + parseFloat(cardStyle.paddingBottom);
+      const available = window.innerHeight * 0.92 - padding - (head?.offsetHeight || 0) - 16;
+      const needed = body.scrollHeight;
+      if (needed > available && needed > 0) {
+        body.style.zoom = String(Math.max(0.45, available / needed));
+      }
+    }
+
+    function renderStatsModalBody() {
+      const body = document.getElementById("r2-stats-modal-body");
+      if (!body) return;
+      const view = getPresenterView();
+      document.getElementById("r2-tab-results").textContent = `Kết quả trả lời (Câu ${view.idx + 1})`;
+      document.getElementById("r2-tab-table").textContent = `Bảng thống kê Vòng 2 (tạm tính đến câu ${view.idx + 1})`;
+      document.querySelectorAll(".r2-stats-tab").forEach((tab) => {
+        const active = tab.dataset.tab === statsTab;
+        tab.classList.toggle("active", active);
+        tab.setAttribute("aria-selected", String(active));
+      });
+      body.innerHTML = statsTab === "results" ? renderQuestionResultsHtml(view) : renderRound2StatsTableHtml();
+      fitStatsModal();
+    }
+
     function renderQuestionPresenter(container) {
-      const q = getCurrentQuestion();
+      const view = getPresenterView();
+      const q = view.q;
       if (!q) {
         renderSummaryStage(container);
         return;
@@ -673,11 +948,12 @@
 
       const totalQuestions = getQuestionsInActiveSet().length;
       const participatingTeams = getRoundTeams(quizData.teams, quizData.round_order, "round2");
-      const answeredCount = participatingTeams.filter((t) => liveR2.answers && liveR2.answers[t.id]).length;
+      const answeredCount = participatingTeams.filter((t) => view.answers && view.answers[t.id]).length;
 
       const durationSec = Number(q.time_seconds) || 30;
-      const isRevealed = liveR2.status === "revealed";
-      const isLocked = liveR2.status === "locked" || isRevealed;
+      const isRevealed = view.status === "revealed";
+      const isStopped = view.status === "locked" || isRevealed;
+      const back = getBackAction();
 
       const allOptions = [
         { letter: "A", text: q.option_a },
@@ -689,7 +965,7 @@
 
       const optionsHtml = options
         .map((opt) => {
-          const isCorrect = isRevealed && q.correct.toUpperCase() === opt.letter;
+          const isCorrect = isRevealed && String(q.correct || "").toUpperCase() === opt.letter;
           return `
             <div class="r2-option-card opt-${opt.letter.toLowerCase()} ${isCorrect ? "revealed-correct" : ""}">
               <span class="opt-letter">${opt.letter}</span>
@@ -700,82 +976,16 @@
         })
         .join("");
 
-      // Results table when revealed
-      let resultsHtml = "";
-      if (isRevealed && liveR2.results) {
-        const teamResultsList = participatingTeams.map((t) => {
-          const res = liveR2.results[t.id];
-          const ansRecord = liveR2.answers?.[t.id];
-          const timeMs = res && Number.isFinite(res.responseTimeMs)
-            ? res.responseTimeMs
-            : (ansRecord && Number.isFinite(ansRecord.answeredAt) && Number.isFinite(liveR2.shownAt)
-              ? calculateRound2AnswerTime(liveR2.shownAt, ansRecord.answeredAt)
-              : null);
-          return {
-            team: t,
-            answered: Boolean(res || ansRecord),
-            choice: res?.answer || ansRecord?.answer || "—",
-            isCorrect: res?.isCorrect || false,
-            timeSec: timeMs !== null ? formatSeconds(timeMs / 1000) : "—",
-            points: res?.points || 0
-          };
-        });
-
-        resultsHtml = `
-          ${
-            q.explanation
-              ? `
-            <div class="panel-card" style="margin-top: 1.5rem; border-left: 5px solid var(--accent); background: var(--surface-2, rgba(255,255,255,0.03)); padding: 1.25rem 1.5rem;">
-              <div style="font-weight: 700; color: var(--accent); font-size: 1.15rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
-                <span>📖 Căn cứ pháp lý &amp; Giải thích đáp án:</span>
-              </div>
-              <div style="font-size: 1.1rem; line-height: 1.6; color: var(--text);">
-                ${escapeHtml(q.explanation)}
-              </div>
-            </div>
-          `
-              : ""
-          }
-
-          <div class="panel-card" style="margin-top: 1.5rem;">
-            <h2 class="panel-title" style="font-size: 1.25rem; font-weight: 700;">Kết quả trả lời của các đội (Câu #${q.number}):</h2>
-            <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem;">
-              ${teamResultsList
-                .map(
-                  (item) => `
-                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border); background-color: var(--surface);">
-                  <div style="display: flex; align-items: center; gap: 0.65rem;">
-                    ${renderAvatarHtml(item.team, "team-avatar-sm")}
-                    <span style="font-weight: 600; font-size: 1.05rem;">${escapeHtml(item.team.name)}</span>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 1rem; font-family: var(--font-mono);">
-                    <span style="font-weight: 800; font-size: 1.25rem; color: ${item.isCorrect ? "#2E7D4F" : "#C94A38"};">
-                      ${item.choice}
-                    </span>
-                    <span style="font-size: 0.95rem; font-weight: 600; color: ${item.isCorrect ? "#2E7D4F" : (item.answered ? "#C94A38" : "var(--text-muted)")}; min-width: 70px; text-align: center;">
-                      ${item.isCorrect ? "✓ Đúng" : (item.answered ? "✗ Sai" : "Chưa trả lời")}
-                    </span>
-                    <span style="font-size: 0.92rem; color: var(--text-muted); min-width: 65px; text-align: right;">${item.answered ? item.timeSec : "—"}</span>
-                    <span style="font-weight: 800; font-size: 1.05rem; color: var(--accent); min-width: 50px; text-align: right;">+${item.points}đ</span>
-                  </div>
-                </div>
-              `
-                )
-                .join("")}
-            </div>
+      const explanationHtml = isRevealed && q.explanation
+        ? `
+          <div class="panel-card" style="margin-top: 1.5rem; border-left: 5px solid var(--accent); background: var(--surface-2, rgba(255,255,255,0.03)); padding: 1.25rem 1.5rem;">
+            <div style="font-weight: 700; color: var(--accent); font-size: 1.15rem; margin-bottom: 0.5rem;">📖 Căn cứ pháp lý &amp; Giải thích đáp án:</div>
+            <div style="font-size: 1.1rem; line-height: 1.6; color: var(--text);">${escapeHtml(q.explanation)}</div>
           </div>
+        `
+        : "";
 
-          <!-- Bảng Thống kê Vòng 2 Tạm Tính -->
-          <div class="panel-card" style="margin-top: 1.5rem;">
-            <h2 class="panel-title">📊 Bảng Thống Kê Vòng 2 (Tạm tính đến câu #${q.number}):</h2>
-            <div style="margin-top: 1rem;">
-              ${renderRound2StatsTableHtml()}
-            </div>
-          </div>
-        `;
-      }
-
-      const liveTeamsListHtml = !isRevealed && liveR2.status !== "idle"
+      const liveTeamsListHtml = !view.isReview && !isRevealed && view.status !== "idle"
         ? `
           <div class="panel-card" style="margin-top: 1.5rem;">
             <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0 0 0.85rem;">
@@ -788,78 +998,55 @@
         `
         : "";
 
+      const timerSeconds = isStopped
+        ? 0
+        : (view.status === "open" && liveR2.deadline)
+          ? Math.max(0, Math.ceil((liveR2.deadline - getServerTime()) / 1000))
+          : durationSec;
+
+      const primaryButton = view.isReview
+        ? `<button type="button" id="btn-review-forward" class="btn btn-primary r2-bar-main">${view.idx + 1 < currentQuestionIdx ? "Câu sau →" : "Về câu hiện tại →"}</button>`
+        : view.status === "idle"
+          ? `<button type="button" id="btn-show-question" class="btn btn-primary r2-bar-main">▶ Bắt đầu</button>`
+          : view.status === "reading"
+            ? `<button type="button" id="btn-open-question" class="btn btn-primary r2-bar-main">▶ Bắt đầu tính giờ</button>`
+            : view.status === "open"
+              ? `<button type="button" id="btn-lock-question" class="btn btn-danger r2-bar-main">🔒 Khóa câu trả lời</button>`
+              : view.status === "locked"
+                ? `<button type="button" id="btn-reveal-question" class="btn btn-primary r2-bar-main">★ Công bố đáp án</button>`
+                : `<button type="button" id="btn-next-question" class="btn btn-primary r2-bar-main">${currentQuestionIdx + 1 < totalQuestions ? "Câu tiếp theo →" : "Tổng kết Vòng 2 →"}</button>`;
+
       container.innerHTML = `
         <div class="question-stage">
-          <!-- Top Action Bar -->
-          <div class="screen-action-bar">
+          <div class="screen-action-bar r2-bar">
             <div class="screen-left-group">
-              <button type="button" id="btn-screen-back" class="btn">
-                ← Bộ đề
-              </button>
-              <span class="meta-pill accent">${escapeHtml(getRound2SetLabel(selectedSet))} • Câu ${currentQuestionIdx + 1}/${totalQuestions}</span>
-              ${q.category ? `<span class="meta-pill" style="background: var(--surface-2, rgba(255,255,255,0.05)); border: 1px solid var(--border); font-size: 0.85rem; font-weight: 700;">Chuyên đề: ${escapeHtml(q.category)}</span>` : ""}
-              <div class="r2-live-counter">
+              <button type="button" id="btn-screen-back" class="btn btn-icon" title="${escapeHtml(back.title)}" aria-label="${escapeHtml(back.title)}" ${back.enabled ? "" : "disabled"}>←</button>
+              <span class="r2-bar-chip accent">${view.isReview ? "Xem lại · " : ""}Câu ${view.idx + 1}/${totalQuestions}</span>
+              <span class="r2-bar-chip">
                 <span>⚡</span>
                 <span id="r2-answered-counter">${answeredCount}/${participatingTeams.length} đội đã trả lời</span>
-              </div>
-              <button type="button" id="btn-toggle-r2-stats" class="btn btn-sm btn-secondary">
-                📊 Thống kê Vòng 2
-              </button>
+              </span>
+              <button type="button" id="btn-toggle-r2-stats" class="btn btn-icon" title="Kết quả &amp; thống kê Vòng 2" aria-label="Kết quả và thống kê Vòng 2">📊</button>
+              <button type="button" id="btn-open-rules" class="btn btn-icon" title="Thể lệ" aria-label="Thể lệ">📜</button>
             </div>
 
             <div class="screen-right-group">
-              <button type="button" id="btn-open-rules" class="btn btn-outline btn-sm">
-                📜 Thể lệ
-              </button>
-
-              <div id="r2-timer-box" class="top-timer-box ${(liveR2.status === "locked" || liveR2.status === "revealed") ? "finished" : ""}">
-                <span id="r2-timer-digits" class="top-timer-digits">${
-                  formatTimer(
-                    (liveR2.status === "locked" || liveR2.status === "revealed")
-                      ? 0
-                      : (liveR2.status === "open" && liveR2.deadline)
-                        ? Math.max(0, Math.ceil((liveR2.deadline - getServerTime()) / 1000))
-                        : durationSec
-                  )
-                }</span>
-                <span id="r2-timer-warning" class="top-timer-warning-text">${
-                  (liveR2.status === "locked" || liveR2.status === "revealed") ? "HẾT GIỜ!" : ""
-                }</span>
+              <div id="r2-timer-box" class="top-timer-box r2-bar-timer ${isStopped ? "finished" : ""}">
+                <span id="r2-timer-digits" class="top-timer-digits">${formatTimer(timerSeconds)}</span>
+                <span id="r2-timer-warning" class="top-timer-warning-text">${isStopped && !view.isReview ? "HẾT GIỜ!" : ""}</span>
               </div>
-
-              ${
-                liveR2.status === "idle"
-                  ? `<button type="button" id="btn-show-question" class="btn btn-primary btn-lg" style="font-weight: 800;">
-                      ▶ Bắt đầu
-                    </button>`
-                : liveR2.status === "reading"
-                  ? `<button type="button" id="btn-open-question" class="btn btn-primary btn-lg" style="font-weight: 800;">
-                      ▶ Bắt đầu tính giờ
-                    </button>`
-                  : liveR2.status === "open"
-                    ? `<button type="button" id="btn-lock-question" class="btn btn-danger btn-lg">
-                        🔒 Khóa câu trả lời
-                      </button>`
-                    : liveR2.status === "locked"
-                      ? `<button type="button" id="btn-reveal-question" class="btn btn-primary btn-lg">
-                          ★ Công bố đáp án
-                        </button>`
-                      : `<button type="button" id="btn-next-question" class="btn btn-primary btn-lg">
-                          ${currentQuestionIdx + 1 < totalQuestions ? "Câu tiếp theo →" : "Xem tổng kết Vòng 2 →"}
-                        </button>`
-              }
+              ${primaryButton}
             </div>
           </div>
 
-          <!-- Question Body or Waiting State -->
           ${
-            liveR2.status === "idle"
+            view.status === "idle"
               ? `<div class="panel-card" style="margin-top: 1.5rem; text-align: center; padding: 4.5rem 2rem;">
                   <span class="meta-pill accent" style="font-size: 1.1rem; padding: 0.35rem 1.25rem;">
-                    Câu ${currentQuestionIdx + 1}/${totalQuestions}
+                    Câu ${view.idx + 1}/${totalQuestions}
                   </span>
                   <h2 style="font-family: var(--font-serif); font-size: 2.2rem; margin: 1.25rem 0 0.75rem;">
-                    ${currentQuestionIdx === 0 ? escapeHtml(getRound2SetLabel(selectedSet)) : `Sẵn Sàng Cho Câu Hỏi Số ${currentQuestionIdx + 1}`}
+                    ${view.idx === 0 ? escapeHtml(getRound2SetLabel(selectedSet)) : `Sẵn Sàng Cho Câu Hỏi Số ${view.idx + 1}`}
                   </h2>
                   <p style="color: var(--text-muted); font-size: 1.15rem; max-width: 520px; margin: 0 auto;">
                     Bấm <strong>"▶ Bắt đầu"</strong> để hiện câu hỏi cho MC đọc.
@@ -874,7 +1061,6 @@
                         </div>`
                       : ""
                   }
-
                   <div class="round2-options-grid">
                     ${optionsHtml}
                   </div>
@@ -882,22 +1068,20 @@
           }
 
           ${liveTeamsListHtml}
-          ${resultsHtml}
+          ${explanationHtml}
         </div>
       `;
 
-      document.getElementById("btn-screen-back")?.addEventListener("click", () => {
-        stopTimerTick();
-        currentQuestionIdx = 0;
-        liveR2.status = "idle";
-        renderStage();
-      });
-
+      document.getElementById("btn-screen-back")?.addEventListener("click", handleBack);
       document.getElementById("btn-open-rules")?.addEventListener("click", () => {
         showingRules = true;
         renderStage();
       });
       document.getElementById("btn-toggle-r2-stats")?.addEventListener("click", openStatsModal);
+      document.getElementById("btn-review-forward")?.addEventListener("click", () => {
+        reviewIdx = reviewIdx !== null && reviewIdx + 1 < currentQuestionIdx ? reviewIdx + 1 : null;
+        renderStage();
+      });
       document.getElementById("btn-open-question")?.addEventListener("click", handleStartQuestion);
       document.getElementById("btn-show-question")?.addEventListener("click", handleOpenQuestionPreview);
       document.getElementById("btn-lock-question")?.addEventListener("click", handleLockQuestion);
@@ -936,6 +1120,15 @@
 
       // Wire close modal
       document.getElementById("btn-close-r2-stats-modal")?.addEventListener("click", closeStatsModal);
+      document.querySelectorAll(".r2-stats-tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          statsTab = tab.dataset.tab === "results" ? "results" : "table";
+          renderStatsModalBody();
+        });
+      });
+      window.addEventListener("resize", () => {
+        if (document.getElementById("r2-stats-modal")?.style.display === "flex") fitStatsModal();
+      });
       document.getElementById("r2-stats-modal")?.addEventListener("click", (e) => {
         if (e.target.id === "r2-stats-modal") closeStatsModal();
       });
@@ -976,6 +1169,9 @@
       liveR2.shownAt = remoteR2.shownAt || null;
       liveR2.deadline = remoteR2.deadline || null;
       liveR2.questionKey = remoteR2.questionKey || buildQuestionKey(selectedSet, currentQuestionIdx);
+      liveR2.pauses = Array.isArray(remoteR2.pauses) ? remoteR2.pauses : remoteR2.pauses ? Object.values(remoteR2.pauses) : [];
+      liveR2.lockedAt = remoteR2.lockedAt ?? null;
+      liveR2.lockedRemainingMs = remoteR2.lockedRemainingMs ?? null;
 
       if (liveR2.status === "reading" || liveR2.status === "open" || liveR2.status === "locked" || liveR2.status === "revealed") {
         liveR2.activeQuestion = remoteR2.activeQuestion || getCurrentQuestion();

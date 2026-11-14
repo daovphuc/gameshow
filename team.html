@@ -25,7 +25,7 @@
     } from "./js/app.js";
     import { resolveImageUrl } from "./js/data.js";
     import { isTeamInRound, isTeamInContest } from "./js/content.js";
-    import { calculateRound2AnswerTime, formatSeconds } from "./js/round2.js";
+    import { calculateRound2AnswerTime, formatSeconds, getAdjustedShownAt } from "./js/round2.js";
     import { formatTimer } from "./js/timer.js";
     import { set, listen, getServerTime, serverTimestamp, onStatusChange } from "./js/backend.js";
     import { getActiveSession } from "./js/auth.js";
@@ -156,7 +156,7 @@
         choiceBtn.classList.add("selected");
       }
 
-      const responseTimeMs = calculateRound2AnswerTime(r2.shownAt, now);
+      const responseTimeMs = calculateRound2AnswerTime(getAdjustedShownAt(r2.shownAt, now, r2.pauses), now);
       const timeStr = formatSeconds(responseTimeMs / 1000);
 
       const statusNote = document.getElementById("team-answer-status");
@@ -379,7 +379,7 @@
       const chosenLetter = typeof mySavedAnswer === "object" ? mySavedAnswer?.answer : mySavedAnswer;
       const ansTime = typeof mySavedAnswer === "object" ? mySavedAnswer?.answeredAt : null;
       const responseTimeMs = ansTime && Number.isFinite(ansTime) && Number.isFinite(r2.shownAt)
-        ? calculateRound2AnswerTime(r2.shownAt, ansTime)
+        ? calculateRound2AnswerTime(getAdjustedShownAt(r2.shownAt, ansTime, r2.pauses), ansTime)
         : (typeof mySavedAnswer === "object" && Number.isFinite(mySavedAnswer?.responseTimeMs) ? mySavedAnswer.responseTimeMs : null);
       const timeStr = responseTimeMs !== null ? ` — Đã trả lời sau ${formatSeconds(responseTimeMs / 1000)}` : "";
 
