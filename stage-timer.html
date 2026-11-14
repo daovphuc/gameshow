@@ -17,12 +17,6 @@
         <span id="st-round-title" class="stage-timer-round">HỘI THI PCCC &amp; CNCH</span>
         <span id="st-phase-badge" class="stage-timer-phase-badge" style="display: none;">CHUẨN BỊ</span>
       </div>
-
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <button type="button" id="btn-st-fullscreen" class="btn btn-sm" title="Toàn màn hình">
-          ⛶ Toàn màn hình
-        </button>
-      </div>
     </header>
 
     <!-- Center: Massive Digits Readable from 10m -->
@@ -43,11 +37,6 @@
           </div>
           <div id="st-team-name" class="stage-timer-team-name">Chưa có đội</div>
         </div>
-      </div>
-
-      <div id="st-topic-slot" style="max-width: 650px; text-align: right; display: none;">
-        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Nội dung thi đấu</div>
-        <div id="st-topic-text" style="font-size: clamp(1.05rem, 1.6vw, 1.35rem); font-weight: 700; line-height: 1.35;"></div>
       </div>
     </footer>
   </div>
@@ -81,14 +70,6 @@
       tickInterval = setInterval(() => {
         updateTimerTick();
       }, 100);
-
-      document.getElementById("btn-st-fullscreen")?.addEventListener("click", () => {
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(() => {});
-        } else {
-          document.exitFullscreen().catch(() => {});
-        }
-      });
     }
 
     function updateStageDisplay() {
@@ -100,8 +81,6 @@
       const phaseBadgeEl = document.getElementById("st-phase-badge");
       const teamNameEl = document.getElementById("st-team-name");
       const avatarSlotEl = document.getElementById("st-team-avatar-slot");
-      const topicSlotEl = document.getElementById("st-topic-slot");
-      const topicTextEl = document.getElementById("st-topic-text");
 
       // 1. Round Title & Phase Badge
       if (currentRound === "round1") {
@@ -139,24 +118,13 @@
       if (currentRound === "round2") {
         if (teamNameEl) teamNameEl.textContent = "TẤT CẢ CÁC ĐỘI THI ĐẤU";
         if (avatarSlotEl) avatarSlotEl.innerHTML = `<div class="team-avatar team-avatar-sm" style="--team-color: var(--accent); background: var(--accent);">⚡</div>`;
-        if (topicSlotEl) topicSlotEl.style.display = "none";
       } else if (stageTeamId) {
         const team = (quizData.allTeams || quizData.teams || []).find((t) => t.id === stageTeamId) || { name: stageTeamId };
         if (teamNameEl) teamNameEl.textContent = team.name || stageTeamId;
         if (avatarSlotEl) avatarSlotEl.innerHTML = renderAvatarHtml(team, "team-avatar-lg");
-
-        // Topic in R1 / R3
-        const topic = liveState.round1?.activeSession?.packageQuestion || liveState.round3?.activeTile?.question;
-        if (topic && topicSlotEl && topicTextEl) {
-          topicSlotEl.style.display = "block";
-          topicTextEl.textContent = topic;
-        } else if (topicSlotEl) {
-          topicSlotEl.style.display = "none";
-        }
       } else {
         if (teamNameEl) teamNameEl.textContent = "Chờ đội lên sân khấu";
         if (avatarSlotEl) avatarSlotEl.innerHTML = "";
-        if (topicSlotEl) topicSlotEl.style.display = "none";
       }
 
       updateTimerTick();

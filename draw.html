@@ -35,13 +35,7 @@
     <!-- Center Card -->
     <main class="draw-remote-card">
       <div>
-        <div id="draw-round-pill" class="meta-pill accent" style="margin-bottom: 0.75rem;">VÒNG THI</div>
-        <h1 id="draw-action-title" style="font-family: var(--font-serif); font-size: clamp(1.6rem, 3.8vw, 2.4rem); margin: 0 0 0.5rem;">
-          Bốc Thăm Quay Số
-        </h1>
-        <p id="draw-action-desc" style="color: var(--text-muted); font-size: 1.05rem; margin: 0;">
-          Bấm nút bên dưới để bắt đầu lồng quay số ngẫu nhiên trên màn hình sân khấu.
-        </p>
+        <div id="draw-round-pill" class="meta-pill accent">VÒNG THI</div>
       </div>
 
       <!-- Giant Draw Button -->
@@ -195,7 +189,6 @@
       const btn = document.getElementById("btn-giant-draw");
       const statusBox = document.getElementById("draw-status-box");
       const roundPill = document.getElementById("draw-round-pill");
-      const titleEl = document.getElementById("draw-action-title");
 
       const currentRound = liveState.currentRound || "round1";
       const cfg = quizData?.config || {};
@@ -206,13 +199,6 @@
           : (cfg.round3_name || "Xử lý tình huống");
 
       if (roundPill) roundPill.textContent = `VÒNG THI: ${roundName.toUpperCase()}`;
-      if (titleEl) {
-        titleEl.textContent = currentRound === "round1"
-          ? "Quay Số Chủ Đề Tuyên Truyền"
-          : currentRound === "round2"
-            ? "Quay Số Bộ Đề Trắc Nghiệm"
-            : "Quay Số Tình Huống";
-      }
 
       const draw = liveState.draw || {};
       const stageTeamId = liveState.stageTeamId || liveState.round1?.activeSession?.teamId || liveState.round3?.activeTile?.selectedTeamId;
