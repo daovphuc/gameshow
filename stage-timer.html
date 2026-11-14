@@ -57,6 +57,7 @@
     import { formatTimer, getRemainingSeconds } from "./js/timer.js";
     import { listen, getServerTime } from "./js/backend.js";
     import { getActiveSession, isRoleAllowedForPortal } from "./js/auth.js";
+    import { getRound3PhaseSeconds } from "./js/state.js";
 
     let quizData = null;
     let liveState = null;
@@ -123,9 +124,13 @@
         if (roundTitleEl) roundTitleEl.textContent = `VÒNG 3: ${cfg.round3_name || "XỬ LÝ TÌNH HUỐNG"}`.toUpperCase();
         if (phaseBadgeEl) {
           const tileNum = liveState.round3?.activeTile?.number;
+          const r3Phase = liveState.round3?.activeTile?.phase === "answer" ? "answer" : "prep";
+          const r3Secs = getRound3PhaseSeconds(cfg);
           phaseBadgeEl.style.display = tileNum ? "inline-flex" : "none";
-          phaseBadgeEl.className = "stage-timer-phase-badge";
-          phaseBadgeEl.textContent = tileNum ? `TÌNH HUỐNG Ô SỐ ${tileNum}` : "XỬ LÝ TÌNH HUỐNG";
+          phaseBadgeEl.className = `stage-timer-phase-badge ${r3Phase === "prep" ? "prep" : "performance"}`;
+          phaseBadgeEl.textContent = tileNum
+            ? `Ô SỐ ${tileNum} • ${r3Phase === "prep" ? `CHUẨN BỊ (${Math.round(r3Secs.prep / 60)} PHÚT)` : `TRẢ LỜI (${Math.round(r3Secs.answer / 60)} PHÚT)`}`
+            : "XỬ LÝ TÌNH HUỐNG";
         }
       }
 
@@ -199,14 +204,15 @@
       } else {
         const r3Timer = liveState.round3?.timer;
         if (r3Timer?.startedAt && r3Timer?.status === "running") {
-          remainingSec = getRemainingSeconds(r3Timer.durationSeconds || 420, r3Timer.startedAt, now);
+          remainingSec = getRemainingSeconds(r3Timer.durationSeconds || 300, r3Timer.startedAt, now);
           isRunning = remainingSec > 0;
           isFinished = remainingSec <= 0 || r3Timer.status === "finished";
         } else if (r3Timer?.status === "finished") {
           remainingSec = 0;
           isFinished = true;
         } else {
-          remainingSec = Number(quizData?.config?.round3_time_seconds) || 420;
+          const r3Secs = getRound3PhaseSeconds(quizData?.config);
+          remainingSec = liveState.round3?.activeTile?.phase === "answer" ? r3Secs.answer : r3Secs.prep;
         }
       }
 

@@ -103,20 +103,25 @@
       let title = "BỐC THĂM QUAY SỐ";
       let getLabel = (it) => (it?.label || it?.name || it?.id || String(it));
 
+      // The MC page writes the exact balls it drew from (`pool`), so this
+      // screen shows the same drum: same balls, same count, same result.
+      const pool = Array.isArray(draw.pool) ? draw.pool.map(String) : null;
+      const inPool = (key) => !pool || pool.includes(String(key));
+
       if (round === "round1") {
-        items = quizData?.round1Packages || [];
+        items = (quizData?.round1Packages || []).filter((p) => inPool(p.id));
         fixedItem = items.find((p) => p.id === draw.result) || { id: draw.result };
         title = "BỐC THĂM CHỦ ĐỀ VÒNG 1";
         getLabel = (pkg) => getRound1TopicLabel(pkg);
       } else if (round === "round2") {
         const questions = quizData?.round2Questions || [];
-        const sets = [...new Set(questions.map((q) => q.set))].filter((s) => !isRehearsalSet(s));
+        const sets = pool || [...new Set(questions.map((q) => q.set))].filter((s) => !isRehearsalSet(s));
         items = sets.length > 0 ? sets : [draw.result];
         fixedItem = draw.result;
         title = "BỐC THĂM BỘ ĐỀ VÒNG 2";
         getLabel = (setKey) => (typeof setKey === "object" ? (setKey.label || setKey.id || "Bộ đề") : `Bộ đề số ${setKey}`);
       } else if (round === "round3") {
-        items = quizData?.round3Questions || [];
+        items = (quizData?.round3Questions || []).filter((q) => inPool(q.number));
         fixedItem = items.find((q) => q.number === Number(draw.result)) || { number: draw.result, points: 30 };
         title = "BỐC THĂM Ô TÌNH HUỐNG VÒNG 3";
         getLabel = (tile) => `Ô số ${tile.number ?? tile} (${tile.points ?? 30}đ)`;
